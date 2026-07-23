@@ -14,7 +14,7 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   { id: 'combat-dagger', name: 'Combat Dagger', baseSpriteId: '87', valueRange: [10, 35], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['weapon'] },
   { id: 'battle-axe', name: 'Battle Axe', baseSpriteId: '90', valueRange: [30, 80], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['weapon'] },
   { id: 'hunting-bow', name: 'Hunting Bow', baseSpriteId: '99', valueRange: [25, 70], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['weapon', 'bow'] },
-  { id: 'compound-bow', name: 'Compound Bow', baseSpriteId: '100', valueRange: [35, 90], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['weapon', 'bow'] },
+  { id: 'crossbow', name: 'Crossbow', baseSpriteId: '100', valueRange: [35, 90], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['weapon', 'bow'] },
   { id: 'arcane-staff', name: 'Arcane Staff', baseSpriteId: '105', valueRange: [40, 120], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['weapon', 'staff'], scoreScaling: 'investment' },
   { id: 'riot-shield', name: 'Riot Shield', baseSpriteId: '97', valueRange: [20, 55], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['weapon'] },
 
@@ -34,7 +34,7 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   // --- Tools (broad trait: tool) ---
   { id: 'pickaxe', name: 'Pickaxe', baseSpriteId: '162', valueRange: [10, 30], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['tool'], secondPriceRebate: true },
   { id: 'rusted-lantern', name: 'Rusted Lantern', baseSpriteId: '169', valueRange: [8, 25], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'timeRefund', timeRefund: { mode: 'catchup', amountMs: 15_000 }, traits: ['tool'] },
-  { id: 'signal-hourglass', name: 'Signal Hourglass', baseSpriteId: '175', valueRange: [15, 40], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'timeRefund', timeRefund: { mode: 'flat', amountMs: 8_000 }, traits: ['tool'] },
+  // { id: 'signal-hourglass', name: 'Signal Hourglass', baseSpriteId: '175', valueRange: [15, 40], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'timeRefund', timeRefund: { mode: 'flat', amountMs: 8_000 }, traits: ['tool'] },
   { id: 'apothecary-kit', name: 'Apothecary Kit', baseSpriteId: '188', valueRange: [12, 35], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['tool'] },
   { id: 'bear-trap', name: 'Bear Trap', baseSpriteId: '174', valueRange: [10, 28], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['tool'] },
 
@@ -54,10 +54,10 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   { id: 'aged-cheese', name: 'Aged Cheese', baseSpriteId: '247', valueRange: [8, 20], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['food'] },
   { id: 'chocolate-cake', name: 'Chocolate Cake', baseSpriteId: '253', valueRange: [10, 30], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['food', 'dessert'] },
   { id: 'candy', name: 'Candy', baseSpriteId: '252', valueRange: [5, 18], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['food', 'dessert'] },
-  { id: 'smoked-turkey-leg', name: 'Smoked Turkey Leg', baseSpriteId: '239', valueRange: [8, 22], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['food'] },
+  { id: 'floor-chicken', name: 'Floor Chicken', baseSpriteId: '239', valueRange: [8, 22], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['food'] },
 
   // --- Aquatic (broad trait: aquatic) ---
-  { id: 'fishing-lure', name: 'Fishing Lure', baseSpriteId: '259', valueRange: [5, 20], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['aquatic'], secondPriceRebate: true },
+  { id: 'rainbow-trout', name: 'Rainbow Trout', baseSpriteId: '259', valueRange: [5, 20], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['aquatic'], secondPriceRebate: true },
   { id: 'pickled-jellyfish', name: 'Pickled Jellyfish', baseSpriteId: '264', valueRange: [8, 25], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['aquatic'] },
   { id: 'dried-octopus', name: 'Dried Octopus', baseSpriteId: '265', valueRange: [10, 30], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['aquatic'] },
 ];

@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import type { ItemInstance, Player, Round, RoomState, ScoreBreakdown } from 'shared';
+import type { ChatMessage, ItemInstance, Player, Round, RoomState, ScoreBreakdown } from 'shared';
 import { getTemplate, getTraitDefinition } from 'shared';
 import { socket } from './socket';
 import { Logo } from './Logo';
 import { Game } from './Game';
 import { PortraitIcon } from './PortraitIcon';
+import { Chat } from './Chat';
 
 interface CurrentRound {
   round: Round;
@@ -33,6 +34,7 @@ export default function App() {
   const [knownItems, setKnownItems] = useState<Record<string, ItemInstance>>({});
   const [gameOverPlayers, setGameOverPlayers] = useState<Player[] | null>(null);
   const [scores, setScores] = useState<ScoreBreakdown[] | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 
   useEffect(() => {
     socket.connect();
@@ -77,6 +79,8 @@ export default function App() {
       setGameOverPlayers(payload.players);
       setScores(payload.scores);
     };
+    const onChatHistory = (history: ChatMessage[]) => setChatMessages(history);
+    const onChatMessage = (message: ChatMessage) => setChatMessages((prev) => [...prev, message].slice(-100));
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
@@ -86,6 +90,8 @@ export default function App() {
     socket.on('bidder_dropped', onBidderDropped);
     socket.on('round_end', onRoundEnd);
     socket.on('game_over', onGameOver);
+    socket.on('chat_history', onChatHistory);
+    socket.on('chat_message', onChatMessage);
 
     return () => {
       socket.off('connect', onConnect);
@@ -96,6 +102,8 @@ export default function App() {
       socket.off('bidder_dropped', onBidderDropped);
       socket.off('round_end', onRoundEnd);
       socket.off('game_over', onGameOver);
+      socket.off('chat_history', onChatHistory);
+      socket.off('chat_message', onChatMessage);
       socket.disconnect();
     };
   }, []);
@@ -122,8 +130,10 @@ export default function App() {
     </main>
   );
 
+  let screen: ReactNode;
+
   if (!joined) {
-    return (
+    screen = (
       <main className="app-shell">
         <Logo scale={5} />
         <div className="panel">
@@ -141,12 +151,10 @@ export default function App() {
         </div>
       </main>
     );
-  }
-
-  if (gameOverPlayers && scores) {
+  } else if (gameOverPlayers && scores) {
     const ranked = [...scores].sort((a, b) => b.total - a.total);
 
-    return shellWithHeader(
+    screen = shellWithHeader(
       <div className="panel">
         <h2 className="panel-title">Game Over</h2>
         <ol className="results-list">
@@ -190,12 +198,10 @@ export default function App() {
         </button>
       </div>
     );
-  }
-
-  if (!room) return shellWithHeader(<p className="status-line">Loading…</p>);
-
-  if (room.status === 'lobby') {
-    return shellWithHeader(
+  } else if (!room) {
+    screen = shellWithHeader(<p className="status-line">Loading…</p>);
+  } else if (room.status === 'lobby') {
+    screen = shellWithHeader(
       <div className="panel">
         <h2 className="panel-title">Lobby</h2>
         <ul className="player-row">
@@ -211,23 +217,30 @@ export default function App() {
           ))}
         </ul>
         <button className="btn btn-block" style={{ marginTop: '1rem' }} onClick={() => socket.emit('start_game')}>
-          Start Game
+          START GAME
         </button>
       </div>
     );
+  } else {
+    screen = shellWithHeader(
+      <Game
+        players={room.players}
+        myId={myId!}
+        currentRound={currentRound}
+        liveTimes={liveTimes}
+        liveBids={liveBids}
+        droppedThisRound={droppedThisRound}
+        lastResult={lastResult}
+        onHoldStart={() => socket.emit('hold_start')}
+        onHoldRelease={() => socket.emit('hold_release')}
+      />
+    );
   }
 
-  return shellWithHeader(
-    <Game
-      players={room.players}
-      myId={myId!}
-      currentRound={currentRound}
-      liveTimes={liveTimes}
-      liveBids={liveBids}
-      droppedThisRound={droppedThisRound}
-      lastResult={lastResult}
-      onHoldStart={() => socket.emit('hold_start')}
-      onHoldRelease={() => socket.emit('hold_release')}
-    />
+  return (
+    <>
+      {screen}
+      <Chat messages={chatMessages} onSend={(text) => socket.emit('send_chat', { name: name || 'Guest', text })} />
+    </>
   );
 }

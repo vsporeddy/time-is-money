@@ -82,6 +82,13 @@ export interface RoomState {
   currentRoundIndex: number;
 }
 
+export interface ChatMessage {
+  id: string;
+  name: string;
+  text: string;
+  ts: number;
+}
+
 // --- Socket event contract ---
 // A single global room — no room codes. Everyone who joins is in the same game.
 
@@ -94,6 +101,7 @@ export interface ClientToServerEvents {
   hold_start: () => void;
   hold_release: () => void;
   restart_game: () => void;
+  send_chat: (payload: { name: string; text: string }) => void;
 }
 
 export interface ScoreBreakdown {
@@ -114,4 +122,6 @@ export interface ServerToClientEvents {
   bidder_dropped: (payload: { roundId: string; playerId: string; committedMs: number }) => void;
   round_end: (payload: { round: Round; item: ItemInstance }) => void;
   game_over: (payload: { players: Player[]; scores: ScoreBreakdown[] }) => void;
+  chat_history: (messages: ChatMessage[]) => void;
+  chat_message: (message: ChatMessage) => void;
 }

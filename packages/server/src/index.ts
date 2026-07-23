@@ -5,6 +5,7 @@ import type { ClientToServerEvents, Player, ServerToClientEvents } from 'shared'
 import { randomPortraitIndex } from 'shared';
 import { getRoom, toRoomState } from './rooms.js';
 import { handleHoldRelease, handleHoldStart, restartGame, startGame, tickRoom } from './round.js';
+import { addChatMessage, getChatHistory } from './chat.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -18,6 +19,13 @@ app.get('/health', (_req, res) => {
 });
 
 io.on('connection', (socket) => {
+  socket.emit('chat_history', getChatHistory());
+
+  socket.on('send_chat', ({ name, text }) => {
+    const message = addChatMessage(name, text);
+    if (message) io.emit('chat_message', message);
+  });
+
   socket.on('join_room', ({ playerName }, ack) => {
     const name = playerName.trim().slice(0, 20);
 
