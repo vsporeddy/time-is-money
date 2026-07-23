@@ -1,6 +1,8 @@
 // Core domain types, shared between client and server.
 
 export * from './items.js';
+export * from './traits.js';
+export * from './scoring.js';
 
 export interface Player {
   id: string;
@@ -11,6 +13,11 @@ export interface Player {
   connected: boolean;
 }
 
+export interface TimeRefundConfig {
+  mode: 'flat' | 'catchup';
+  amountMs: number; // flat: refund is exactly this; catchup: this is the max, scaled down as the winner's remaining time increases
+}
+
 export interface ItemTemplate {
   id: string;
   name: string;
@@ -18,7 +25,12 @@ export interface ItemTemplate {
   valueRange: [number, number];
   materials: string[];
   rarities: string[];
-  effectType: 'none' | 'timeRefund'; // stretch goal hook, unused for now
+  effectType: 'none' | 'timeRefund';
+  timeRefund?: TimeRefundConfig; // present when effectType === 'timeRefund'
+  traits: string[]; // TraitDefinition ids this template's items count toward (category traits, may nest)
+  scoreScaling?: 'investment' | 'bargain'; // scores based on time spent winning it, instead of/alongside trueValue
+  loner?: number; // bonus applied only if this is the sole copy of this template in a player's stash
+  secondPriceRebate?: boolean; // winner only "pays" the runner-up's committed time, rest refunded
 }
 
 export interface ItemInstance {
@@ -27,6 +39,7 @@ export interface ItemInstance {
   material: string;
   rarity: string;
   trueValue: number;
+  hiddenTraitId?: string; // secret like trueValue — stripped from round_start, revealed at round_end
   visual: {
     baseSpriteId: string;
     paletteId: string;
@@ -83,12 +96,22 @@ export interface ClientToServerEvents {
   hold_release: () => void;
 }
 
+export interface ScoreBreakdown {
+  playerId: string;
+  baseValue: number; // sum of trueValue after diminishing-returns-on-duplicates
+  hiddenTraitBonus: number;
+  scoreScalingBonus: number; // investment/bargain, from price paid
+  lonerBonus: number;
+  traitBonuses: { traitId: string; count: number; bonus: number }[];
+  total: number;
+}
+
 export interface ServerToClientEvents {
   room_state: (state: RoomState) => void;
-  round_start: (payload: { round: Round; item: Omit<ItemInstance, 'trueValue'> }) => void;
+  round_start: (payload: { round: Round; item: Omit<ItemInstance, 'trueValue' | 'hiddenTraitId'> }) => void;
   round_tick: (payload: { players: Record<string, number>; bidders: Record<string, number> }) => void;
   reveal: (payload: { roundId: string; field: string; value: string | number }) => void;
   bidder_dropped: (payload: { roundId: string; playerId: string; committedMs: number }) => void;
   round_end: (payload: { round: Round; item: ItemInstance }) => void;
-  game_over: (payload: { players: Player[] }) => void;
+  game_over: (payload: { players: Player[]; scores: ScoreBreakdown[] }) => void;
 }

@@ -1,6 +1,6 @@
 import type { Server } from 'socket.io';
-import type { ClientToServerEvents, Round, ServerToClientEvents } from 'shared';
-import { rollItemInstance } from 'shared';
+import type { ClientToServerEvents, Round, ServerToClientEvents, TimeRefundConfig } from 'shared';
+import { computeScores, getTemplate, rollItemInstance } from 'shared';
 import { toRoomState } from './rooms.js';
 import type { Room } from './rooms.js';
 
@@ -155,6 +155,19 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
   if (ar.noBidTimer) clearTimeout(ar.noBidTimer);
   if (ar.maxDurationTimer) clearTimeout(ar.maxDurationTimer);
 
+  const template = getTemplate(ar.item.templateId);
+
+  // The highest amount any already-folded bidder paid this round — the
+  // "runner-up" price. Second-price-rebate items only charge the winner up
+  // to this, refunding the rest as time (uncontested wins already cost
+  // almost nothing; this covers the contested case too).
+  const secondPrice = Math.max(
+    0,
+    ...Object.values(ar.round.bidders)
+      .filter((b) => b.droppedAt !== null)
+      .map((b) => b.committedMs)
+  );
+
   // Whoever is still mid-hold at resolution (normally just the winner, but
   // possibly several in a max-duration stalemate) has to pay for that time
   // now — resolving doesn't happen via their own release, so nothing else
@@ -165,17 +178,22 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
     const player = room.players.get(playerId);
     if (!bidder || !player) continue;
 
-    const elapsed = now - startedAt;
-    player.timeRemainingMs = Math.max(0, player.timeRemainingMs - elapsed);
+    const isWinner = playerId === winnerId;
+    const rawElapsed = now - startedAt;
+    const netElapsed = isWinner && template?.secondPriceRebate ? Math.min(rawElapsed, secondPrice) : rawElapsed;
+
+    player.timeRemainingMs = Math.max(0, player.timeRemainingMs - netElapsed);
     if (player.timeRemainingMs <= 0) {
       player.timeRemainingMs = 0;
       player.status = 'out_of_time';
     }
 
     bidder.isHolding = false;
-    bidder.committedMs = elapsed;
+    bidder.committedMs = netElapsed;
     bidder.droppedAt = now;
     ar.holdStartedAt.delete(playerId);
+
+    if (isWinner) room.itemPricePaidMs.set(ar.item.id, netElapsed);
   }
 
   ar.round.status = 'resolved';
@@ -186,6 +204,18 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
     if (winner) {
       winner.stash.push(ar.item.id);
       room.wonItems.set(ar.item.id, ar.item);
+
+      if (!room.itemPricePaidMs.has(ar.item.id)) {
+        room.itemPricePaidMs.set(ar.item.id, ar.round.bidders[winnerId]?.committedMs ?? 0);
+      }
+
+      if (template?.effectType === 'timeRefund' && template.timeRefund) {
+        const refund = computeTimeRefund(template.timeRefund, winner.timeRemainingMs, room.settings.startingTimeMs);
+        if (refund > 0) {
+          winner.timeRemainingMs += refund;
+          if (winner.status === 'out_of_time') winner.status = 'active';
+        }
+      }
     }
   }
 
@@ -204,14 +234,24 @@ function finishGame(room: Room, io: IO) {
   room.status = 'game_over';
   room.activeRound = null;
   io.to(room.code).emit('room_state', toRoomState(room));
-  io.to(room.code).emit('game_over', { players: [...room.players.values()] });
+
+  const players = [...room.players.values()];
+  const scores = computeScores(players, room.wonItems, room.itemPricePaidMs);
+  io.to(room.code).emit('game_over', { players, scores });
 }
 
 function emitRoundStart(room: Room, io: IO) {
   const ar = room.activeRound;
   if (!ar) return;
-  const { trueValue: _trueValue, ...publicItem } = ar.item;
+  const { trueValue: _trueValue, hiddenTraitId: _hiddenTraitId, ...publicItem } = ar.item;
   io.to(room.code).emit('round_start', { round: ar.round, item: publicItem });
+}
+
+function computeTimeRefund(config: TimeRefundConfig, currentTimeRemainingMs: number, startingTimeMs: number): number {
+  if (config.mode === 'flat') return config.amountMs;
+  // catchup: full amount at ~0 remaining time, scaling down to 0 once back at/above starting time
+  const ratio = Math.max(0, 1 - currentTimeRemainingMs / startingTimeMs);
+  return Math.round(config.amountMs * ratio);
 }
 
 export function tickRoom(room: Room, io: IO) {

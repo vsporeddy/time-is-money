@@ -18,6 +18,7 @@ export interface Room {
   currentRoundIndex: number;
   activeRound: ActiveRound | null;
   wonItems: Map<string, ItemInstance>; // itemId -> instance, for end-game scoring lookups
+  itemPricePaidMs: Map<string, number>; // itemId -> net time the winner actually paid (after any rebate)
 }
 
 const DEFAULT_SETTINGS: GameSettings = {
@@ -42,6 +43,7 @@ export function getOrCreateRoom(code: string): Room {
       currentRoundIndex: -1,
       activeRound: null,
       wonItems: new Map(),
+      itemPricePaidMs: new Map(),
     };
     rooms.set(code, room);
   }

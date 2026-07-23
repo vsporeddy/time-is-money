@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import type { ItemInstance, Player, Round, RoomState } from 'shared';
+import type { ItemInstance, Player, Round, RoomState, ScoreBreakdown } from 'shared';
+import { getTemplate, getTraitDefinition } from 'shared';
 import { socket } from './socket';
 import { SpriteIcon } from './SpriteIcon';
 import { Game } from './Game';
@@ -31,6 +32,7 @@ export default function App() {
   const [lastResult, setLastResult] = useState<LastResult | null>(null);
   const [knownItems, setKnownItems] = useState<Record<string, ItemInstance>>({});
   const [gameOverPlayers, setGameOverPlayers] = useState<Player[] | null>(null);
+  const [scores, setScores] = useState<ScoreBreakdown[] | null>(null);
 
   useEffect(() => {
     socket.connect();
@@ -61,7 +63,10 @@ export default function App() {
       setCurrentRound(null);
       setKnownItems((prev) => ({ ...prev, [payload.item.id]: payload.item }));
     };
-    const onGameOver = (payload: { players: Player[] }) => setGameOverPlayers(payload.players);
+    const onGameOver = (payload: { players: Player[]; scores: ScoreBreakdown[] }) => {
+      setGameOverPlayers(payload.players);
+      setScores(payload.scores);
+    };
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
@@ -130,23 +135,47 @@ export default function App() {
     );
   }
 
-  if (gameOverPlayers) {
-    const ranked = [...gameOverPlayers]
-      .map((p) => ({
-        ...p,
-        totalValue: p.stash.reduce((sum, itemId) => sum + (knownItems[itemId]?.trueValue ?? 0), 0),
-      }))
-      .sort((a, b) => b.totalValue - a.totalValue);
+  if (gameOverPlayers && scores) {
+    const ranked = [...scores].sort((a, b) => b.total - a.total);
 
     return shell(
       <>
         <h2>Game Over</h2>
         <ol>
-          {ranked.map((p) => (
-            <li key={p.id}>
-              {p.name}{p.id === myId ? ' (you)' : ''} — ${p.totalValue} ({p.stash.length} item{p.stash.length === 1 ? '' : 's'})
-            </li>
-          ))}
+          {ranked.map((s) => {
+            const player = gameOverPlayers.find((p) => p.id === s.playerId);
+            const itemNames = (player?.stash ?? [])
+              .map((id) => knownItems[id])
+              .filter((item): item is ItemInstance => Boolean(item))
+              .map((item) => getTemplate(item.templateId)?.name ?? item.templateId);
+
+            const extras: string[] = [];
+            if (s.hiddenTraitBonus !== 0) extras.push(`hidden ${s.hiddenTraitBonus >= 0 ? '+' : ''}${s.hiddenTraitBonus}`);
+            if (s.scoreScalingBonus !== 0) extras.push(`scaling +${s.scoreScalingBonus}`);
+            if (s.lonerBonus !== 0) extras.push(`loner +${s.lonerBonus}`);
+            for (const t of s.traitBonuses) {
+              extras.push(`${getTraitDefinition(t.traitId)?.name ?? t.traitId} x${t.count} +${t.bonus}`);
+            }
+
+            return (
+              <li key={s.playerId} style={{ marginBottom: 16 }}>
+                <div>
+                  <strong>
+                    {player?.name}
+                    {s.playerId === myId ? ' (you)' : ''}
+                  </strong>{' '}
+                  — ${s.total}
+                </div>
+                <div style={{ fontSize: '0.85em', opacity: 0.85 }}>
+                  base ${s.baseValue}
+                  {extras.length > 0 ? `, ${extras.join(', ')}` : ''}
+                </div>
+                {itemNames.length > 0 && (
+                  <div style={{ fontSize: '0.85em', opacity: 0.7 }}>{itemNames.join(', ')}</div>
+                )}
+              </li>
+            );
+          })}
         </ol>
       </>
     );

@@ -1,6 +1,23 @@
-import type { ItemInstance, Player, Round } from 'shared';
-import { getTemplate } from 'shared';
+import type { ItemInstance, ItemTemplate, Player, Round } from 'shared';
+import { getHiddenTrait, getTemplate, getTraitDefinition } from 'shared';
 import { SpriteIcon } from './SpriteIcon';
+
+function templateFlags(template: ItemTemplate | undefined): string[] {
+  if (!template) return [];
+  const flags: string[] = [];
+  if (template.scoreScaling === 'investment') flags.push('Investment — scores more the longer you held to win it');
+  if (template.scoreScaling === 'bargain') flags.push('Bargain — scores more the cheaper you win it');
+  if (template.secondPriceRebate) flags.push('Fair Trade — only pay the runner-up\'s price, rest refunded');
+  if (template.effectType === 'timeRefund' && template.timeRefund) {
+    flags.push(
+      template.timeRefund.mode === 'catchup'
+        ? 'Emergency Refund — big time refund if you\'re running low'
+        : `Time Refund — +${(template.timeRefund.amountMs / 1000).toFixed(0)}s on win`
+    );
+  }
+  if (template.loner) flags.push(`Loner — bonus if it's the only one of these you own`);
+  return flags;
+}
 
 interface CurrentRound {
   round: Round;
@@ -75,21 +92,30 @@ export function Game({
         })}
       </ul>
 
-      {lastResult && (
-        <div style={{ marginTop: 24, padding: 16, background: '#222', borderRadius: 8 }}>
-          <h3>SOLD</h3>
-          <p>
-            {getTemplate(lastResult.item.templateId)?.name} ({lastResult.item.material}, {lastResult.item.rarity}) — true
-            value ${lastResult.item.trueValue}
-          </p>
-          <p>
-            {lastResult.round.winnerId
-              ? `Won by ${players.find((p) => p.id === lastResult.round.winnerId)?.name ?? 'someone'}`
-              : 'No one held on — item goes unclaimed.'}
-          </p>
-          <p>Next lot incoming…</p>
-        </div>
-      )}
+      {lastResult && (() => {
+        const hidden = getHiddenTrait(lastResult.item.hiddenTraitId);
+        return (
+          <div style={{ marginTop: 24, padding: 16, background: '#222', borderRadius: 8 }}>
+            <h3>SOLD</h3>
+            <p>
+              {getTemplate(lastResult.item.templateId)?.name} ({lastResult.item.material}, {lastResult.item.rarity}) — true
+              value ${lastResult.item.trueValue}
+            </p>
+            {hidden && (
+              <p style={{ color: hidden.scoreBonus >= 0 ? '#6c6' : '#c66' }}>
+                {hidden.name} ({hidden.scoreBonus >= 0 ? '+' : ''}
+                {hidden.scoreBonus})
+              </p>
+            )}
+            <p>
+              {lastResult.round.winnerId
+                ? `Won by ${players.find((p) => p.id === lastResult.round.winnerId)?.name ?? 'someone'}`
+                : 'No one held on — item goes unclaimed.'}
+            </p>
+            <p>Next lot incoming…</p>
+          </div>
+        );
+      })()}
 
       {!lastResult && currentRound && (
         <div style={{ marginTop: 24, padding: 16, background: '#222', borderRadius: 8, textAlign: 'center' }}>
@@ -98,6 +124,16 @@ export function Game({
           <p>
             {currentRound.item.material} · {currentRound.item.rarity} · value: ???
           </p>
+          <p style={{ fontSize: '0.85em', opacity: 0.8 }}>
+            {getTemplate(currentRound.item.templateId)
+              ?.traits.map((id) => getTraitDefinition(id)?.name ?? id)
+              .join(' · ')}
+          </p>
+          {templateFlags(getTemplate(currentRound.item.templateId)).map((flag) => (
+            <p key={flag} style={{ fontSize: '0.8em', color: '#fc6' }}>
+              {flag}
+            </p>
+          ))}
 
           {currentRound.round.status === 'pending' && <p>Get ready…</p>}
 
