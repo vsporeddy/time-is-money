@@ -55,14 +55,16 @@ Both hot-reload (`tsx watch` / Vite). The client points at the server via `packa
 ## Deployment
 
 - **Server**: hosted on Fly.io at **https://time-is-money-server.fly.dev**. `Dockerfile` + `fly.toml` live at the repo root; `fly deploy` from there redeploys it (the image only builds/runs the `server` workspace).
-- **Client**: itch.io only hosts static files, so `npm run build:client` gets zipped and uploaded there directly — it's a static bundle that talks to the Fly server over `wss://`.
+- **Client** ships to two static hosts, both talking to the same Fly server over `wss://`:
+  - **itch.io** — `npm run build:client` (root-relative paths); zip `packages/client/dist` and upload it directly.
+  - **GitHub Pages** — auto-deployed by `.github/workflows/deploy-pages.yml` on every push to `main` (uses `npm run build:pages`, which builds with base path `/time-is-money/` via `packages/client/.env.pages`). Requires repo Settings → Pages → Source = "GitHub Actions" (one-time toggle).
 
 ## Assets & content
 
 - **Sprites** — `packages/client/public/sprites.png` is the icon sheet items are drawn from (32×32 px cells, 16 columns). **[`sprites_reference.png`](sprites_reference.png) at the repo root is an annotated copy with the index number labeled on every cell** — use it to find the right `baseSpriteId` when adding a new item in `packages/shared/src/items.ts`. Index = `row * 16 + col`, 0-indexed from the top-left.
 - **Portraits** — `packages/client/public/portraits.png`, a 13×13 grid (128px cells), assigned randomly per player on join (`packages/shared/src/portraits.ts`).
 - **Sounds** — `packages/client/public/sounds/`: `music/menu.mp3` (background loop) plus a bunch of `interface/*.wav` effects — only `click.wav` and `ding.wav` are wired up so far, there are more (bonus, coin, level_up, error, …) if you want to add more feedback.
-- **Font** — Press Start 2P, `packages/client/public/fonts/`.
+- **Font** — Press Start 2P, `packages/client/src/assets/fonts/` (lives in `src/`, not `public/`, so Vite hashes/rewrites its path correctly regardless of which base path a build uses).
 - Full attributions in [`CREDITS.md`](CREDITS.md).
 
 ## Known rough edges / dev-only stuff
