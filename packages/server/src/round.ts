@@ -15,7 +15,7 @@ export function startGame(room: Room, io: IO) {
 }
 
 export function startRound(room: Room, io: IO) {
-  const eligible = [...room.players.values()].filter((p) => p.status === 'active');
+  const eligible = [...room.players.values()].filter((p) => p.status === 'active' && !p.isObserver);
 
   if (eligible.length === 0) {
     finishGame(room, io);
@@ -235,13 +235,20 @@ function finishGame(room: Room, io: IO) {
   room.activeRound = null;
   io.emit('room_state', toRoomState(room));
 
-  const players = [...room.players.values()];
+  const players = [...room.players.values()].filter((p) => !p.isObserver);
   const scores = computeScores(players, room.wonItems, room.itemPricePaidMs);
   io.emit('game_over', { players, scores });
 }
 
-export function restartGame(room: Room, io: IO) {
-  if (room.status !== 'game_over') return;
+// Clears round/round-timers/status back to a fresh lobby. Also promotes any
+// observers back to full players — a reset means "everyone currently here
+// plays the next one." Callers are responsible for emitting room_state.
+export function resetRoomToLobby(room: Room) {
+  if (room.activeRound) {
+    if (room.activeRound.noBidTimer) clearTimeout(room.activeRound.noBidTimer);
+    if (room.activeRound.maxDurationTimer) clearTimeout(room.activeRound.maxDurationTimer);
+    if (room.activeRound.interRoundTimer) clearTimeout(room.activeRound.interRoundTimer);
+  }
 
   room.status = 'lobby';
   room.currentRoundIndex = -1;
@@ -253,8 +260,19 @@ export function restartGame(room: Room, io: IO) {
     player.timeRemainingMs = room.settings.startingTimeMs;
     player.status = 'active';
     player.stash = [];
+    player.isObserver = false;
   }
+}
 
+export function restartGame(room: Room, io: IO) {
+  if (room.status !== 'game_over') return;
+  resetRoomToLobby(room);
+  io.emit('room_state', toRoomState(room));
+}
+
+// Dev-only escape hatch — resets from ANY state, no guard. Remove before shipping.
+export function forceResetGame(room: Room, io: IO) {
+  resetRoomToLobby(room);
   io.emit('room_state', toRoomState(room));
 }
 

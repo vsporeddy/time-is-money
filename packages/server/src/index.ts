@@ -4,7 +4,15 @@ import { Server } from 'socket.io';
 import type { ClientToServerEvents, Player, ServerToClientEvents } from 'shared';
 import { randomPortraitIndex } from 'shared';
 import { getRoom, toRoomState } from './rooms.js';
-import { handleHoldRelease, handleHoldStart, restartGame, startGame, tickRoom } from './round.js';
+import {
+  forceResetGame,
+  handleHoldRelease,
+  handleHoldStart,
+  resetRoomToLobby,
+  restartGame,
+  startGame,
+  tickRoom,
+} from './round.js';
 import { addChatMessage, getChatHistory } from './chat.js';
 
 const app = express();
@@ -20,6 +28,7 @@ app.get('/health', (_req, res) => {
 
 io.on('connection', (socket) => {
   socket.emit('chat_history', getChatHistory());
+  socket.emit('room_state', toRoomState(getRoom())); // so the join screen can tell a game is already running
 
   socket.on('send_chat', ({ name, text }) => {
     const message = addChatMessage(name, text);
@@ -35,19 +44,17 @@ io.on('connection', (socket) => {
     }
 
     const room = getRoom();
-    if (room.status !== 'lobby') {
-      ack({ ok: false, error: 'Game already in progress.' });
-      return;
-    }
+    const isObserver = room.status !== 'lobby';
 
     const player: Player = {
       id: socket.id,
       name,
-      timeRemainingMs: room.settings.startingTimeMs,
+      timeRemainingMs: isObserver ? 0 : room.settings.startingTimeMs,
       status: 'active',
       stash: [],
       connected: true,
       portraitIndex: randomPortraitIndex(),
+      isObserver,
     };
     room.players.set(player.id, player);
 
@@ -71,12 +78,21 @@ io.on('connection', (socket) => {
     restartGame(getRoom(), io);
   });
 
+  socket.on('reset_game', () => {
+    forceResetGame(getRoom(), io);
+  });
+
   socket.on('disconnect', () => {
     const room = getRoom();
     if (!room.players.has(socket.id)) return;
 
     handleHoldRelease(room, socket.id, io); // don't leave them stuck "holding" if they vanish mid-round
     room.players.delete(socket.id);
+
+    if (room.players.size === 0 && room.status !== 'lobby') {
+      resetRoomToLobby(room); // nobody left to play with — don't leave the room stuck
+    }
+
     io.emit('room_state', toRoomState(room));
   });
 });

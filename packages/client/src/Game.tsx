@@ -34,6 +34,7 @@ interface LastResult {
 interface GameProps {
   players: Player[];
   myId: string;
+  isObserver: boolean;
   currentRound: CurrentRound | null;
   liveTimes: Record<string, number>;
   liveBids: Record<string, number>; // playerId -> committedMs, present only while currently holding
@@ -50,6 +51,7 @@ function fmt(ms: number) {
 export function Game({
   players,
   myId,
+  isObserver,
   currentRound,
   liveTimes,
   liveBids,
@@ -63,7 +65,7 @@ export function Game({
 
   const iHaveDropped = isDropped(myId);
   const myTime = liveTimes[myId] ?? players.find((p) => p.id === myId)?.timeRemainingMs ?? 0;
-  const canHold = currentRound?.round.status === 'active' && !iHaveDropped && myTime > 0;
+  const canHold = !isObserver && currentRound?.round.status === 'active' && !iHaveDropped && myTime > 0;
 
   // The server only confirms bidding/withdrawn state via round_tick / bidder_dropped,
   // which lags a click by up to ~100ms (or never visibly arrives at all if an
@@ -104,9 +106,15 @@ export function Game({
                 {p.name}
                 {isMe ? ' (you)' : ''}
               </div>
-              <div>{fmt(time)} left</div>
-              {holding && <div>bidding {fmt(liveBids[p.id])}</div>}
-              {dropped && <div>withdrew — spent {fmt(droppedThisRound[p.id])}</div>}
+              {p.isObserver ? (
+                <div>Observing</div>
+              ) : (
+                <>
+                  <div>{fmt(time)} left</div>
+                  {holding && <div>bidding {fmt(liveBids[p.id])}</div>}
+                  {dropped && <div>withdrew — spent {fmt(droppedThisRound[p.id])}</div>}
+                </>
+              )}
             </li>
           );
         })}
@@ -168,19 +176,22 @@ export function Game({
 
           {currentRound.round.status === 'pending' && <p className="status-line">Get ready…</p>}
 
-          {currentRound.round.status === 'active' && (
-            <>
-              <button
-                disabled={!canHold && !iAmHolding}
-                onClick={handleBidClick}
-                className={`bid-button${iAmHolding ? ' active' : ''}`}
-                style={{ marginTop: '1rem' }}
-              >
-                {iHaveDropped ? 'Withdrawn' : iAmHolding ? 'Withdraw' : 'Bid'}
-              </button>
-              {iAmHolding && <p className="spend-line">Spending: {fmt(liveBids[myId] ?? 0)}</p>}
-            </>
-          )}
+          {currentRound.round.status === 'active' &&
+            (isObserver ? (
+              <p className="status-line">You're observing this round.</p>
+            ) : (
+              <>
+                <button
+                  disabled={!canHold && !iAmHolding}
+                  onClick={handleBidClick}
+                  className={`bid-button${iAmHolding ? ' active' : ''}`}
+                  style={{ marginTop: '1rem' }}
+                >
+                  {iHaveDropped ? 'Withdrawn' : iAmHolding ? 'Withdraw' : 'Bid'}
+                </button>
+                {iAmHolding && <p className="spend-line">Spending: {fmt(liveBids[myId] ?? 0)}</p>}
+              </>
+            ))}
         </div>
       )}
     </>

@@ -13,6 +13,7 @@ export interface Player {
   stash: string[]; // ItemInstance ids won
   connected: boolean;
   portraitIndex: number;
+  isObserver: boolean; // joined while a game was already in progress — watches, never bids
 }
 
 export interface TimeRefundConfig {
@@ -101,6 +102,7 @@ export interface ClientToServerEvents {
   hold_start: () => void;
   hold_release: () => void;
   restart_game: () => void;
+  reset_game: () => void; // dev-only escape hatch — works from any state, remove before shipping
   send_chat: (payload: { name: string; text: string }) => void;
 }
 

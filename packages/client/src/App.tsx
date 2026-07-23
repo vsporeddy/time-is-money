@@ -121,6 +121,12 @@ export default function App() {
     });
   };
 
+  const handleResetGame = () => {
+    if (window.confirm('Reset the game for everyone? This clears all progress.')) {
+      socket.emit('reset_game');
+    }
+  };
+
   const shellWithHeader = (children: ReactNode) => (
     <main className="app-shell">
       <div className="top-bar">
@@ -130,6 +136,9 @@ export default function App() {
     </main>
   );
 
+  const myPlayer = room?.players.find((p) => p.id === myId);
+  const isObserver = myPlayer?.isObserver ?? false;
+
   let screen: ReactNode;
 
   if (!joined) {
@@ -138,6 +147,9 @@ export default function App() {
         <Logo scale={5} />
         <div className="panel">
           <p className="status-line">{connected ? 'Connected to server' : 'Connecting…'}</p>
+          {room && room.status !== 'lobby' && (
+            <p className="status-line">A game is already in progress — you'll join as an observer.</p>
+          )}
           <form onSubmit={handleJoin}>
             <div className="field">
               <label htmlFor="name">Your name</label>
@@ -200,6 +212,11 @@ export default function App() {
     );
   } else if (!room) {
     screen = shellWithHeader(<p className="status-line">Loading…</p>);
+  } else if (room.status === 'game_over') {
+    // room.status flipped to game_over before we had a chance to see the
+    // one-time game_over event (e.g. joined right as it fired) — nothing to
+    // rank, just wait for the next game.
+    screen = shellWithHeader(<p className="status-line">A game just ended — waiting for a new one to start.</p>);
   } else if (room.status === 'lobby') {
     screen = shellWithHeader(
       <div className="panel">
@@ -226,6 +243,7 @@ export default function App() {
       <Game
         players={room.players}
         myId={myId!}
+        isObserver={isObserver}
         currentRound={currentRound}
         liveTimes={liveTimes}
         liveBids={liveBids}
@@ -240,6 +258,9 @@ export default function App() {
   return (
     <>
       {screen}
+      <button className="dev-reset-button" onClick={handleResetGame}>
+        Reset Game
+      </button>
       <Chat messages={chatMessages} onSend={(text) => socket.emit('send_chat', { name: name || 'Guest', text })} />
     </>
   );

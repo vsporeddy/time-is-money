@@ -424,6 +424,26 @@ input[type='text']:focus {
   opacity: 0.8;
 }
 
+/* --- Dev-only reset button (remove before shipping) --- */
+
+.dev-reset-button {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 40;
+  font-family: var(--font-pixel);
+  font-size: 0.55rem;
+  padding: 0.5rem 0.7rem;
+  background: var(--red);
+  color: var(--text);
+  border: 2px solid var(--red-bright);
+  cursor: pointer;
+}
+
+.dev-reset-button:active {
+  transform: translate(1px, 1px);
+}
+
 /* --- Chat: always-visible strip pinned above the player dock --- */
 
 .chat-panel {
