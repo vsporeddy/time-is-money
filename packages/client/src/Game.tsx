@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ItemInstance, ItemTemplate, Player, Round } from 'shared';
 import { getHiddenTrait, getTemplate, getTraitDefinition } from 'shared';
 import { SpriteIcon } from './SpriteIcon';
+import { playClick } from './sound';
 
 function templateFlags(template: ItemTemplate | undefined): string[] {
   if (!template) return [];
@@ -78,6 +79,7 @@ export function Game({
   const iAmHolding = !iHaveDropped && (optimisticBidding || isHolding(myId));
 
   const handleBidClick = () => {
+    playClick();
     if (iAmHolding) {
       setOptimisticBidding(false);
       onHoldRelease();

@@ -7,6 +7,8 @@ import { Logo } from './Logo';
 import { Game } from './Game';
 import { PortraitIcon } from './PortraitIcon';
 import { Chat } from './Chat';
+import { BackgroundMusic } from './BackgroundMusic';
+import { playChatDing, playClick } from './sound';
 
 interface CurrentRound {
   round: Round;
@@ -80,7 +82,10 @@ export default function App() {
       setScores(payload.scores);
     };
     const onChatHistory = (history: ChatMessage[]) => setChatMessages(history);
-    const onChatMessage = (message: ChatMessage) => setChatMessages((prev) => [...prev, message].slice(-100));
+    const onChatMessage = (message: ChatMessage) => {
+      playChatDing();
+      setChatMessages((prev) => [...prev, message].slice(-100));
+    };
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
@@ -110,6 +115,7 @@ export default function App() {
 
   const handleJoin = (e: FormEvent) => {
     e.preventDefault();
+    playClick();
     setError(null);
     socket.emit('join_room', { playerName: name }, (res) => {
       if (res.ok) {
@@ -122,6 +128,7 @@ export default function App() {
   };
 
   const handleResetGame = () => {
+    playClick();
     if (window.confirm('Reset the game for everyone? This clears all progress.')) {
       socket.emit('reset_game');
     }
@@ -239,7 +246,14 @@ export default function App() {
             );
           })}
         </ol>
-        <button className="btn btn-block" style={{ marginTop: '1rem' }} onClick={() => socket.emit('restart_game')}>
+        <button
+          className="btn btn-block"
+          style={{ marginTop: '1rem' }}
+          onClick={() => {
+            playClick();
+            socket.emit('restart_game');
+          }}
+        >
           Play Again
         </button>
       </div>
@@ -255,7 +269,13 @@ export default function App() {
     screen = shellWithHeader(
       <div className="panel">
         <h2 className="panel-title">Lobby</h2>
-        <button className="btn btn-block" onClick={() => socket.emit('start_game')}>
+        <button
+          className="btn btn-block"
+          onClick={() => {
+            playClick();
+            socket.emit('start_game');
+          }}
+        >
           START GAME
         </button>
       </div>
@@ -280,6 +300,7 @@ export default function App() {
   return (
     <>
       {screen}
+      <BackgroundMusic />
       <button className="dev-reset-button" onClick={handleResetGame}>
         Reset Game
       </button>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { ChatMessage } from 'shared';
 import { SpriteIcon } from './SpriteIcon';
+import { playClick } from './sound';
 
 const CHAT_ICON_SPRITE_INDEX = 3; // speech bubble
 
@@ -24,6 +25,7 @@ export function Chat({ messages, onSend }: ChatProps) {
     e.preventDefault();
     const text = draft.trim();
     if (!text) return;
+    playClick();
     onSend(text);
     setDraft('');
   };

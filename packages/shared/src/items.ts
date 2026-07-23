@@ -29,7 +29,7 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   // --- Trinkets (broad trait: trinket) ---
   { id: 'gold-ring', name: 'Gold Ring', baseSpriteId: '134', valueRange: [20, 60], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['trinket'] },
   { id: 'diamond-ring', name: 'Diamond Ring', baseSpriteId: '133', valueRange: [40, 130], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['trinket'], scoreScaling: 'investment' },
-  { id: 'ruby-necklace', name: 'Ruby Necklace', baseSpriteId: '136', valueRange: [35, 100], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['trinket'], loner: 25 },
+  { id: 'bonetooth-necklace', name: 'Bonetooth Necklace', baseSpriteId: '136', valueRange: [35, 100], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['trinket'], loner: 25 },
 
   // --- Tools (broad trait: tool) ---
   { id: 'pickaxe', name: 'Pickaxe', baseSpriteId: '162', valueRange: [10, 30], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['tool'], secondPriceRebate: true },

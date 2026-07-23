@@ -447,6 +447,26 @@ input[type='text']:focus {
   transform: translate(1px, 1px);
 }
 
+/* --- Music toggle --- */
+
+.music-toggle {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 40;
+  font-family: var(--font-pixel);
+  font-size: 0.55rem;
+  padding: 0.5rem 0.7rem;
+  background: var(--gold);
+  color: var(--bg);
+  border: 2px solid var(--border-gold);
+  cursor: pointer;
+}
+
+.music-toggle:active {
+  transform: translate(1px, 1px);
+}
+
 /* --- Chat: far-right column of the bottom bar, next to the player dock --- */
 
 .chat-panel {
