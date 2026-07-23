@@ -1,7 +1,7 @@
 import type { ItemInstance, ItemTemplate } from './index.js';
 import { MATERIAL_POOL, rollHiddenTrait } from './traits.js';
 
-const RARITY_POOL = ['common', 'rare', 'legendary'];
+const RARITY_POOL = ['Common', 'Rare', 'Legendary'];
 
 // baseSpriteId indices refer to the annotated sprites_reference.png grid
 // (index = row * 16 + col, 0-indexed top-left). Starting trait/flag

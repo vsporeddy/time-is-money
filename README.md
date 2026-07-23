@@ -6,8 +6,8 @@ A browser-based multiplayer party game built for a game jam (theme: **COUNT DOWN
 
 - Everyone starts with a pool of time (default 60s).
 - Each round, an item comes up for auction. Its true dollar value is hidden — you only see its material/rarity flavor and its traits until it sells.
-- Click **Bid** to commit to a lot; while you're "in," your time ticks down live and is visible to everyone. Click **Withdraw** to bail out — but time you've already spent is gone either way (sunk cost).
-- Last player still holding wins the lot and pays for however long they held. If nobody ever bids, or everyone releases at once, the item goes unclaimed.
+- During each auction's 6-second opt-in window, click **Bid** to join without spending time, or **Cancel Bid** to change your mind and bid again later in the same window. When it closes, every opted-in player's time ticks down live. Click **Withdraw** to bail out — but time you've already spent is gone either way (sunk cost).
+- The final active bidder to withdraw wins the lot and pays for however long they held. If nobody remains opted in when the opening window closes, the item goes unclaimed.
 - Some items have special behavior, all visible as tags on the item card before you bid:
   - **Investment** — scores higher the longer you held to win it.
   - **Bargain** — scores higher the *cheaper* you win it (rewards sniping uncontested lots).

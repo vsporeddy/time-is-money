@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import type { ChatMessage, ItemInstance, Player, Round, RoomState, ScoreBreakdown } from 'shared';
-import { getTemplate, getTraitDefinition } from 'shared';
+import { computeScores, getTemplate, getTraitDefinition } from 'shared';
 import { socket } from './socket';
 import { Logo } from './Logo';
 import { Game } from './Game';
 import { PortraitIcon } from './PortraitIcon';
 import { Chat } from './Chat';
 import { BackgroundMusic } from './BackgroundMusic';
+import { Inventory } from './Inventory';
 import { playChatDing, playClick } from './sound';
 
 interface CurrentRound {
@@ -34,9 +35,12 @@ export default function App() {
   const [droppedThisRound, setDroppedThisRound] = useState<Record<string, number>>({});
   const [lastResult, setLastResult] = useState<LastResult | null>(null);
   const [knownItems, setKnownItems] = useState<Record<string, ItemInstance>>({});
+  const [itemPrices, setItemPrices] = useState<Record<string, number>>({});
   const [gameOverPlayers, setGameOverPlayers] = useState<Player[] | null>(null);
   const [scores, setScores] = useState<ScoreBreakdown[] | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [selectedOpponentId, setSelectedOpponentId] = useState<string | null>(null);
+  const [myInventoryOpen, setMyInventoryOpen] = useState(true);
 
   useEffect(() => {
     socket.connect();
@@ -45,13 +49,22 @@ export default function App() {
     const onDisconnect = () => setConnected(false);
     const onRoomState = (state: RoomState) => {
       setRoom(state);
+      setKnownItems((previous) => ({
+        ...previous,
+        ...Object.fromEntries(state.knownItems.map((item) => [item.id, item])),
+      }));
+      setItemPrices((previous) => ({ ...previous, ...state.itemPrices }));
       if (state.status === 'lobby') {
         // Covers restart_game bringing us back here — clear out the last game's view.
         setGameOverPlayers(null);
         setScores(null);
         setKnownItems({});
+        setItemPrices({});
         setLastResult(null);
         setCurrentRound(null);
+      }
+      if (selectedOpponentId && !state.players.some((player) => player.id === selectedOpponentId)) {
+        setSelectedOpponentId(null);
       }
     };
     const onRoundStart = (payload: CurrentRound) => {
@@ -59,6 +72,20 @@ export default function App() {
       setLastResult(null);
       setLiveBids({});
       setDroppedThisRound({});
+    };
+    const onBidWindowClosed = ({ roundId }: { roundId: string }) => {
+      setCurrentRound((current) =>
+        current?.round.id === roundId
+          ? { ...current, round: { ...current.round, bidWindowOpen: false } }
+          : current
+      );
+    };
+    const onBidderCancelled = ({ playerId }: { roundId: string; playerId: string }) => {
+      setLiveBids((previous) => {
+        const next = { ...previous };
+        delete next[playerId];
+        return next;
+      });
     };
     const onRoundTick = (payload: { players: Record<string, number>; bidders: Record<string, number> }) => {
       setLiveTimes(payload.players);
@@ -76,6 +103,12 @@ export default function App() {
       setLastResult(payload);
       setCurrentRound(null);
       setKnownItems((prev) => ({ ...prev, [payload.item.id]: payload.item }));
+      if (payload.round.winnerId) {
+        setItemPrices((previous) => ({
+          ...previous,
+          [payload.item.id]: payload.round.bidders[payload.round.winnerId!]?.committedMs ?? 0,
+        }));
+      }
     };
     const onGameOver = (payload: { players: Player[]; scores: ScoreBreakdown[] }) => {
       setGameOverPlayers(payload.players);
@@ -91,6 +124,8 @@ export default function App() {
     socket.on('disconnect', onDisconnect);
     socket.on('room_state', onRoomState);
     socket.on('round_start', onRoundStart);
+    socket.on('bid_window_closed', onBidWindowClosed);
+    socket.on('bidder_cancelled', onBidderCancelled);
     socket.on('round_tick', onRoundTick);
     socket.on('bidder_dropped', onBidderDropped);
     socket.on('round_end', onRoundEnd);
@@ -103,6 +138,8 @@ export default function App() {
       socket.off('disconnect', onDisconnect);
       socket.off('room_state', onRoomState);
       socket.off('round_start', onRoundStart);
+      socket.off('bid_window_closed', onBidWindowClosed);
+      socket.off('bidder_cancelled', onBidderCancelled);
       socket.off('round_tick', onRoundTick);
       socket.off('bidder_dropped', onBidderDropped);
       socket.off('round_end', onRoundEnd);
@@ -145,6 +182,16 @@ export default function App() {
 
   const myPlayer = room?.players.find((p) => p.id === myId);
   const isObserver = myPlayer?.isObserver ?? false;
+  const scoresByPlayer = useMemo(() => {
+    if (!room) return new Map<string, ScoreBreakdown>();
+    const wonItems = new Map(Object.entries(knownItems));
+    const pricePaidMs = new Map(Object.entries(itemPrices));
+    const scores = new Map<string, ScoreBreakdown>();
+    for (const score of computeScores(room.players, wonItems, pricePaidMs)) {
+      scores.set(score.playerId, score);
+    }
+    return scores;
+  }, [room, knownItems, itemPrices]);
 
   const fmt = (ms: number) => (Math.max(0, ms) / 1000).toFixed(1) + 's';
 
@@ -152,28 +199,39 @@ export default function App() {
     <ul className="player-row">
       {(room?.players ?? []).map((p) => {
         const isMe = p.id === myId;
-        const holding = liveBids[p.id] !== undefined;
-        const dropped = droppedThisRound[p.id] !== undefined;
+        const holding = isMe && liveBids[p.id] !== undefined;
+        const dropped = isMe && droppedThisRound[p.id] !== undefined;
         const time = liveTimes[p.id] ?? p.timeRemainingMs;
         const classes = ['player-card', isMe && 'me', holding && 'holding', dropped && 'dropped']
           .filter(Boolean)
           .join(' ');
         return (
           <li key={p.id} className={classes}>
-            <PortraitIcon index={p.portraitIndex} />
+            <button
+              type="button"
+              className="portrait-button"
+              aria-pressed={isMe ? myInventoryOpen : selectedOpponentId === p.id}
+              aria-label={isMe ? `${myInventoryOpen ? 'Hide' : 'Show'} your inventory` : `Show ${p.name}'s inventory`}
+              onClick={() => {
+                if (isMe) setMyInventoryOpen((open) => !open);
+                else setSelectedOpponentId((selected) => (selected === p.id ? null : p.id));
+              }}
+            >
+              <PortraitIcon index={p.portraitIndex} />
+            </button>
             <div className="name">
               {p.name}
               {isMe ? ' (you)' : ''}
             </div>
             {p.isObserver ? (
               <div>Observing</div>
-            ) : (
+            ) : isMe ? (
               <>
                 <div>{fmt(time)} left</div>
                 {holding && <div>bidding {fmt(liveBids[p.id])}</div>}
                 {dropped && <div>withdrew — spent {fmt(droppedThisRound[p.id])}</div>}
               </>
-            )}
+            ) : null}
           </li>
         );
       })}
@@ -300,6 +358,23 @@ export default function App() {
   return (
     <>
       {screen}
+      {joined && myPlayer && myInventoryOpen && (
+        <Inventory
+          player={myPlayer}
+          items={knownItems}
+          score={scoresByPlayer.get(myPlayer.id)}
+          side="left"
+          onClose={() => setMyInventoryOpen(false)}
+        />
+      )}
+      {joined && selectedOpponentId && room?.players.find((player) => player.id === selectedOpponentId) && (
+        <Inventory
+          player={room.players.find((player) => player.id === selectedOpponentId)!}
+          items={knownItems}
+          score={scoresByPlayer.get(selectedOpponentId)}
+          side="right"
+        />
+      )}
       <BackgroundMusic />
       <button className="dev-reset-button" onClick={handleResetGame}>
         Reset Game

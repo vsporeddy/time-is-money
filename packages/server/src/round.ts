@@ -1,7 +1,7 @@
 import type { Server } from 'socket.io';
 import type { ClientToServerEvents, Round, ServerToClientEvents, TimeRefundConfig } from 'shared';
 import { computeScores, getTemplate, rollItemInstance } from 'shared';
-import { toRoomState } from './rooms.js';
+import { emitRoomState } from './rooms.js';
 import type { Room } from './rooms.js';
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
@@ -33,6 +33,8 @@ export function startRound(room: Room, io: IO) {
     id: `round-${roundCounter}`,
     itemInstanceId: item.id,
     status: 'pending',
+    initialBidDeadlineAt: null,
+    bidWindowOpen: false,
     bidders,
     revealedFields: [],
     winnerId: null,
@@ -44,13 +46,14 @@ export function startRound(room: Room, io: IO) {
     item,
     holdStartedAt: new Map(),
     hasAnyoneHeld: false,
+    bidWindowOpen: false,
     noBidTimer: null,
     maxDurationTimer: null,
     interRoundTimer: null,
   };
 
   emitRoundStart(room, io);
-  io.emit('room_state', toRoomState(room));
+  emitRoomState(room, io);
 
   setTimeout(() => activateRound(room, io), room.settings.pendingDurationMs);
 }
@@ -60,14 +63,38 @@ function activateRound(room: Room, io: IO) {
   if (!ar || ar.round.status !== 'pending') return;
 
   ar.round.status = 'active';
+  ar.round.initialBidDeadlineAt = Date.now() + room.settings.noBidTimeoutMs;
+  ar.round.bidWindowOpen = true;
+  ar.bidWindowOpen = true;
   emitRoundStart(room, io);
 
-  ar.noBidTimer = setTimeout(() => {
-    if (!ar.hasAnyoneHeld) resolveRound(room, io, null);
-  }, room.settings.noBidTimeoutMs);
+  ar.noBidTimer = setTimeout(() => closeBidWindow(room, io), room.settings.noBidTimeoutMs);
+
+}
+
+function closeBidWindow(room: Room, io: IO) {
+  const ar = room.activeRound;
+  if (!ar || ar.round.status !== 'active' || !ar.bidWindowOpen) return;
+
+  ar.bidWindowOpen = false;
+  ar.round.bidWindowOpen = false;
+  ar.noBidTimer = null;
+
+  const activeBidders = Object.entries(ar.round.bidders).filter(([, bidder]) => bidder.isHolding);
+  if (activeBidders.length === 0) {
+    resolveRound(room, io, null);
+    return;
+  }
+
+  // Everyone who opted in during the opening window starts spending at the
+  // same moment, regardless of when they pressed Bid.
+  const spendingStartedAt = Date.now();
+  for (const [playerId] of activeBidders) {
+    ar.holdStartedAt.set(playerId, spendingStartedAt);
+  }
 
   ar.maxDurationTimer = setTimeout(() => {
-    const stillHolding = Object.entries(ar.round.bidders).filter(([, b]) => b.isHolding);
+    const stillHolding = Object.entries(ar.round.bidders).filter(([, bidder]) => bidder.isHolding);
     if (stillHolding.length === 0) return; // already resolved via checkResolution
 
     const now = Date.now();
@@ -78,11 +105,15 @@ function activateRound(room: Room, io: IO) {
     });
     resolveRound(room, io, winnerId);
   }, room.settings.maxRoundDurationMs);
+
+  io.emit('bid_window_closed', { roundId: ar.round.id });
+  emitRoomState(room, io);
 }
 
 export function handleHoldStart(room: Room, playerId: string, io: IO) {
   const ar = room.activeRound;
   if (!ar || ar.round.status !== 'active') return;
+  if (!ar.bidWindowOpen) return; // entrants are locked once spending begins
 
   const bidder = ar.round.bidders[playerId];
   const player = room.players.get(playerId);
@@ -91,20 +122,10 @@ export function handleHoldStart(room: Room, playerId: string, io: IO) {
   if (player.status !== 'active' || player.timeRemainingMs <= 0) return;
 
   bidder.isHolding = true;
-  ar.holdStartedAt.set(playerId, Date.now());
+  ar.hasAnyoneHeld = true;
 
-  if (!ar.hasAnyoneHeld) {
-    ar.hasAnyoneHeld = true;
-    if (ar.noBidTimer) {
-      clearTimeout(ar.noBidTimer);
-      ar.noBidTimer = null;
-    }
-  }
-
-  // Covers the uncontested case: if everyone else has already folded (or
-  // never held), starting a hold immediately makes you the sole holder —
-  // that has to resolve right here, since nothing else will ever trigger it.
-  checkResolution(room, io);
+  // During the opening window this only records an opt-in. Time begins for
+  // all opted-in players together when closeBidWindow runs.
 }
 
 export function handleHoldRelease(room: Room, playerId: string, io: IO) {
@@ -114,7 +135,19 @@ export function handleHoldRelease(room: Room, playerId: string, io: IO) {
   const bidder = ar.round.bidders[playerId];
   const player = room.players.get(playerId);
   const startedAt = ar.holdStartedAt.get(playerId);
-  if (!bidder || !player || !bidder.isHolding || startedAt === undefined) return;
+  if (!bidder || !player || !bidder.isHolding) return;
+
+  // Cancelling during the opt-in window costs nothing and leaves the player
+  // free to bid again before the window closes.
+  if (ar.bidWindowOpen) {
+    bidder.isHolding = false;
+    bidder.committedMs = 0;
+    bidder.droppedAt = null;
+    io.to(playerId).emit('bidder_cancelled', { roundId: ar.round.id, playerId });
+    return;
+  }
+
+  if (startedAt === undefined) return;
 
   const elapsed = Date.now() - startedAt;
   ar.holdStartedAt.delete(playerId);
@@ -129,22 +162,23 @@ export function handleHoldRelease(room: Room, playerId: string, io: IO) {
   bidder.committedMs = elapsed;
   bidder.droppedAt = Date.now();
 
-  io.emit('bidder_dropped', { roundId: ar.round.id, playerId, committedMs: elapsed });
-  io.emit('room_state', toRoomState(room));
+  // A player's spent time is private until the final result.
+  io.to(playerId).emit('bidder_dropped', { roundId: ar.round.id, playerId, committedMs: elapsed });
+  emitRoomState(room, io);
 
-  checkResolution(room, io);
+  // Bidding is an opt-in phase: a lone bidder stays in until they choose to
+  // withdraw. When the final active bidder withdraws, they win the lot.
+  checkResolution(room, io, playerId);
 }
 
-function checkResolution(room: Room, io: IO) {
+function checkResolution(room: Room, io: IO, lastWithdrawerId: string | null = null) {
   const ar = room.activeRound;
   if (!ar || ar.round.status !== 'active') return;
 
   const stillHolding = Object.entries(ar.round.bidders).filter(([, b]) => b.isHolding);
 
-  if (stillHolding.length === 1 && ar.hasAnyoneHeld) {
-    resolveRound(room, io, stillHolding[0][0]);
-  } else if (stillHolding.length === 0 && ar.hasAnyoneHeld) {
-    resolveRound(room, io, null);
+  if (stillHolding.length === 0 && ar.hasAnyoneHeld) {
+    resolveRound(room, io, lastWithdrawerId);
   }
 }
 
@@ -219,8 +253,8 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
     }
   }
 
-  io.emit('round_end', { round: ar.round, item: ar.item });
-  io.emit('room_state', toRoomState(room));
+  io.emit('round_end', { round: publicRoundResult(ar.round), item: ar.item });
+  emitRoomState(room, io);
 
   ar.interRoundTimer = setTimeout(() => {
     room.activeRound = null;
@@ -233,7 +267,7 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
 function finishGame(room: Room, io: IO) {
   room.status = 'game_over';
   room.activeRound = null;
-  io.emit('room_state', toRoomState(room));
+  emitRoomState(room, io);
 
   const players = [...room.players.values()].filter((p) => !p.isObserver);
   const scores = computeScores(players, room.wonItems, room.itemPricePaidMs);
@@ -267,13 +301,13 @@ export function resetRoomToLobby(room: Room) {
 export function restartGame(room: Room, io: IO) {
   if (room.status !== 'game_over') return;
   resetRoomToLobby(room);
-  io.emit('room_state', toRoomState(room));
+  emitRoomState(room, io);
 }
 
 // Dev-only escape hatch — resets from ANY state, no guard. Remove before shipping.
 export function forceResetGame(room: Room, io: IO) {
   resetRoomToLobby(room);
-  io.emit('room_state', toRoomState(room));
+  emitRoomState(room, io);
 }
 
 function emitRoundStart(room: Room, io: IO) {
@@ -281,6 +315,19 @@ function emitRoundStart(room: Room, io: IO) {
   if (!ar) return;
   const { trueValue: _trueValue, hiddenTraitId: _hiddenTraitId, ...publicItem } = ar.item;
   io.emit('round_start', { round: ar.round, item: publicItem });
+}
+
+// Do not reveal losing bidders' spend to other players. The winner's final
+// committed time is intentionally preserved for the result screen.
+function publicRoundResult(round: Round): Round {
+  const bidders: Round['bidders'] = {};
+  for (const [playerId, bidder] of Object.entries(round.bidders)) {
+    bidders[playerId] =
+      playerId === round.winnerId
+        ? { ...bidder }
+        : { isHolding: false, committedMs: 0, droppedAt: null };
+  }
+  return { ...round, bidders };
 }
 
 function computeTimeRefund(config: TimeRefundConfig, currentTimeRemainingMs: number, startingTimeMs: number): number {
@@ -307,7 +354,16 @@ export function tickRoom(room: Room, io: IO) {
     bidders[playerId] = now - startedAt;
   }
 
-  io.emit('round_tick', { players, bidders });
+  // A player sees only their own live clock and spend. This avoids exposing
+  // other players' remaining time, bid participation, or committed time.
+  for (const socketId of io.sockets.sockets.keys()) {
+    const ownTime = players[socketId];
+    const ownBid = bidders[socketId];
+    io.to(socketId).emit('round_tick', {
+      players: ownTime === undefined ? {} : { [socketId]: ownTime },
+      bidders: ownBid === undefined ? {} : { [socketId]: ownBid },
+    });
+  }
 
   // Force-release anyone who has run out of time while holding.
   for (const [playerId, startedAt] of [...ar.holdStartedAt]) {

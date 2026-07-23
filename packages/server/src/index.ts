@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import { Server } from 'socket.io';
 import type { ClientToServerEvents, Player, ServerToClientEvents } from 'shared';
 import { randomPortraitIndex } from 'shared';
-import { getRoom, toRoomState } from './rooms.js';
+import { emitRoomState, getRoom, toRoomState } from './rooms.js';
 import {
   forceResetGame,
   handleHoldRelease,
@@ -59,7 +59,7 @@ io.on('connection', (socket) => {
     room.players.set(player.id, player);
 
     ack({ ok: true, playerId: player.id });
-    io.emit('room_state', toRoomState(room));
+    emitRoomState(room, io);
   });
 
   socket.on('start_game', () => {
@@ -93,7 +93,7 @@ io.on('connection', (socket) => {
       resetRoomToLobby(room); // nobody left to play with — don't leave the room stuck
     }
 
-    io.emit('room_state', toRoomState(room));
+    emitRoomState(room, io);
   });
 });
 

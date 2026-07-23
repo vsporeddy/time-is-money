@@ -60,6 +60,9 @@ export interface Round {
   id: string;
   itemInstanceId: string;
   status: 'pending' | 'active' | 'resolved';
+  // The initial opt-in deadline. Bidders do not spend time until it closes.
+  initialBidDeadlineAt: number | null;
+  bidWindowOpen: boolean;
   bidders: Record<string, RoundBidder>;
   revealedFields: string[];
   winnerId: string | null;
@@ -71,7 +74,7 @@ export interface GameSettings {
   startingTimeMs: number;
   refundOnFold: boolean;
   pendingDurationMs: number; // "get ready" window before hold buttons activate
-  noBidTimeoutMs: number; // round ends with no winner if nobody holds within this window
+  noBidTimeoutMs: number; // opt-in window before time begins draining
   maxRoundDurationMs: number; // failsafe cutoff if holders never release
   interRoundDelayMs: number; // pause between round end and the next round starting
 }
@@ -79,6 +82,8 @@ export interface GameSettings {
 export interface RoomState {
   status: RoomStatus;
   players: Player[];
+  knownItems: ItemInstance[]; // every item already won, for inventory backfill on join
+  itemPrices: Record<string, number>; // revealed winning time per item, used for score effects
   settings: GameSettings;
   currentRoundIndex: number;
 }
@@ -119,6 +124,8 @@ export interface ScoreBreakdown {
 export interface ServerToClientEvents {
   room_state: (state: RoomState) => void;
   round_start: (payload: { round: Round; item: Omit<ItemInstance, 'trueValue' | 'hiddenTraitId'> }) => void;
+  bid_window_closed: (payload: { roundId: string }) => void;
+  bidder_cancelled: (payload: { roundId: string; playerId: string }) => void;
   round_tick: (payload: { players: Record<string, number>; bidders: Record<string, number> }) => void;
   reveal: (payload: { roundId: string; field: string; value: string | number }) => void;
   bidder_dropped: (payload: { roundId: string; playerId: string; committedMs: number }) => void;
