@@ -11,7 +11,6 @@ export interface ActiveRound {
 }
 
 export interface Room {
-  code: string;
   status: RoomStatus;
   players: Map<string, Player>;
   settings: GameSettings;
@@ -30,36 +29,26 @@ const DEFAULT_SETTINGS: GameSettings = {
   interRoundDelayMs: 4_000,
 };
 
-const rooms = new Map<string, Room>();
+// Single global room — everyone who connects plays in the same game.
+const room: Room = {
+  status: 'lobby',
+  players: new Map(),
+  settings: { ...DEFAULT_SETTINGS },
+  currentRoundIndex: -1,
+  activeRound: null,
+  wonItems: new Map(),
+  itemPricePaidMs: new Map(),
+};
 
-export function getOrCreateRoom(code: string): Room {
-  let room = rooms.get(code);
-  if (!room) {
-    room = {
-      code,
-      status: 'lobby',
-      players: new Map(),
-      settings: { ...DEFAULT_SETTINGS },
-      currentRoundIndex: -1,
-      activeRound: null,
-      wonItems: new Map(),
-      itemPricePaidMs: new Map(),
-    };
-    rooms.set(code, room);
-  }
+export function getRoom(): Room {
   return room;
 }
 
-export function listRooms(): Room[] {
-  return [...rooms.values()];
-}
-
-export function toRoomState(room: Room): RoomState {
+export function toRoomState(r: Room): RoomState {
   return {
-    code: room.code,
-    status: room.status,
-    players: [...room.players.values()],
-    settings: room.settings,
-    currentRoundIndex: room.currentRoundIndex,
+    status: r.status,
+    players: [...r.players.values()],
+    settings: r.settings,
+    currentRoundIndex: r.currentRoundIndex,
   };
 }

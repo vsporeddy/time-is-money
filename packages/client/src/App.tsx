@@ -22,7 +22,6 @@ export default function App() {
   const [joined, setJoined] = useState(false);
   const [myId, setMyId] = useState<string | null>(null);
   const [name, setName] = useState('');
-  const [roomCode, setRoomCode] = useState('');
   const [room, setRoom] = useState<RoomState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,7 +39,17 @@ export default function App() {
 
     const onConnect = () => setConnected(true);
     const onDisconnect = () => setConnected(false);
-    const onRoomState = (state: RoomState) => setRoom(state);
+    const onRoomState = (state: RoomState) => {
+      setRoom(state);
+      if (state.status === 'lobby') {
+        // Covers restart_game bringing us back here — clear out the last game's view.
+        setGameOverPlayers(null);
+        setScores(null);
+        setKnownItems({});
+        setLastResult(null);
+        setCurrentRound(null);
+      }
+    };
     const onRoundStart = (payload: CurrentRound) => {
       setCurrentRound(payload);
       setLastResult(null);
@@ -94,7 +103,7 @@ export default function App() {
   const handleJoin = (e: FormEvent) => {
     e.preventDefault();
     setError(null);
-    socket.emit('join_room', { roomCode, playerName: name }, (res) => {
+    socket.emit('join_room', { playerName: name }, (res) => {
       if (res.ok) {
         setJoined(true);
         setMyId(res.playerId);
@@ -123,15 +132,6 @@ export default function App() {
             <div className="field">
               <label htmlFor="name">Your name</label>
               <input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
-            <div className="field">
-              <label htmlFor="roomCode">Room code</label>
-              <input
-                id="roomCode"
-                type="text"
-                value={roomCode}
-                onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-              />
             </div>
             <button type="submit" className="btn btn-block" disabled={!connected}>
               Join
@@ -185,6 +185,9 @@ export default function App() {
             );
           })}
         </ol>
+        <button className="btn btn-block" style={{ marginTop: '1rem' }} onClick={() => socket.emit('restart_game')}>
+          Play Again
+        </button>
       </div>
     );
   }
@@ -194,7 +197,7 @@ export default function App() {
   if (room.status === 'lobby') {
     return shellWithHeader(
       <div className="panel">
-        <h2 className="panel-title">Room {room.code}</h2>
+        <h2 className="panel-title">Lobby</h2>
         <ul className="player-row">
           {room.players.map((p) => (
             <li key={p.id} className={`player-card${p.id === myId ? ' me' : ''}`}>

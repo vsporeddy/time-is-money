@@ -1,6 +1,7 @@
 import { SpriteIcon } from './SpriteIcon';
 
 const HOURGLASS_SPRITE_INDEX = 175;
+const GOLD_SPRITE_INDEX = 202;
 
 export function Logo({ scale = 4 }: { scale?: number }) {
   return (
@@ -10,6 +11,7 @@ export function Logo({ scale = 4 }: { scale?: number }) {
         TIME is MONEY
         <small>a countdown auction</small>
       </h1>
+      <SpriteIcon index={GOLD_SPRITE_INDEX} scale={scale} />
     </div>
   );
 }

@@ -50,7 +50,7 @@ export function startRound(room: Room, io: IO) {
   };
 
   emitRoundStart(room, io);
-  io.to(room.code).emit('room_state', toRoomState(room));
+  io.emit('room_state', toRoomState(room));
 
   setTimeout(() => activateRound(room, io), room.settings.pendingDurationMs);
 }
@@ -129,8 +129,8 @@ export function handleHoldRelease(room: Room, playerId: string, io: IO) {
   bidder.committedMs = elapsed;
   bidder.droppedAt = Date.now();
 
-  io.to(room.code).emit('bidder_dropped', { roundId: ar.round.id, playerId, committedMs: elapsed });
-  io.to(room.code).emit('room_state', toRoomState(room));
+  io.emit('bidder_dropped', { roundId: ar.round.id, playerId, committedMs: elapsed });
+  io.emit('room_state', toRoomState(room));
 
   checkResolution(room, io);
 }
@@ -219,8 +219,8 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
     }
   }
 
-  io.to(room.code).emit('round_end', { round: ar.round, item: ar.item });
-  io.to(room.code).emit('room_state', toRoomState(room));
+  io.emit('round_end', { round: ar.round, item: ar.item });
+  io.emit('room_state', toRoomState(room));
 
   ar.interRoundTimer = setTimeout(() => {
     room.activeRound = null;
@@ -233,18 +233,36 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
 function finishGame(room: Room, io: IO) {
   room.status = 'game_over';
   room.activeRound = null;
-  io.to(room.code).emit('room_state', toRoomState(room));
+  io.emit('room_state', toRoomState(room));
 
   const players = [...room.players.values()];
   const scores = computeScores(players, room.wonItems, room.itemPricePaidMs);
-  io.to(room.code).emit('game_over', { players, scores });
+  io.emit('game_over', { players, scores });
+}
+
+export function restartGame(room: Room, io: IO) {
+  if (room.status !== 'game_over') return;
+
+  room.status = 'lobby';
+  room.currentRoundIndex = -1;
+  room.activeRound = null;
+  room.wonItems.clear();
+  room.itemPricePaidMs.clear();
+
+  for (const player of room.players.values()) {
+    player.timeRemainingMs = room.settings.startingTimeMs;
+    player.status = 'active';
+    player.stash = [];
+  }
+
+  io.emit('room_state', toRoomState(room));
 }
 
 function emitRoundStart(room: Room, io: IO) {
   const ar = room.activeRound;
   if (!ar) return;
   const { trueValue: _trueValue, hiddenTraitId: _hiddenTraitId, ...publicItem } = ar.item;
-  io.to(room.code).emit('round_start', { round: ar.round, item: publicItem });
+  io.emit('round_start', { round: ar.round, item: publicItem });
 }
 
 function computeTimeRefund(config: TimeRefundConfig, currentTimeRemainingMs: number, startingTimeMs: number): number {
@@ -271,7 +289,7 @@ export function tickRoom(room: Room, io: IO) {
     bidders[playerId] = now - startedAt;
   }
 
-  io.to(room.code).emit('round_tick', { players, bidders });
+  io.emit('round_tick', { players, bidders });
 
   // Force-release anyone who has run out of time while holding.
   for (const [playerId, startedAt] of [...ar.holdStartedAt]) {

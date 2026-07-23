@@ -76,7 +76,6 @@ export interface GameSettings {
 }
 
 export interface RoomState {
-  code: string;
   status: RoomStatus;
   players: Player[];
   settings: GameSettings;
@@ -84,18 +83,17 @@ export interface RoomState {
 }
 
 // --- Socket event contract ---
-// Only join_room / room_state are implemented server-side so far (lobby proof).
-// The round-related events are defined here now so client and server never
-// drift on shape once round logic lands.
+// A single global room — no room codes. Everyone who joins is in the same game.
 
 export interface ClientToServerEvents {
   join_room: (
-    payload: { roomCode: string; playerName: string },
+    payload: { playerName: string },
     ack: (res: { ok: true; playerId: string } | { ok: false; error: string }) => void
   ) => void;
   start_game: () => void;
   hold_start: () => void;
   hold_release: () => void;
+  restart_game: () => void;
 }
 
 export interface ScoreBreakdown {

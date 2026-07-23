@@ -3,8 +3,8 @@ import { createServer } from 'node:http';
 import { Server } from 'socket.io';
 import type { ClientToServerEvents, Player, ServerToClientEvents } from 'shared';
 import { randomPortraitIndex } from 'shared';
-import { getOrCreateRoom, listRooms, toRoomState } from './rooms.js';
-import { handleHoldRelease, handleHoldStart, startGame, tickRoom } from './round.js';
+import { getRoom, toRoomState } from './rooms.js';
+import { handleHoldRelease, handleHoldStart, restartGame, startGame, tickRoom } from './round.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -17,20 +17,16 @@ app.get('/health', (_req, res) => {
   res.send('ok');
 });
 
-// Tracks which room a connected socket belongs to, so disconnect can clean up.
-const socketRoom = new Map<string, string>();
-
 io.on('connection', (socket) => {
-  socket.on('join_room', ({ roomCode, playerName }, ack) => {
-    const code = roomCode.trim().toUpperCase();
+  socket.on('join_room', ({ playerName }, ack) => {
     const name = playerName.trim().slice(0, 20);
 
-    if (!code || !name) {
-      ack({ ok: false, error: 'Room code and name are required.' });
+    if (!name) {
+      ack({ ok: false, error: 'Name is required.' });
       return;
     }
 
-    const room = getOrCreateRoom(code);
+    const room = getRoom();
     if (room.status !== 'lobby') {
       ack({ ok: false, error: 'Game already in progress.' });
       return;
@@ -46,51 +42,40 @@ io.on('connection', (socket) => {
       portraitIndex: randomPortraitIndex(),
     };
     room.players.set(player.id, player);
-    socketRoom.set(socket.id, code);
-    socket.join(code);
 
     ack({ ok: true, playerId: player.id });
-    io.to(code).emit('room_state', toRoomState(room));
+    io.emit('room_state', toRoomState(room));
   });
 
   socket.on('start_game', () => {
-    const code = socketRoom.get(socket.id);
-    if (!code) return;
-    const room = getOrCreateRoom(code);
-    startGame(room, io);
+    startGame(getRoom(), io);
   });
 
   socket.on('hold_start', () => {
-    const code = socketRoom.get(socket.id);
-    if (!code) return;
-    const room = getOrCreateRoom(code);
-    handleHoldStart(room, socket.id, io);
+    handleHoldStart(getRoom(), socket.id, io);
   });
 
   socket.on('hold_release', () => {
-    const code = socketRoom.get(socket.id);
-    if (!code) return;
-    const room = getOrCreateRoom(code);
-    handleHoldRelease(room, socket.id, io);
+    handleHoldRelease(getRoom(), socket.id, io);
+  });
+
+  socket.on('restart_game', () => {
+    restartGame(getRoom(), io);
   });
 
   socket.on('disconnect', () => {
-    const code = socketRoom.get(socket.id);
-    if (!code) return;
-    socketRoom.delete(socket.id);
+    const room = getRoom();
+    if (!room.players.has(socket.id)) return;
 
-    const room = getOrCreateRoom(code);
     handleHoldRelease(room, socket.id, io); // don't leave them stuck "holding" if they vanish mid-round
     room.players.delete(socket.id);
-    io.to(code).emit('room_state', toRoomState(room));
+    io.emit('room_state', toRoomState(room));
   });
 });
 
-// Single global tick loop drives every room's live countdown broadcast.
+// Single global tick loop drives the room's live countdown broadcast.
 setInterval(() => {
-  for (const room of listRooms()) {
-    tickRoom(room, io);
-  }
+  tickRoom(getRoom(), io);
 }, 100);
 
 const PORT = Number(process.env.PORT) || 8080;
