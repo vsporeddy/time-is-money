@@ -77,6 +77,7 @@ export interface GameSettings {
   noBidTimeoutMs: number; // opt-in window before time begins draining
   maxRoundDurationMs: number; // failsafe cutoff if holders never release
   interRoundDelayMs: number; // pause between round end and the next round starting
+  maxRounds: number | null; // null means unlimited rounds
 }
 
 export interface RoomState {

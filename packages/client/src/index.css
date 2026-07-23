@@ -271,6 +271,26 @@ input[type='text']:focus {
 
 /* --- Item / auction card --- */
 
+.round-progress {
+  display: flex;
+  justify-content: center;
+  gap: 0.45rem;
+  width: 100%;
+  max-width: 640px;
+}
+
+.round-dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  background: var(--bg-panel-alt-2);
+  border: 2px solid var(--border-gold);
+  border-radius: 50%;
+}
+
+.round-dot.complete {
+  background: var(--gold-bright);
+}
+
 .initial-bid-timer {
   width: 100%;
   max-width: 640px;
@@ -645,6 +665,54 @@ input[type='text']:focus {
   letter-spacing: 0.08em;
 }
 
+.sold-details {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.55rem;
+  margin: 1rem 0;
+}
+
+.sold-detail {
+  display: flex;
+  min-height: 5.5rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.35rem;
+  background: var(--bg-panel-alt);
+  border: 2px solid var(--border-gold);
+  color: var(--text-dim);
+  font-size: 0.65rem;
+  line-height: 1.4;
+}
+
+.sold-detail strong {
+  color: var(--gold-bright);
+  font-size: 0.82rem;
+}
+
+.sold-detail .portrait-icon {
+  margin: 0;
+}
+
+.winner-detail strong {
+  font-size: 0.62rem;
+}
+
+.passed-details {
+  grid-template-columns: 1fr;
+  max-width: 11rem;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.next-lot-line {
+  margin: 1rem 0 0;
+  color: #fff;
+  font-size: 1.33rem;
+}
+
 .hidden-trait.positive {
   color: #8fbf5a;
 }
@@ -874,6 +942,15 @@ input[type='text']:focus {
   .bid-button {
     max-width: none;
     min-height: 6rem;
+  }
+
+  .sold-details {
+    gap: 0.3rem;
+  }
+
+  .sold-detail {
+    min-height: 5rem;
+    font-size: 0.52rem;
   }
 
   .field {

@@ -344,6 +344,8 @@ export default function App() {
         players={room.players}
         myId={myId!}
         isObserver={isObserver}
+        roundNumber={room.currentRoundIndex + 1}
+        maxRounds={room.settings.maxRounds}
         currentRound={currentRound}
         liveTimes={liveTimes}
         liveBids={liveBids}

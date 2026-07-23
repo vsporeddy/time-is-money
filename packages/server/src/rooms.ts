@@ -1,6 +1,10 @@
 import type { Server } from 'socket.io';
 import type { ClientToServerEvents, GameSettings, ItemInstance, Player, Round, RoomState, RoomStatus, ServerToClientEvents } from 'shared';
 
+// Game-jam tuning flag: set to false to restore the original unlimited game.
+const ROUND_LIMIT_ENABLED = true;
+const ROUND_LIMIT = 10;
+
 export interface ActiveRound {
   round: Round;
   item: ItemInstance; // full instance including trueValue — server-only until round_end
@@ -29,6 +33,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   noBidTimeoutMs: 3_000,
   maxRoundDurationMs: 45_000,
   interRoundDelayMs: 4_000,
+  maxRounds: ROUND_LIMIT_ENABLED ? ROUND_LIMIT : null,
 };
 
 // Single global room — everyone who connects plays in the same game.

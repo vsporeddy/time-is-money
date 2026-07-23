@@ -17,6 +17,7 @@ A browser-based multiplayer party game built for a game jam (theme: **COUNT DOWN
 - Items also carry category traits (Weapon, Armor, Food, etc., some nested — a Sword counts for both "Sword" and "Weapon") that pay out a bonus once you own enough of a kind, TFT-trait style. A couple of hidden traits (Blessed/Cursed/Lucky) can roll on any item and are only revealed once it sells.
 - Owning multiple exact copies of the same item has diminishing returns, so trait-hunting across different items beats hoarding one thing.
 - Game ends once every player is out of time; final ranking is base item value + all bonuses, shown with a full breakdown.
+- By default, the game also ends after 10 resolved lots. Set `ROUND_LIMIT_ENABLED` to `false` in `packages/server/src/rooms.ts` for unlimited rounds.
 - Joining after a game has already started makes you an **Observer** (visible in the player list, can't bid) instead of being locked out — see "Known rough edges" below for why that matters.
 
 ## Architecture

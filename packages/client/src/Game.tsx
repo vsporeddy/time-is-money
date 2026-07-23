@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ItemInstance, ItemTemplate, Player, Round } from 'shared';
 import { getHiddenTrait, getTemplate, getTraitDefinition } from 'shared';
 import { SpriteIcon } from './SpriteIcon';
+import { PortraitIcon } from './PortraitIcon';
 import { playClick } from './sound';
 
 function templateAttributes(template: ItemTemplate | undefined): string[] {
@@ -31,6 +32,8 @@ interface GameProps {
   players: Player[];
   myId: string;
   isObserver: boolean;
+  roundNumber: number;
+  maxRounds: number | null;
   currentRound: CurrentRound | null;
   liveTimes: Record<string, number>;
   liveBids: Record<string, number>; // playerId -> committedMs, present only while currently holding
@@ -52,6 +55,8 @@ export function Game({
   players,
   myId,
   isObserver,
+  roundNumber,
+  maxRounds,
   currentRound,
   liveTimes,
   liveBids,
@@ -110,6 +115,13 @@ export function Game({
 
   return (
     <>
+      {maxRounds !== null && (
+        <div className="round-progress" aria-label={`Round ${roundNumber} of ${maxRounds}`}>
+          {Array.from({ length: maxRounds }, (_, index) => (
+            <span key={index} className={`round-dot${index < roundNumber ? ' complete' : ''}`} />
+          ))}
+        </div>
+      )}
       {showInitialBidTimer && (
         <div className="initial-bid-timer" role="status" aria-live="polite">
           <strong>{initialBidSeconds.toFixed(1)}s</strong>
@@ -119,12 +131,21 @@ export function Game({
       {lastResult &&
         (() => {
           const hidden = getHiddenTrait(lastResult.item.hiddenTraitId);
+          const winner = lastResult.round.winnerId
+            ? players.find((player) => player.id === lastResult.round.winnerId)
+            : undefined;
+          const winningTime = lastResult.round.winnerId
+            ? lastResult.round.bidders[lastResult.round.winnerId]?.committedMs ?? 0
+            : 0;
           return (
             <div className="item-card">
               <h3 className="sold-title">{lastResult.round.winnerId ? 'SOLD' : 'PASSED'}</h3>
               <p className="item-meta">
-                {getTemplate(lastResult.item.templateId)?.name} ({lastResult.item.material}, {lastResult.item.rarity}) —
-                true value ${lastResult.item.trueValue}
+                {getTemplate(lastResult.item.templateId)?.name} (
+                <span className={`modifier ${modifierClass(lastResult.item.material)}`}>{lastResult.item.material}</span>
+                {', '}
+                <span className={`modifier ${modifierClass(lastResult.item.rarity)}`}>{lastResult.item.rarity}</span>
+                {')'}
               </p>
               {hidden && (
                 <p className={`hidden-trait ${hidden.scoreBonus >= 0 ? 'positive' : 'negative'}`}>
@@ -132,17 +153,34 @@ export function Game({
                   {hidden.scoreBonus})
                 </p>
               )}
-              <p className="item-meta">
-                {lastResult.round.winnerId
-                  ? `Won by ${players.find((p) => p.id === lastResult.round.winnerId)?.name ?? 'someone'}`
-                  : 'No one held on — item goes unclaimed.'}
-              </p>
-              {lastResult.round.winnerId && (
-                <p className="item-meta">
-                  Winning time spent: {fmt(lastResult.round.bidders[lastResult.round.winnerId]?.committedMs ?? 0)}
-                </p>
+              {winner ? (
+                <div className="sold-details">
+                  <div className="sold-detail winner-detail">
+                    <span>Won by</span>
+                    <PortraitIcon index={winner.portraitIndex} size={42} />
+                    <strong>{winner.name}</strong>
+                  </div>
+                  <div className="sold-detail">
+                    <span>Time Spent</span>
+                    <strong>{fmt(winningTime)}</strong>
+                  </div>
+                  <div className="sold-detail">
+                    <span>True Value</span>
+                    <strong>${lastResult.item.trueValue}</strong>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="item-meta">No one bid — item goes unclaimed.</p>
+                  <div className="sold-details passed-details">
+                    <div className="sold-detail">
+                      <span>True Value</span>
+                      <strong>${lastResult.item.trueValue}</strong>
+                    </div>
+                  </div>
+                </>
               )}
-              <p className="item-meta">Next lot incoming…</p>
+              <p className="next-lot-line">Next lot incoming…</p>
             </div>
           );
         })()}

@@ -258,8 +258,10 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
 
   ar.interRoundTimer = setTimeout(() => {
     room.activeRound = null;
+    const reachedRoundLimit =
+      room.settings.maxRounds !== null && room.currentRoundIndex + 1 >= room.settings.maxRounds;
     const stillPlaying = [...room.players.values()].some((p) => p.status === 'active');
-    if (stillPlaying) startRound(room, io);
+    if (!reachedRoundLimit && stillPlaying) startRound(room, io);
     else finishGame(room, io);
   }, room.settings.interRoundDelayMs);
 }
