@@ -2,6 +2,7 @@ import express from 'express';
 import { createServer } from 'node:http';
 import { Server } from 'socket.io';
 import type { ClientToServerEvents, Player, ServerToClientEvents } from 'shared';
+import { randomPortraitIndex } from 'shared';
 import { getOrCreateRoom, listRooms, toRoomState } from './rooms.js';
 import { handleHoldRelease, handleHoldStart, startGame, tickRoom } from './round.js';
 
@@ -42,6 +43,7 @@ io.on('connection', (socket) => {
       status: 'active',
       stash: [],
       connected: true,
+      portraitIndex: randomPortraitIndex(),
     };
     room.players.set(player.id, player);
     socketRoom.set(socket.id, code);

@@ -3,8 +3,9 @@ import type { FormEvent, ReactNode } from 'react';
 import type { ItemInstance, Player, Round, RoomState, ScoreBreakdown } from 'shared';
 import { getTemplate, getTraitDefinition } from 'shared';
 import { socket } from './socket';
-import { SpriteIcon } from './SpriteIcon';
+import { Logo } from './Logo';
 import { Game } from './Game';
+import { PortraitIcon } from './PortraitIcon';
 
 interface CurrentRound {
   round: Round;
@@ -103,45 +104,52 @@ export default function App() {
     });
   };
 
-  const shell = (children: ReactNode) => (
-    <main style={{ fontFamily: 'sans-serif', padding: '2rem', color: '#eee', background: '#111', minHeight: '100vh' }}>
-      <h1>Time is Money</h1>
+  const shellWithHeader = (children: ReactNode) => (
+    <main className="app-shell">
+      <div className="top-bar">
+        <Logo scale={2} />
+      </div>
       {children}
     </main>
   );
 
   if (!joined) {
-    return shell(
-      <>
-        <div style={{ display: 'flex', gap: 4, marginBottom: '1rem' }}>
-          {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
-            <SpriteIcon key={i} index={i} scale={2} />
-          ))}
+    return (
+      <main className="app-shell">
+        <Logo scale={5} />
+        <div className="panel">
+          <p className="status-line">{connected ? 'Connected to server' : 'Connecting…'}</p>
+          <form onSubmit={handleJoin}>
+            <div className="field">
+              <label htmlFor="name">Your name</label>
+              <input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+            <div className="field">
+              <label htmlFor="roomCode">Room code</label>
+              <input
+                id="roomCode"
+                type="text"
+                value={roomCode}
+                onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+              />
+            </div>
+            <button type="submit" className="btn btn-block" disabled={!connected}>
+              Join
+            </button>
+          </form>
+          {error && <p className="error-text">{error}</p>}
         </div>
-        <p>{connected ? 'Connected to server' : 'Connecting…'}</p>
-        <form onSubmit={handleJoin} style={{ display: 'flex', gap: 8 }}>
-          <input placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} />
-          <input
-            placeholder="Room code"
-            value={roomCode}
-            onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-          />
-          <button type="submit" disabled={!connected}>
-            Join
-          </button>
-        </form>
-        {error && <p style={{ color: '#f66' }}>{error}</p>}
-      </>
+      </main>
     );
   }
 
   if (gameOverPlayers && scores) {
     const ranked = [...scores].sort((a, b) => b.total - a.total);
 
-    return shell(
-      <>
-        <h2>Game Over</h2>
-        <ol>
+    return shellWithHeader(
+      <div className="panel">
+        <h2 className="panel-title">Game Over</h2>
+        <ol className="results-list">
           {ranked.map((s) => {
             const player = gameOverPlayers.find((p) => p.id === s.playerId);
             const itemNames = (player?.stash ?? [])
@@ -158,49 +166,55 @@ export default function App() {
             }
 
             return (
-              <li key={s.playerId} style={{ marginBottom: 16 }}>
-                <div>
-                  <strong>
-                    {player?.name}
-                    {s.playerId === myId ? ' (you)' : ''}
-                  </strong>{' '}
-                  — ${s.total}
+              <li key={s.playerId} className="results-item">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  {player && <PortraitIcon index={player.portraitIndex} size={40} />}
+                  <div>
+                    <div className="rank-total">
+                      {player?.name}
+                      {s.playerId === myId ? ' (you)' : ''} — ${s.total}
+                    </div>
+                    <div className="rank-breakdown">
+                      base ${s.baseValue}
+                      {extras.length > 0 ? `, ${extras.join(', ')}` : ''}
+                    </div>
+                    {itemNames.length > 0 && <div className="rank-items">{itemNames.join(', ')}</div>}
+                  </div>
                 </div>
-                <div style={{ fontSize: '0.85em', opacity: 0.85 }}>
-                  base ${s.baseValue}
-                  {extras.length > 0 ? `, ${extras.join(', ')}` : ''}
-                </div>
-                {itemNames.length > 0 && (
-                  <div style={{ fontSize: '0.85em', opacity: 0.7 }}>{itemNames.join(', ')}</div>
-                )}
               </li>
             );
           })}
         </ol>
-      </>
+      </div>
     );
   }
 
-  if (!room) return shell(<p>Loading…</p>);
+  if (!room) return shellWithHeader(<p className="status-line">Loading…</p>);
 
   if (room.status === 'lobby') {
-    return shell(
-      <>
-        <h2>Room {room.code}</h2>
-        <ul>
+    return shellWithHeader(
+      <div className="panel">
+        <h2 className="panel-title">Room {room.code}</h2>
+        <ul className="player-row">
           {room.players.map((p) => (
-            <li key={p.id}>
-              {p.name}
-              {p.id === myId ? ' (you)' : ''} — {(p.timeRemainingMs / 1000).toFixed(0)}s
+            <li key={p.id} className={`player-card${p.id === myId ? ' me' : ''}`}>
+              <PortraitIcon index={p.portraitIndex} />
+              <div className="name">
+                {p.name}
+                {p.id === myId ? ' (you)' : ''}
+              </div>
+              <div>{(p.timeRemainingMs / 1000).toFixed(0)}s</div>
             </li>
           ))}
         </ul>
-        <button onClick={() => socket.emit('start_game')}>Start Game</button>
-      </>
+        <button className="btn btn-block" style={{ marginTop: '1rem' }} onClick={() => socket.emit('start_game')}>
+          Start Game
+        </button>
+      </div>
     );
   }
 
-  return shell(
+  return shellWithHeader(
     <Game
       players={room.players}
       myId={myId!}

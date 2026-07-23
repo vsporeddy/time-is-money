@@ -3,6 +3,7 @@
 export * from './items.js';
 export * from './traits.js';
 export * from './scoring.js';
+export * from './portraits.js';
 
 export interface Player {
   id: string;
@@ -11,6 +12,7 @@ export interface Player {
   status: 'active' | 'out_of_time';
   stash: string[]; // ItemInstance ids won
   connected: boolean;
+  portraitIndex: number;
 }
 
 export interface TimeRefundConfig {

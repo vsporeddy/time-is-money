@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react';
 import type { ItemInstance, ItemTemplate, Player, Round } from 'shared';
 import { getHiddenTrait, getTemplate, getTraitDefinition } from 'shared';
 import { SpriteIcon } from './SpriteIcon';
+import { PortraitIcon } from './PortraitIcon';
 
 function templateFlags(template: ItemTemplate | undefined): string[] {
   if (!template) return [];
@@ -60,107 +62,127 @@ export function Game({
   const isDropped = (id: string) => droppedThisRound[id] !== undefined;
 
   const iHaveDropped = isDropped(myId);
-  const iAmHolding = isHolding(myId);
   const myTime = liveTimes[myId] ?? players.find((p) => p.id === myId)?.timeRemainingMs ?? 0;
   const canHold = currentRound?.round.status === 'active' && !iHaveDropped && myTime > 0;
 
+  // The server only confirms bidding/withdrawn state via round_tick / bidder_dropped,
+  // which lags a click by up to ~100ms (or never visibly arrives at all if an
+  // uncontested bid resolves instantly) — track it optimistically so the button
+  // flips the instant it's tapped, then let server state correct/confirm it.
+  const [optimisticBidding, setOptimisticBidding] = useState(false);
+  useEffect(() => {
+    setOptimisticBidding(false);
+  }, [currentRound?.round.id]);
+
+  const iAmHolding = !iHaveDropped && (optimisticBidding || isHolding(myId));
+
+  const handleBidClick = () => {
+    if (iAmHolding) {
+      setOptimisticBidding(false);
+      onHoldRelease();
+    } else if (canHold) {
+      setOptimisticBidding(true);
+      onHoldStart();
+    }
+  };
+
   return (
-    <div>
-      <ul style={{ listStyle: 'none', padding: 0, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+    <>
+      <ul className="player-row">
         {players.map((p) => {
           const holding = isHolding(p.id);
           const dropped = isDropped(p.id);
           const isMe = p.id === myId;
           const time = liveTimes[p.id] ?? p.timeRemainingMs;
+          const classes = ['player-card', isMe && 'me', holding && 'holding', dropped && 'dropped']
+            .filter(Boolean)
+            .join(' ');
           return (
-            <li
-              key={p.id}
-              style={{
-                padding: '8px 12px',
-                borderRadius: 8,
-                background: holding ? '#2a4' : dropped ? '#333' : '#222',
-                opacity: dropped ? 0.6 : 1,
-                border: isMe ? '2px solid #fff' : '2px solid transparent',
-              }}
-            >
-              <div>{p.name}{isMe ? ' (you)' : ''}</div>
+            <li key={p.id} className={classes}>
+              <PortraitIcon index={p.portraitIndex} />
+              <div className="name">
+                {p.name}
+                {isMe ? ' (you)' : ''}
+              </div>
               <div>{fmt(time)} left</div>
-              {holding && <div>holding {fmt(liveBids[p.id])}</div>}
-              {dropped && <div>folded — spent {fmt(droppedThisRound[p.id])}</div>}
+              {holding && <div>bidding {fmt(liveBids[p.id])}</div>}
+              {dropped && <div>withdrew — spent {fmt(droppedThisRound[p.id])}</div>}
             </li>
           );
         })}
       </ul>
 
-      {lastResult && (() => {
-        const hidden = getHiddenTrait(lastResult.item.hiddenTraitId);
-        return (
-          <div style={{ marginTop: 24, padding: 16, background: '#222', borderRadius: 8 }}>
-            <h3>SOLD</h3>
-            <p>
-              {getTemplate(lastResult.item.templateId)?.name} ({lastResult.item.material}, {lastResult.item.rarity}) — true
-              value ${lastResult.item.trueValue}
-            </p>
-            {hidden && (
-              <p style={{ color: hidden.scoreBonus >= 0 ? '#6c6' : '#c66' }}>
-                {hidden.name} ({hidden.scoreBonus >= 0 ? '+' : ''}
-                {hidden.scoreBonus})
+      {lastResult &&
+        (() => {
+          const hidden = getHiddenTrait(lastResult.item.hiddenTraitId);
+          return (
+            <div className="item-card">
+              <h3 className="sold-title">SOLD</h3>
+              <p className="item-meta">
+                {getTemplate(lastResult.item.templateId)?.name} ({lastResult.item.material}, {lastResult.item.rarity}) —
+                true value ${lastResult.item.trueValue}
               </p>
-            )}
-            <p>
-              {lastResult.round.winnerId
-                ? `Won by ${players.find((p) => p.id === lastResult.round.winnerId)?.name ?? 'someone'}`
-                : 'No one held on — item goes unclaimed.'}
-            </p>
-            <p>Next lot incoming…</p>
-          </div>
-        );
-      })()}
+              {hidden && (
+                <p className={`hidden-trait ${hidden.scoreBonus >= 0 ? 'positive' : 'negative'}`}>
+                  {hidden.name} ({hidden.scoreBonus >= 0 ? '+' : ''}
+                  {hidden.scoreBonus})
+                </p>
+              )}
+              <p className="item-meta">
+                {lastResult.round.winnerId
+                  ? `Won by ${players.find((p) => p.id === lastResult.round.winnerId)?.name ?? 'someone'}`
+                  : 'No one held on — item goes unclaimed.'}
+              </p>
+              <p className="item-meta">Next lot incoming…</p>
+            </div>
+          );
+        })()}
 
       {!lastResult && currentRound && (
-        <div style={{ marginTop: 24, padding: 16, background: '#222', borderRadius: 8, textAlign: 'center' }}>
-          <SpriteIcon index={Number(currentRound.item.visual.baseSpriteId)} scale={4} />
-          <h3>{getTemplate(currentRound.item.templateId)?.name}</h3>
-          <p>
+        <div className="item-card">
+          <div className="item-sprite">
+            <SpriteIcon index={Number(currentRound.item.visual.baseSpriteId)} scale={5} />
+          </div>
+          <h3 className="item-name">{getTemplate(currentRound.item.templateId)?.name}</h3>
+          <p className="item-meta">
             {currentRound.item.material} · {currentRound.item.rarity} · value: ???
           </p>
-          <p style={{ fontSize: '0.85em', opacity: 0.8 }}>
-            {getTemplate(currentRound.item.templateId)
-              ?.traits.map((id) => getTraitDefinition(id)?.name ?? id)
-              .join(' · ')}
-          </p>
-          {templateFlags(getTemplate(currentRound.item.templateId)).map((flag) => (
-            <p key={flag} style={{ fontSize: '0.8em', color: '#fc6' }}>
-              {flag}
-            </p>
-          ))}
 
-          {currentRound.round.status === 'pending' && <p>Get ready…</p>}
+          <div className="tag-row">
+            {getTemplate(currentRound.item.templateId)?.traits.map((id) => (
+              <span key={id} className="tag">
+                {getTraitDefinition(id)?.name ?? id}
+              </span>
+            ))}
+          </div>
+
+          {templateFlags(getTemplate(currentRound.item.templateId)).length > 0 && (
+            <div className="tag-row">
+              {templateFlags(getTemplate(currentRound.item.templateId)).map((flag) => (
+                <span key={flag} className="tag tag-flag">
+                  {flag}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {currentRound.round.status === 'pending' && <p className="status-line">Get ready…</p>}
 
           {currentRound.round.status === 'active' && (
             <>
               <button
-                disabled={!canHold}
-                onPointerDown={canHold ? onHoldStart : undefined}
-                onPointerUp={onHoldRelease}
-                onPointerLeave={onHoldRelease}
-                onPointerCancel={onHoldRelease}
-                style={{
-                  fontSize: '1.5rem',
-                  padding: '16px 32px',
-                  borderRadius: 12,
-                  background: iAmHolding ? '#c33' : '#357',
-                  color: '#fff',
-                  border: 'none',
-                }}
+                disabled={!canHold && !iAmHolding}
+                onClick={handleBidClick}
+                className={`bid-button${iAmHolding ? ' active' : ''}`}
+                style={{ marginTop: '1rem' }}
               >
-                {iHaveDropped ? 'Folded' : iAmHolding ? 'Holding…' : 'Hold to bid'}
+                {iHaveDropped ? 'Withdrawn' : iAmHolding ? 'Withdraw' : 'Bid'}
               </button>
-              {iAmHolding && <p>Spending: {fmt(liveBids[myId])}</p>}
+              {iAmHolding && <p className="spend-line">Spending: {fmt(liveBids[myId] ?? 0)}</p>}
             </>
           )}
         </div>
       )}
-    </div>
+    </>
   );
 }
