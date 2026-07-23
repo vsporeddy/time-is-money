@@ -31,7 +31,7 @@ export function Chat({ messages, onSend }: ChatProps) {
   return (
     <div className="chat-panel">
       <div className="chat-header">
-        <SpriteIcon index={CHAT_ICON_SPRITE_INDEX} scale={2} />
+        <SpriteIcon index={CHAT_ICON_SPRITE_INDEX} scale={1} />
         <span>Chat</span>
       </div>
       <div className="chat-messages" ref={listRef}>

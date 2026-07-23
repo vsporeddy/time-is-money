@@ -23,7 +23,7 @@
   --shadow: rgba(0, 0, 0, 0.65);
   --font-pixel: 'Press Start 2P', 'Courier New', monospace;
   --dock-height: 13rem;
-  --chat-height: 9rem;
+  --chat-height: 16rem;
 }
 
 * {
@@ -60,7 +60,7 @@ input {
 .app-shell {
   min-height: 100vh;
   padding: 1rem;
-  padding-bottom: calc(var(--dock-height) + var(--chat-height) + 1rem); /* clears the fixed chat + player dock */
+  padding-bottom: calc(var(--dock-height) + 1rem); /* clears the fixed bottom bar (dock + chat share its height) */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -190,7 +190,21 @@ input[type='text']:focus {
   font-size: 0.75rem;
 }
 
-/* --- Player list: fixed dock along the bottom of the screen --- */
+/* --- Bottom bar: player dock (left, scrolls) + chat (right, fixed width) --- */
+
+.bottom-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  height: var(--dock-height);
+  display: flex;
+  align-items: stretch;
+  background: var(--bg-panel);
+  border-top: 4px solid var(--border-gold);
+  box-shadow: 0 -4px 0 0 var(--shadow);
+}
 
 .player-row {
   list-style: none;
@@ -199,21 +213,10 @@ input[type='text']:focus {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  flex-wrap: nowrap;
-  justify-content: flex-start;
+  flex: 1 1 auto;
+  min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
-  width: 100%;
-  max-width: none;
-  height: var(--dock-height);
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 20;
-  background: var(--bg-panel);
-  border-top: 4px solid var(--border-gold);
-  box-shadow: 0 -4px 0 0 var(--shadow);
 }
 
 .player-card {
@@ -444,30 +447,24 @@ input[type='text']:focus {
   transform: translate(1px, 1px);
 }
 
-/* --- Chat: always-visible strip pinned above the player dock --- */
+/* --- Chat: far-right column of the bottom bar, next to the player dock --- */
 
 .chat-panel {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: var(--dock-height);
-  z-index: 20;
-  width: 100%;
-  height: var(--chat-height);
+  flex: 0 0 320px;
+  max-width: 320px;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--bg-panel);
-  border-top: 4px solid var(--border-gold);
-  box-shadow: 0 -4px 0 0 var(--shadow);
+  border-left: 4px solid var(--border-gold);
 }
 
 .chat-header {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.6rem;
+  gap: 0.35rem;
+  padding: 0.15rem 0.5rem;
   color: var(--gold);
-  font-size: 0.65rem;
+  font-size: 0.55rem;
   border-bottom: 2px solid var(--border-gold);
   flex: 0 0 auto;
 }
@@ -535,7 +532,29 @@ input[type='text']:focus {
 
   .app-shell {
     padding: 0.6rem;
+    padding-bottom: calc(var(--dock-height) + var(--chat-height) + 0.6rem);
     gap: 0.85rem;
+  }
+
+  /* Side-by-side doesn't work at phone widths — stack chat above the dock instead. */
+  .bottom-bar {
+    flex-direction: column;
+    height: auto;
+  }
+
+  .chat-panel {
+    order: -1;
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: none;
+    height: var(--chat-height);
+    border-left: none;
+    border-bottom: 3px solid var(--border-gold);
+  }
+
+  .player-row {
+    flex: 0 0 auto;
+    height: var(--dock-height);
   }
 
   .panel,

@@ -139,6 +139,40 @@ export default function App() {
   const myPlayer = room?.players.find((p) => p.id === myId);
   const isObserver = myPlayer?.isObserver ?? false;
 
+  const fmt = (ms: number) => (Math.max(0, ms) / 1000).toFixed(1) + 's';
+
+  const playerDock = (
+    <ul className="player-row">
+      {(room?.players ?? []).map((p) => {
+        const isMe = p.id === myId;
+        const holding = liveBids[p.id] !== undefined;
+        const dropped = droppedThisRound[p.id] !== undefined;
+        const time = liveTimes[p.id] ?? p.timeRemainingMs;
+        const classes = ['player-card', isMe && 'me', holding && 'holding', dropped && 'dropped']
+          .filter(Boolean)
+          .join(' ');
+        return (
+          <li key={p.id} className={classes}>
+            <PortraitIcon index={p.portraitIndex} />
+            <div className="name">
+              {p.name}
+              {isMe ? ' (you)' : ''}
+            </div>
+            {p.isObserver ? (
+              <div>Observing</div>
+            ) : (
+              <>
+                <div>{fmt(time)} left</div>
+                {holding && <div>bidding {fmt(liveBids[p.id])}</div>}
+                {dropped && <div>withdrew — spent {fmt(droppedThisRound[p.id])}</div>}
+              </>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+
   let screen: ReactNode;
 
   if (!joined) {
@@ -221,19 +255,7 @@ export default function App() {
     screen = shellWithHeader(
       <div className="panel">
         <h2 className="panel-title">Lobby</h2>
-        <ul className="player-row">
-          {room.players.map((p) => (
-            <li key={p.id} className={`player-card${p.id === myId ? ' me' : ''}`}>
-              <PortraitIcon index={p.portraitIndex} />
-              <div className="name">
-                {p.name}
-                {p.id === myId ? ' (you)' : ''}
-              </div>
-              <div>{(p.timeRemainingMs / 1000).toFixed(0)}s</div>
-            </li>
-          ))}
-        </ul>
-        <button className="btn btn-block" style={{ marginTop: '1rem' }} onClick={() => socket.emit('start_game')}>
+        <button className="btn btn-block" onClick={() => socket.emit('start_game')}>
           START GAME
         </button>
       </div>
@@ -261,7 +283,10 @@ export default function App() {
       <button className="dev-reset-button" onClick={handleResetGame}>
         Reset Game
       </button>
-      <Chat messages={chatMessages} onSend={(text) => socket.emit('send_chat', { name: name || 'Guest', text })} />
+      <div className="bottom-bar">
+        {playerDock}
+        <Chat messages={chatMessages} onSend={(text) => socket.emit('send_chat', { name: name || 'Guest', text })} />
+      </div>
     </>
   );
 }

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import type { ItemInstance, ItemTemplate, Player, Round } from 'shared';
 import { getHiddenTrait, getTemplate, getTraitDefinition } from 'shared';
 import { SpriteIcon } from './SpriteIcon';
-import { PortraitIcon } from './PortraitIcon';
 
 function templateFlags(template: ItemTemplate | undefined): string[] {
   if (!template) return [];
@@ -90,36 +89,6 @@ export function Game({
 
   return (
     <>
-      <ul className="player-row">
-        {players.map((p) => {
-          const holding = isHolding(p.id);
-          const dropped = isDropped(p.id);
-          const isMe = p.id === myId;
-          const time = liveTimes[p.id] ?? p.timeRemainingMs;
-          const classes = ['player-card', isMe && 'me', holding && 'holding', dropped && 'dropped']
-            .filter(Boolean)
-            .join(' ');
-          return (
-            <li key={p.id} className={classes}>
-              <PortraitIcon index={p.portraitIndex} />
-              <div className="name">
-                {p.name}
-                {isMe ? ' (you)' : ''}
-              </div>
-              {p.isObserver ? (
-                <div>Observing</div>
-              ) : (
-                <>
-                  <div>{fmt(time)} left</div>
-                  {holding && <div>bidding {fmt(liveBids[p.id])}</div>}
-                  {dropped && <div>withdrew — spent {fmt(droppedThisRound[p.id])}</div>}
-                </>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-
       {lastResult &&
         (() => {
           const hidden = getHiddenTrait(lastResult.item.hiddenTraitId);
