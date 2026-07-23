@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-const MUSIC_SRC = '/sounds/music/menu.mp3';
+const MUSIC_SRC = `${import.meta.env.BASE_URL}sounds/music/menu.mp3`;
 
 export function BackgroundMusic() {
   const audioRef = useRef<HTMLAudioElement | null>(null);

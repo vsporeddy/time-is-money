@@ -5,7 +5,7 @@ let sheetImage: HTMLImageElement | null = null;
 function getSheet() {
   if (!sheetImage) {
     sheetImage = new Image();
-    sheetImage.src = '/portraits.png';
+    sheetImage.src = `${import.meta.env.BASE_URL}portraits.png`;
   }
   return sheetImage;
 }

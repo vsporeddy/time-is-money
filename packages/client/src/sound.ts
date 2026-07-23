@@ -1,4 +1,4 @@
-const SFX_BASE = '/sounds/interface/';
+const SFX_BASE = `${import.meta.env.BASE_URL}sounds/interface/`;
 
 function playSfx(file: string, volume = 0.5) {
   const audio = new Audio(`${SFX_BASE}${file}`);
