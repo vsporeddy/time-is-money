@@ -997,7 +997,16 @@ input[type='text']:focus {
 
   .bid-button {
     max-width: none;
-    min-height: 6rem;
+    min-height: 4.5rem;
+    padding: 0.85rem 1.5rem;
+    font-size: clamp(0.8rem, 4.5vw, 0.95rem);
+  }
+
+  /* Sprite is drawn at 128px (4x a 32px source) — 96px keeps it an exact
+     3x multiple so it stays pixel-crisp while taking up less vertical space. */
+  .item-sprite canvas {
+    width: 96px;
+    height: 96px;
   }
 
   .sold-details {
