@@ -18,8 +18,8 @@ export function playCountdownTick() {
   playSfx('ding.wav', 0.35);
 }
 
-export function playCoin() {
-  playSfx('coin.wav', 0.2);
+export function playCoin(volume = 0.2) {
+  playSfx('coin.wav', volume);
 }
 
 export function playWin() {

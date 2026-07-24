@@ -21,13 +21,13 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   // --- Armor (broad trait: armor) ---
   { id: 'horned-helm', name: 'Horned Helm', baseSpriteId: '115', valueRange: [30, 75], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['armor'] },
   { id: 'leather-vest', name: 'Leather Vest', baseSpriteId: '118', valueRange: [20, 55], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['armor'] },
-  { id: 'chainmail', name: 'Chainmail', baseSpriteId: '119', valueRange: [35, 90], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['armor'] },
-  { id: 'travelers-hood', name: "Traveler's Hood", baseSpriteId: '117', valueRange: [10, 30], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['armor'], scoreScaling: 'bargain' },
+  { id: 'plate-armor', name: 'Plate Armor', baseSpriteId: '119', valueRange: [35, 90], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['armor'] },
+  { id: 'travelers-cuirass', name: "Traveler's Cuirass", baseSpriteId: '117', valueRange: [10, 30], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['armor'], scoreScaling: 'bargain' },
   { id: 'worn-boots', name: 'Worn Boots', baseSpriteId: '130', valueRange: [8, 25], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['armor'] },
   { id: 'reinforced-gauntlet', name: 'Reinforced Gauntlet', baseSpriteId: '129', valueRange: [15, 40], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['armor'] },
 
   // --- Trinkets (broad trait: trinket) ---
-  { id: 'gold-ring', name: 'Gold Ring', baseSpriteId: '134', valueRange: [20, 60], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['trinket'] },
+  { id: 'gold-pendant', name: 'Gold Pendant', baseSpriteId: '134', valueRange: [20, 60], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['trinket'] },
   { id: 'diamond-ring', name: 'Diamond Ring', baseSpriteId: '133', valueRange: [40, 130], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['trinket'], scoreScaling: 'investment' },
   { id: 'bonetooth-necklace', name: 'Bonetooth Necklace', baseSpriteId: '136', valueRange: [35, 100], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['trinket'], loner: 25 },
 

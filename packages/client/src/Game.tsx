@@ -51,6 +51,18 @@ function modifierClass(value: string): string {
   return `modifier-${value.toLowerCase().replace(/\s+/g, '-')}`;
 }
 
+function lerpColor(from: [number, number, number], to: [number, number, number], t: number): string {
+  const r = Math.round(from[0] + (to[0] - from[0]) * t);
+  const g = Math.round(from[1] + (to[1] - from[1]) * t);
+  const b = Math.round(from[2] + (to[2] - from[2]) * t);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+// Shared with both the coin cue's volume ramp and the timer's size/color ramp.
+const SPENDING_URGENCY_CAP_SECONDS = 30;
+const COIN_MIN_VOLUME = 0.08;
+const COIN_MAX_VOLUME = 0.4;
+
 export function Game({
   players,
   myId,
@@ -97,11 +109,17 @@ export function Game({
   // starts once the window closes, so that's when the coin cue should too.
   const iAmSpending = iAmHolding && currentRound?.round.bidWindowOpen === false;
 
-  // Ticking "spending money" cue for as long as the player is actively spending.
+  // Ticking "spending money" cue for as long as the player is actively spending —
+  // starts quiet and ramps louder the longer the lot has been contested, capping at 30s.
   useEffect(() => {
     if (!iAmSpending) return;
-    playCoin();
-    const interval = window.setInterval(playCoin, 300);
+    const startedAt = currentRound?.round.spendingStartedAt ?? Date.now();
+    const tick = () => {
+      const urgency = Math.min(1, (Date.now() - startedAt) / 1000 / SPENDING_URGENCY_CAP_SECONDS);
+      playCoin(COIN_MIN_VOLUME + (COIN_MAX_VOLUME - COIN_MIN_VOLUME) * urgency);
+    };
+    tick();
+    const interval = window.setInterval(tick, 300);
     return () => window.clearInterval(interval);
   }, [iAmSpending]);
 
@@ -135,6 +153,11 @@ export function Game({
   const spendingSeconds = spendingStartedAt ? Math.max(0, (now - spendingStartedAt) / 1000) : null;
   const showSpendingTimer =
     currentRound?.round.status === 'active' && !currentRound.round.bidWindowOpen && spendingSeconds !== null;
+
+  // Grows larger and redder the longer the lot has been contested, capping at 30s.
+  const spendingUrgency = spendingSeconds !== null ? Math.min(1, spendingSeconds / SPENDING_URGENCY_CAP_SECONDS) : 0;
+  const spendingFontSizeRem = 1.8 + (3.6 - 1.8) * spendingUrgency;
+  const spendingColor = lerpColor([217, 130, 43] /* amber */, [201, 79, 79] /* red-bright */, spendingUrgency);
 
   const handleBidClick = () => {
     playClick();
@@ -199,7 +222,7 @@ export function Game({
                 </div>
               ) : (
                 <>
-                  <p className="item-meta">No one bid — item goes unclaimed.</p>
+                  <p className="item-meta">No one bid! Item goes unclaimed.</p>
                   <div className="sold-details passed-details">
                     <div className="sold-detail">
                       <span>True Value</span>
@@ -265,7 +288,9 @@ export function Game({
       )}
       {showSpendingTimer && (
         <div className="initial-bid-timer" role="status" aria-live="polite">
-          <strong>{spendingSeconds!.toFixed(1)}s</strong>
+          <strong style={{ fontSize: `${spendingFontSizeRem}rem`, color: spendingColor }}>
+            {spendingSeconds!.toFixed(1)}s
+          </strong>
           <small>Bidding is underway.</small>
         </div>
       )}

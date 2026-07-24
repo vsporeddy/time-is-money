@@ -37,7 +37,7 @@ export function Chat({ messages, onSend }: ChatProps) {
         <span>Chat</span>
       </div>
       <div className="chat-messages" ref={listRef}>
-        {messages.length === 0 && <p className="chat-empty">No messages yet — say hi.</p>}
+        {messages.length === 0 && <p className="chat-empty">It's quiet in here...</p>}
         {messages.map((m) => (
           <p key={m.id} className="chat-line">
             <span className="chat-name">{m.name}:</span> <span className="chat-text">{m.text}</span>

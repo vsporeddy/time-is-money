@@ -30,7 +30,7 @@ export default function App() {
     myIdRef.current = myId;
   }, [myId]);
   // Withdrawing as the last remaining bidder actually wins the lot (see
-  // handleHoldRelease in round.ts) — suppress the "lose" cue for that case
+  // handleHoldRelease in round.ts). Suppress the "lose" cue for that case
   // so it doesn't play right before the "win" cue.
   const suppressNextLoseRef = useRef(false);
   const [name, setName] = useState('');
@@ -248,7 +248,7 @@ export default function App() {
               <>
                 <div>{fmt(time)} left</div>
                 {holding && <div>bidding {fmt(liveBids[p.id])}</div>}
-                {dropped && <div>withdrew — spent {fmt(droppedThisRound[p.id])}</div>}
+                {dropped && <div>withdrew! Spent {fmt(droppedThisRound[p.id])}</div>}
               </>
             ) : holding ? (
               <div>bidding</div>
@@ -268,7 +268,7 @@ export default function App() {
         <div className="panel">
           <p className="status-line">{connected ? 'Connected to server' : 'Connecting…'}</p>
           {room && room.status !== 'lobby' && (
-            <p className="status-line">A game is already in progress — you'll join as an observer.</p>
+            <p className="status-line">A game is already in progress. You'll join as an observer.</p>
           )}
           <form onSubmit={handleJoin}>
             <div className="field">
@@ -288,7 +288,7 @@ export default function App() {
 
     screen = shellWithHeader(
       <div className="panel">
-        <h2 className="panel-title">Game Over</h2>
+        <h2 className="panel-title">GAME OVER</h2>
         <ol className="results-list">
           {ranked.map((s) => {
             const player = gameOverPlayers.find((p) => p.id === s.playerId);
@@ -312,7 +312,7 @@ export default function App() {
                   <div>
                     <div className="rank-total">
                       {player?.name}
-                      {s.playerId === myId ? ' (you)' : ''} — ${s.total}
+                      {s.playerId === myId ? ' (you)' : ''}: ${s.total}
                     </div>
                     <div className="rank-breakdown">
                       base ${s.baseValue}
@@ -341,9 +341,9 @@ export default function App() {
     screen = shellWithHeader(<p className="status-line">Loading…</p>);
   } else if (room.status === 'game_over') {
     // room.status flipped to game_over before we had a chance to see the
-    // one-time game_over event (e.g. joined right as it fired) — nothing to
+    // one-time game_over event (e.g. joined right as it fired). Nothing to
     // rank, just wait for the next game.
-    screen = shellWithHeader(<p className="status-line">A game just ended — waiting for a new one to start.</p>);
+    screen = shellWithHeader(<p className="status-line">A game just ended! Waiting for a new one to start.</p>);
   } else if (room.status === 'lobby') {
     screen = shellWithHeader(
       <div className="panel">
