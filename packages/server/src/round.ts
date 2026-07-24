@@ -314,6 +314,9 @@ export function restartGame(room: Room, io: IO) {
 // Dev-only escape hatch — resets from ANY state, no guard. Remove before shipping.
 export function forceResetGame(room: Room, io: IO) {
   resetRoomToLobby(room);
+  for (const [id, player] of room.players) {
+    if (player.isBot) room.players.delete(id);
+  }
   emitRoomState(room, io);
 }
 
