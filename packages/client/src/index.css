@@ -875,7 +875,8 @@ input[type='text']:focus {
 
 @media (max-width: 560px) {
   :root {
-    --chat-height: 7rem;
+    --dock-height: 8rem;
+    --chat-height: 11rem;
   }
 
   .app-shell {
@@ -903,6 +904,8 @@ input[type='text']:focus {
   .player-row {
     flex: 0 0 auto;
     height: var(--dock-height);
+    padding: 0.4rem;
+    gap: 0.4rem;
   }
 
   .panel,
@@ -916,8 +919,17 @@ input[type='text']:focus {
   }
 
   .player-card {
-    min-width: 6rem;
-    font-size: 0.62rem;
+    min-width: 4.5rem;
+    padding: 0.4rem 0.5rem;
+    font-size: 0.55rem;
+  }
+
+  /* Portraits dominate the crowded dock at desktop size (120px) — shrink
+     them so the dock (and the chat panel stacked above it) both fit. */
+  .player-row .portrait-icon {
+    width: 3rem !important;
+    height: 3rem !important;
+    margin-bottom: 0.25rem;
   }
 
   .inventory-panel {
