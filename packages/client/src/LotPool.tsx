@@ -50,7 +50,7 @@ export function LotPool({ pool, onClose }: LotPoolProps) {
             return (
               <div key={entry.id} className={slotClasses} title={label}>
                 {entry.saleRound !== undefined && <span className="lot-pool-round-badge">{entry.saleRound}</span>}
-                <SpriteIcon index={Number(template?.baseSpriteId ?? 0)} scale={2} />
+                {hidden ? <span className="lot-pool-mystery-mark">?</span> : <SpriteIcon index={Number(template?.baseSpriteId ?? 0)} scale={2} />}
               </div>
             );
           })}

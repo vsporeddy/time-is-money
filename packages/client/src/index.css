@@ -586,8 +586,15 @@ input[type='text']:focus {
   grid-template-columns: repeat(6, 1fr);
 }
 
-.lot-pool-slot-hidden canvas {
-  filter: blur(3px);
+.lot-pool-slot-hidden {
+  border-style: dashed;
+  border-color: var(--gold);
+}
+
+.lot-pool-mystery-mark {
+  font-family: var(--font-pixel);
+  font-size: 1.3rem;
+  color: var(--text-dim);
 }
 
 .lot-pool-slot-auctioned {
