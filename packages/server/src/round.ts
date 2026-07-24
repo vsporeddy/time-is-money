@@ -586,13 +586,14 @@ export function useWeapon(
   return { ok: true };
 }
 
-// The Magnifying Glass skips the staggered reveal entirely and shows the
-// true value up front — a persistent effect re-checked every time the lot
-// is (re-)announced, including after an Arcane Staff transform.
+// The Magnifying Glass skips the staggered reveal entirely, showing rarity/
+// material/specialModifier up front — a persistent effect re-checked every
+// time the lot is (re-)announced, including after an Arcane Staff transform.
+// trueValue is always public now (base value is fixed), so it needs no masking.
 function maskedItemForSocket(room: Room, ar: ActiveRound, socketId: string): MaskedRoundItem {
-  const { trueValue, hiddenTraitId: _hiddenTraitId, material, rarity, specialModifier, ...publicItem } = ar.item;
+  const { hiddenTraitId: _hiddenTraitId, material, rarity, specialModifier, ...publicItem } = ar.item;
   return ownsItemTemplate(room, socketId, 'magnifying-glass')
-    ? { ...publicItem, material, rarity, specialModifier, revealedValue: trueValue }
+    ? { ...publicItem, material, rarity, specialModifier, modifiersRevealedInstantly: true }
     : publicItem;
 }
 

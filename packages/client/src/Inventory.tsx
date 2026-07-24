@@ -78,7 +78,7 @@ function itemAttributes(item: ItemInstance): DisplayAttribute[] {
   if (item.fairTrade) attributes.push({ label: 'Fair Trade', effect: true });
   if (template?.effectType === 'timeRefund') attributes.push({ label: 'Time Refund' });
   if (item.loner) attributes.push({ label: 'Loner', effect: true });
-  if (template?.effectType === 'revealValue') attributes.push({ label: 'Reveals Value', effect: true });
+  if (template?.effectType === 'revealValue') attributes.push({ label: 'Reveals Modifiers & Pool', effect: true });
   if (template?.effectType === 'revealBidding') attributes.push({ label: 'Scouts Bidders', effect: true });
   if (template?.effectType === 'chest') attributes.push({ label: 'Needs Key', effect: true });
   if (template?.effectType === 'key') attributes.push({ label: 'Opens Chests', effect: true });

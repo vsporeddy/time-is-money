@@ -73,6 +73,8 @@ export function ownsItemTemplate(r: Room, playerId: string | undefined, template
 }
 
 export function toRoomState(r: Room, viewerId?: string): RoomState {
+  const hasMagnifyingGlass = ownsItemTemplate(r, viewerId, 'magnifying-glass');
+
   return {
     status: r.status,
     players: [...r.players.values()].map((player) =>
@@ -82,11 +84,18 @@ export function toRoomState(r: Room, viewerId?: string): RoomState {
     itemPrices: Object.fromEntries(r.itemPricePaidMs),
     settings: r.settings,
     currentRoundIndex: r.currentRoundIndex,
-    lotPool: r.lotPool.map((item) => ({
-      id: item.id,
-      templateId: item.templateId,
-      status: r.revealedPoolItemIds.has(item.id) ? 'auctioned' : r.hiddenPoolItemIds.has(item.id) ? 'hidden' : 'upcoming',
-    })),
+    lotPool: r.lotPool.map((item) => {
+      const auctioned = r.revealedPoolItemIds.has(item.id);
+      const hidden = !hasMagnifyingGlass && !auctioned && r.hiddenPoolItemIds.has(item.id);
+      const auctionIndex = r.auctionOrder.indexOf(item.id);
+      return {
+        id: item.id,
+        templateId: item.templateId,
+        status: auctioned ? 'auctioned' : hidden ? 'hidden' : 'upcoming',
+        // Magnifying Glass: reveal the whole schedule, not just this lot's modifiers.
+        saleRound: hasMagnifyingGlass && auctionIndex !== -1 ? auctionIndex + 1 : undefined,
+      };
+    }),
   };
 }
 

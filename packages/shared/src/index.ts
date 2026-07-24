@@ -42,7 +42,7 @@ export interface ItemTemplate {
   id: string;
   name: string;
   baseSpriteId: string;
-  valueRange: [number, number];
+  baseValue: number; // fixed per template — variance now comes entirely from rolled modifiers
   materials: string[];
   rarities: string[];
   effectType:
@@ -64,7 +64,7 @@ export interface ItemTemplate {
   timeRefund?: TimeRefundConfig; // present when effectType === 'timeRefund'
   chest?: ChestConfig; // present when effectType === 'chest'
   weapon?: WeaponEffectConfig; // present for the active-use weapon effect types above
-  flatValue?: boolean; // skips material/rarity/specialModifier/loner/investment/fairTrade/hiddenTrait rolls; trueValue is fixed at valueRange[0]
+  flatValue?: boolean; // skips material/rarity/specialModifier/loner/investment/fairTrade/hiddenTrait rolls (baseValue is always fixed regardless)
   traits: string[]; // TraitDefinition ids this template's items count toward (category traits, may nest)
   scoreScaling?: 'bargain'; // template-specific score effect
 }
@@ -130,6 +130,7 @@ export interface LotPoolItem {
   id: string;
   templateId: string;
   status: 'hidden' | 'upcoming' | 'auctioned';
+  saleRound?: number; // 1-indexed position in the (otherwise secret) auction order — only sent to a Magnifying Glass owner; absent for pool leftovers
 }
 
 export interface RoomState {
@@ -186,11 +187,14 @@ export interface ScoreBreakdown {
   total: number;
 }
 
-// What every client sees of the active lot: true value/rarity/material/specialModifier/
-// hidden trait are stripped unless individually revealed — except for a Magnifying
-// Glass owner, who gets material/rarity/specialModifier plus revealedValue up front.
-export type MaskedRoundItem = Omit<ItemInstance, 'trueValue' | 'hiddenTraitId' | 'material' | 'rarity' | 'specialModifier'> &
-  Partial<Pick<ItemInstance, 'material' | 'rarity' | 'specialModifier'>> & { revealedValue?: number };
+// What every client sees of the active lot. trueValue is always shown (base
+// value is fixed and public; only the modifier rolls create variance).
+// rarity/material/specialModifier/hiddenTrait are stripped unless individually
+// revealed — except for a Magnifying Glass owner, who gets them all up front.
+export type MaskedRoundItem = Omit<ItemInstance, 'hiddenTraitId' | 'material' | 'rarity' | 'specialModifier'> &
+  Partial<Pick<ItemInstance, 'material' | 'rarity' | 'specialModifier'>> & {
+    modifiersRevealedInstantly?: boolean; // true for a Magnifying Glass owner — lets the client skip the blur-in animation
+  };
 
 export interface ServerToClientEvents {
   room_state: (state: RoomState) => void;
