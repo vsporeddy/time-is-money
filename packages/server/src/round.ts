@@ -1,7 +1,7 @@
 import type { Server } from 'socket.io';
-import type { ClientToServerEvents, Round, ServerToClientEvents, TimeRefundConfig } from 'shared';
-import { computeScores, getTemplate, ITEM_TEMPLATES, rollItemInstance } from 'shared';
-import { emitRoomState } from './rooms.js';
+import type { ClientToServerEvents, Player, Round, ServerToClientEvents, TimeRefundConfig } from 'shared';
+import { computeScores, getTemplate, ITEM_TEMPLATES, rollItemInstance, rollItemInstanceForTemplate } from 'shared';
+import { emitRoomState, ownsItemTemplate } from './rooms.js';
 import type { Room } from './rooms.js';
 import { scheduleBotEntries, scheduleBotReleases } from './bots.js';
 
@@ -185,8 +185,9 @@ export function handleHoldRelease(room: Room, playerId: string, io: IO) {
   bidder.committedMs = elapsed;
   bidder.droppedAt = Date.now();
 
-  // A player's spent time is private until the final result.
-  io.to(playerId).emit('bidder_dropped', { roundId: ar.round.id, playerId, committedMs: elapsed });
+  // A player's spent time is private until the final result — except to
+  // whoever holds a Spyglass, which reveals it live.
+  emitBidderDropped(room, io, { roundId: ar.round.id, playerId, committedMs: elapsed });
   emitRoomState(room, io);
 
   // Bidding is an opt-in phase: a lone bidder stays in until they choose to
@@ -277,6 +278,8 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
           if (winner.status === 'out_of_time') winner.status = 'active';
         }
       }
+
+      tryOpenChests(room, winner);
     }
   }
 
@@ -344,11 +347,56 @@ export function forceResetGame(room: Room, io: IO) {
   emitRoomState(room, io);
 }
 
+// Sends the winner's amount to whoever is entitled to see it: the withdrawer
+// themself, plus anyone currently holding a Spyglass.
+function emitBidderDropped(room: Room, io: IO, payload: { roundId: string; playerId: string; committedMs: number }) {
+  for (const socketId of io.sockets.sockets.keys()) {
+    if (socketId === payload.playerId || ownsItemTemplate(room, socketId, 'spyglass')) {
+      io.to(socketId).emit('bidder_dropped', payload);
+    }
+  }
+}
+
+// Combining a chest with its matching key consumes both and grants a handful
+// of random items from the chest's reward trait. Checked right after a win
+// changes the winner's stash, since that's the only way stash contents change.
+function tryOpenChests(room: Room, player: Player) {
+  for (const chestTemplate of ITEM_TEMPLATES) {
+    if (!chestTemplate.chest) continue;
+
+    const chestItemId = player.stash.find((id) => room.wonItems.get(id)?.templateId === chestTemplate.id);
+    const keyItemId = player.stash.find((id) => room.wonItems.get(id)?.templateId === chestTemplate.chest!.keyTemplateId);
+    if (!chestItemId || !keyItemId) continue;
+
+    player.stash = player.stash.filter((id) => id !== chestItemId && id !== keyItemId);
+
+    const { grantsTraitId, grantsCountRange } = chestTemplate.chest;
+    const [min, max] = grantsCountRange;
+    const grantCount = min + Math.floor(Math.random() * (max - min + 1));
+    const pool = ITEM_TEMPLATES.filter((t) => t.traits.includes(grantsTraitId));
+
+    for (let i = 0; i < grantCount && pool.length > 0; i++) {
+      const grantTemplate = pool[Math.floor(Math.random() * pool.length)];
+      const grantedItem = rollItemInstanceForTemplate(grantTemplate.id, room.settings.maxRounds);
+      room.wonItems.set(grantedItem.id, grantedItem);
+      player.stash.push(grantedItem.id);
+    }
+  }
+}
+
 function emitRoundStart(room: Room, io: IO) {
   const ar = room.activeRound;
   if (!ar) return;
-  const { trueValue: _trueValue, hiddenTraitId: _hiddenTraitId, material: _material, rarity: _rarity, specialModifier: _specialModifier, ...publicItem } = ar.item;
-  io.emit('round_start', { round: ar.round, item: publicItem });
+  const { trueValue, hiddenTraitId: _hiddenTraitId, material, rarity, specialModifier, ...publicItem } = ar.item;
+
+  for (const socketId of io.sockets.sockets.keys()) {
+    // The Magnifying Glass skips the staggered reveal entirely and shows the
+    // true value up front — a persistent effect re-checked every round.
+    const item = ownsItemTemplate(room, socketId, 'magnifying-glass')
+      ? { ...publicItem, material, rarity, specialModifier, revealedValue: trueValue }
+      : publicItem;
+    io.to(socketId).emit('round_start', { round: ar.round, item });
+  }
 }
 
 function scheduleModifierReveals(room: Room, io: IO) {
@@ -420,14 +468,15 @@ export function tickRoom(room: Room, io: IO) {
     .filter(([, bidder]) => bidder.isHolding || bidder.droppedAt !== null)
     .map(([playerId]) => playerId);
 
-  // A player sees only their own live clock and spend. This avoids exposing
-  // other players' remaining time or committed time.
+  // A player sees only their own live clock and spend, unless they hold a
+  // Spyglass — that reveals everyone's.
   for (const socketId of io.sockets.sockets.keys()) {
+    const hasSpyglass = ownsItemTemplate(room, socketId, 'spyglass');
     const ownTime = players[socketId];
     const ownBid = bidders[socketId];
     io.to(socketId).emit('round_tick', {
-      players: ownTime === undefined ? {} : { [socketId]: ownTime },
-      bidders: ownBid === undefined ? {} : { [socketId]: ownBid },
+      players: hasSpyglass ? players : ownTime === undefined ? {} : { [socketId]: ownTime },
+      bidders: hasSpyglass ? bidders : ownBid === undefined ? {} : { [socketId]: ownBid },
       holding,
     });
   }

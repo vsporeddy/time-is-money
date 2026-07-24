@@ -43,7 +43,7 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   { id: 'gold-pendant', name: 'Gold Pendant', baseSpriteId: '134', valueRange: [20, 60], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['trinket'] },
   { id: 'diamond-ring', name: 'Diamond Ring', baseSpriteId: '133', valueRange: [40, 130], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['trinket'] },
   { id: 'bonetooth-necklace', name: 'Bonetooth Necklace', baseSpriteId: '136', valueRange: [35, 100], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['trinket'] },
-
+  { id: 'one-ring', name: 'The One Ring', baseSpriteId: '132', valueRange: [50, 150], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['trinket'] },
   // --- Tools (broad trait: tool) ---
   { id: 'pickaxe', name: 'Pickaxe', baseSpriteId: '162', valueRange: [10, 30], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['tool'] },
   { id: 'rusted-lantern', name: 'Rusted Lantern', baseSpriteId: '169', valueRange: [8, 25], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'timeRefund', timeRefund: { mode: 'catchup', amountMs: 15_000 }, traits: ['tool'] },
@@ -73,6 +73,17 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   { id: 'rainbow-trout', name: 'Rainbow Trout', baseSpriteId: '259', valueRange: [5, 20], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['aquatic'] },
   { id: 'pickled-jellyfish', name: 'Pickled Jellyfish', baseSpriteId: '264', valueRange: [8, 25], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['aquatic'] },
   { id: 'dried-octopus', name: 'Dried Octopus', baseSpriteId: '265', valueRange: [10, 30], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['aquatic'] },
+  { id: 'clownfish', name: 'Clownfish', baseSpriteId: '263', valueRange: [5, 18], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['aquatic'] },
+  { id: 'rotting-boot', name: 'Rotting Boot', baseSpriteId: '268', valueRange: [5, 10], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['aquatic'] },
+  { id: 'fish-skeleton', name: 'Fish Skeleton', baseSpriteId: '267', valueRange: [3, 8], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['aquatic'] },
+  { id: 'ancient-fossil', name: 'Ancient Fossil', baseSpriteId: '269', valueRange: [15, 45], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['aquatic'] },
+
+  // --- Curios (flat value, no modifiers/traits, unique standalone effects) ---
+  { id: 'magnifying-glass', name: 'Magnifying Glass', baseSpriteId: '168', valueRange: [5, 5], materials: ['Ordinary'], rarities: ['Common'], effectType: 'revealValue', flatValue: true, traits: [] },
+  { id: 'spyglass', name: 'Spyglass', baseSpriteId: '167', valueRange: [5, 5], materials: ['Ordinary'], rarities: ['Common'], effectType: 'revealBidding', flatValue: true, traits: [] },
+  { id: 'treasure-chest', name: 'Treasure Chest', baseSpriteId: '187', valueRange: [10, 10], materials: ['Ordinary'], rarities: ['Common'], effectType: 'chest', flatValue: true, traits: [], chest: { keyTemplateId: 'rusty-key', grantsTraitId: 'trinket', grantsCountRange: [1, 3] } },
+  { id: 'sunken-treasure-chest', name: 'Sunken Treasure Chest', baseSpriteId: '270', valueRange: [0, 0], materials: ['Ordinary'], rarities: ['Common'], effectType: 'chest', flatValue: true, traits: [], chest: { keyTemplateId: 'rusty-key', grantsTraitId: 'aquatic', grantsCountRange: [3, 5] } },
+  { id: 'rusty-key', name: 'Rusty Key', baseSpriteId: '185', valueRange: [1, 1], materials: ['Ordinary'], rarities: ['Common'], effectType: 'key', flatValue: true, traits: [] },
 ];
 
 function randInt(min: number, max: number): number {
@@ -105,17 +116,30 @@ function rollSpecialModifier(maxRounds: number | null): ItemInstance['specialMod
   return undefined;
 }
 
-export function rollItemInstance(maxRounds: number | null, excludedTemplateIds: ReadonlySet<string> = new Set()): ItemInstance {
-  const availableTemplates = ITEM_TEMPLATES.filter((template) => !excludedTemplateIds.has(template.id));
-  if (availableTemplates.length === 0) throw new Error('No unused item templates remain.');
+function buildInstanceFromTemplate(template: ItemTemplate, maxRounds: number | null): ItemInstance {
+  instanceCounter += 1;
+  const visual = {
+    baseSpriteId: template.baseSpriteId,
+    paletteId: 'default', // Day 3: derive from material
+    overlayEffectIds: [], // Day 3: derive from rarity
+  };
 
-  const template = pick(availableTemplates);
+  if (template.flatValue) {
+    return {
+      id: `item-${instanceCounter}`,
+      templateId: template.id,
+      material: 'Ordinary',
+      rarity: 'Common',
+      trueValue: template.valueRange[0],
+      visual,
+    };
+  }
+
   const material = pickWeighted(WEIGHTED_MATERIAL_POOL).value;
   const specialModifier = rollSpecialModifier(maxRounds);
   const rarity = pickWeighted(WEIGHTED_RARITY_POOL).value;
   const [min, max] = template.valueRange;
 
-  instanceCounter += 1;
   return {
     id: `item-${instanceCounter}`,
     templateId: template.id,
@@ -127,12 +151,23 @@ export function rollItemInstance(maxRounds: number | null, excludedTemplateIds: 
     rarity,
     trueValue: randInt(min, max),
     hiddenTraitId: rollHiddenTrait(),
-    visual: {
-      baseSpriteId: template.baseSpriteId,
-      paletteId: 'default', // Day 3: derive from material
-      overlayEffectIds: [], // Day 3: derive from rarity
-    },
+    visual,
   };
+}
+
+export function rollItemInstance(maxRounds: number | null, excludedTemplateIds: ReadonlySet<string> = new Set()): ItemInstance {
+  const availableTemplates = ITEM_TEMPLATES.filter((template) => !excludedTemplateIds.has(template.id));
+  if (availableTemplates.length === 0) throw new Error('No unused item templates remain.');
+
+  return buildInstanceFromTemplate(pick(availableTemplates), maxRounds);
+}
+
+// Rolls an instance of a specific template, bypassing the pool/exclusion logic —
+// used for bonus items granted outside the normal auction flow (e.g. chest rewards).
+export function rollItemInstanceForTemplate(templateId: string, maxRounds: number | null): ItemInstance {
+  const template = getTemplate(templateId);
+  if (!template) throw new Error(`Unknown item template: ${templateId}`);
+  return buildInstanceFromTemplate(template, maxRounds);
 }
 
 export function getTemplate(templateId: string): ItemTemplate | undefined {

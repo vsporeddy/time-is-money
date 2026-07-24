@@ -20,13 +20,21 @@ function templateAttributes(template: ItemTemplate | undefined, item?: Pick<Item
   if (template.scoreScaling === 'bargain') attributes.push({ label: 'Bargain' });
   if (item?.fairTrade) attributes.push({ label: 'Fair Trade', effect: true, tooltip: { title: 'FAIR TRADE', text: "Only costs the runner-up's time spent" } });
   if (item?.loner) attributes.push({ label: 'Loner', effect: true, tooltip: { title: 'If you own only one Loner item: +$20', text: '' } });
+  if (template.effectType === 'revealValue') attributes.push({ label: 'Reveals Value', effect: true, tooltip: { title: 'MAGNIFYING GLASS', text: 'Modifiers and true value are always revealed to you while you own one' } });
+  if (template.effectType === 'revealBidding') attributes.push({ label: 'Scouts Bidders', effect: true, tooltip: { title: 'SPYGLASS', text: "Other players' time left and bids are always revealed to you while you own one" } });
+  if (template.effectType === 'chest' && template.chest) {
+    const traitName = getTraitDefinition(template.chest.grantsTraitId)?.name ?? template.chest.grantsTraitId;
+    const [min, max] = template.chest.grantsCountRange;
+    attributes.push({ label: 'Needs Key', effect: true, tooltip: { title: template.name.toUpperCase(), text: `Combine with a Rusty Key to receive ${min}-${max} ${traitName} item${max > 1 ? 's' : ''}` } });
+  }
+  if (template.effectType === 'key') attributes.push({ label: 'Opens Chests', effect: true, tooltip: { title: 'RUSTY KEY', text: 'Combine with a matching locked chest — both are consumed' } });
   return attributes;
 }
 
 interface CurrentRound {
   round: Round;
   item: Omit<ItemInstance, 'trueValue' | 'hiddenTraitId' | 'material' | 'rarity' | 'specialModifier'> &
-    Partial<Pick<ItemInstance, 'material' | 'rarity' | 'specialModifier'>>;
+    Partial<Pick<ItemInstance, 'material' | 'rarity' | 'specialModifier'>> & { revealedValue?: number };
 }
 
 interface LastResult {
@@ -185,6 +193,9 @@ export function Game({
     }
   };
 
+  // Magnifying Glass holders get modifiers up front — see revealValue effect — so skip the blur reveal for them.
+  const modifierRevealClass = currentRound?.item.revealedValue === undefined ? 'modifier-reveal' : '';
+
   return (
     <>
       {maxRounds !== null && (
@@ -271,17 +282,17 @@ export function Game({
               <p>Modifiers</p>
               <ul>
                 {currentRound.item.material && (
-                  <li className={`modifier modifier-reveal ${modifierClass(currentRound.item.material)}`}>
+                  <li className={`modifier ${modifierRevealClass} ${modifierClass(currentRound.item.material)}`}>
                     {currentRound.item.material} ×{getMaterialValueMultiplier(currentRound.item.material).toFixed(1)}
                   </li>
                 )}
                 {currentRound.item.rarity && (
-                  <li className={`modifier modifier-reveal ${modifierClass(currentRound.item.rarity)}`}>
+                  <li className={`modifier ${modifierRevealClass} ${modifierClass(currentRound.item.rarity)}`}>
                     {currentRound.item.rarity} ×{getRarityValueMultiplier(currentRound.item.rarity).toFixed(1)}
                   </li>
                 )}
                 {currentRound.item.specialModifier && (
-                  <li className={`modifier modifier-reveal ${modifierClass(currentRound.item.specialModifier)}`}>
+                  <li className={`modifier ${modifierRevealClass} ${modifierClass(currentRound.item.specialModifier)}`}>
                     {currentRound.item.specialModifier === 'Cursed' ? (
                       <span className="special-modifier-trigger">
                         {cursedSetActive ? 'Cursed x1.25' : 'Cursed ×0.75'}
@@ -312,7 +323,7 @@ export function Game({
             getTemplate(currentRound.item.templateId)?.timeRefund?.mode === 'catchup' && (
               <div className="item-effect-callout">Emergency Refund: Refunds time based on remaining time</div>
             )}
-          <p className="item-meta">Value: ???</p>
+          <p className="item-meta">Value: {currentRound.item.revealedValue !== undefined ? `$${currentRound.item.revealedValue}` : '???'}</p>
 
           {currentRound.round.status === 'pending' && <p className="status-line">Get ready…</p>}
 

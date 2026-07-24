@@ -25,6 +25,12 @@ export interface TimeRefundConfig {
   amountMs: number; // flat: refund is exactly this; catchup: this is the max, scaled down as the winner's remaining time increases
 }
 
+export interface ChestConfig {
+  keyTemplateId: string; // ItemTemplate id that unlocks this chest
+  grantsTraitId: string; // TraitDefinition id the granted items are drawn from
+  grantsCountRange: [number, number];
+}
+
 export interface ItemTemplate {
   id: string;
   name: string;
@@ -32,8 +38,10 @@ export interface ItemTemplate {
   valueRange: [number, number];
   materials: string[];
   rarities: string[];
-  effectType: 'none' | 'timeRefund';
+  effectType: 'none' | 'timeRefund' | 'revealValue' | 'revealBidding' | 'chest' | 'key';
   timeRefund?: TimeRefundConfig; // present when effectType === 'timeRefund'
+  chest?: ChestConfig; // present when effectType === 'chest'
+  flatValue?: boolean; // skips material/rarity/specialModifier/loner/investment/fairTrade/hiddenTrait rolls; trueValue is fixed at valueRange[0]
   traits: string[]; // TraitDefinition ids this template's items count toward (category traits, may nest)
   scoreScaling?: 'bargain'; // template-specific score effect
 }
@@ -139,7 +147,7 @@ export interface ServerToClientEvents {
   round_start: (payload: {
     round: Round;
     item: Omit<ItemInstance, 'trueValue' | 'hiddenTraitId' | 'material' | 'rarity' | 'specialModifier'> &
-      Partial<Pick<ItemInstance, 'material' | 'rarity' | 'specialModifier'>>;
+      Partial<Pick<ItemInstance, 'material' | 'rarity' | 'specialModifier'>> & { revealedValue?: number };
   }) => void;
   bid_window_closed: (payload: { roundId: string; spendingStartedAt: number }) => void;
   bidder_cancelled: (payload: { roundId: string; playerId: string }) => void;

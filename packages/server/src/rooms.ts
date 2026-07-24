@@ -54,11 +54,20 @@ export function getRoom(): Room {
   return room;
 }
 
+// True if the given player currently holds an item of the given template —
+// used to gate passive item effects (e.g. Spyglass, Magnifying Glass).
+export function ownsItemTemplate(r: Room, playerId: string | undefined, templateId: string): boolean {
+  if (!playerId) return false;
+  const player = r.players.get(playerId);
+  if (!player) return false;
+  return player.stash.some((itemId) => r.wonItems.get(itemId)?.templateId === templateId);
+}
+
 export function toRoomState(r: Room, viewerId?: string): RoomState {
   return {
     status: r.status,
     players: [...r.players.values()].map((player) =>
-      player.id === viewerId ? player : { ...player, timeRemainingMs: 0 }
+      player.id === viewerId || ownsItemTemplate(r, viewerId, 'spyglass') ? player : { ...player, timeRemainingMs: 0 }
     ),
     knownItems: [...r.wonItems.values()],
     itemPrices: Object.fromEntries(r.itemPricePaidMs),

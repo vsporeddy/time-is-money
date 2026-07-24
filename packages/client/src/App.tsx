@@ -14,7 +14,7 @@ import { playChatDing, playClick, playLose, playWin } from './sound';
 interface CurrentRound {
   round: Round;
   item: Omit<ItemInstance, 'trueValue' | 'hiddenTraitId' | 'material' | 'rarity' | 'specialModifier'> &
-    Partial<Pick<ItemInstance, 'material' | 'rarity' | 'specialModifier'>>;
+    Partial<Pick<ItemInstance, 'material' | 'rarity' | 'specialModifier'>> & { revealedValue?: number };
 }
 
 interface LastResult {
@@ -218,6 +218,9 @@ export default function App() {
 
   const myPlayer = room?.players.find((p) => p.id === myId);
   const isObserver = myPlayer?.isObserver ?? false;
+  // A Spyglass reveals everyone's time/bids — the server already sends that
+  // data once owned, this just decides whether the dock renders it.
+  const hasSpyglass = myPlayer?.stash.some((id) => knownItems[id]?.templateId === 'spyglass') ?? false;
   const scoresByPlayer = useMemo(() => {
     if (!room) return new Map<string, ScoreBreakdown>();
     const wonItems = new Map(Object.entries(knownItems));
@@ -240,7 +243,7 @@ export default function App() {
         // Distinct from `holding` above: only true while actively spending, so
         // the live amount swaps for the final spend line the instant you withdraw.
         const isCurrentlyHolding = liveBids[p.id] !== undefined;
-        const dropped = isMe && droppedThisRound[p.id] !== undefined;
+        const dropped = (isMe || hasSpyglass) && droppedThisRound[p.id] !== undefined;
         const time = liveTimes[p.id] ?? p.timeRemainingMs;
         const classes = ['player-card', isMe && 'me', holding && 'holding', dropped && 'dropped']
           .filter(Boolean)
@@ -265,7 +268,7 @@ export default function App() {
             </div>
             {p.isObserver ? (
               <div>Observing</div>
-            ) : isMe ? (
+            ) : isMe || hasSpyglass ? (
               <>
                 <div>{fmt(time)} left</div>
                 {isCurrentlyHolding && <div>bidding {fmt(liveBids[p.id])}</div>}
