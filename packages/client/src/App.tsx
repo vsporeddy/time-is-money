@@ -11,6 +11,7 @@ import { BackgroundMusic } from './BackgroundMusic';
 import { Inventory } from './Inventory';
 import { ItemTargetPicker } from './ItemTargetPicker';
 import { PlayerPicker } from './PlayerPicker';
+import { LotPool } from './LotPool';
 import { playChatDing, playClick, playLose, playWin } from './sound';
 
 interface CurrentRound {
@@ -61,6 +62,7 @@ export default function App() {
   const [playerPickerItemId, setPlayerPickerItemId] = useState<string | null>(null);
   const [playerPickerError, setPlayerPickerError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [lotPoolOpen, setLotPoolOpen] = useState(false);
 
   useEffect(() => {
     if (!actionError) return;
@@ -89,6 +91,7 @@ export default function App() {
         setItemPrices({});
         setLastResult(null);
         setCurrentRound(null);
+        setLotPoolOpen(false);
       }
       if (selectedOpponentId && !state.players.some((player) => player.id === selectedOpponentId)) {
         setSelectedOpponentId(null);
@@ -586,6 +589,7 @@ export default function App() {
           }
           socket.emit('hold_release');
         }}
+        onOpenLotPool={() => setLotPoolOpen(true)}
       />
     );
   }
@@ -628,6 +632,7 @@ export default function App() {
         />
       )}
       {actionError && <div className="action-error-banner">{actionError}</div>}
+      {joined && lotPoolOpen && room && <LotPool pool={room.lotPool} onClose={() => setLotPoolOpen(false)} />}
       {joined && selectedOpponentId && room?.players.find((player) => player.id === selectedOpponentId) && (
         <Inventory
           player={room.players.find((player) => player.id === selectedOpponentId)!}

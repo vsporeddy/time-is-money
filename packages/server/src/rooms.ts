@@ -24,7 +24,11 @@ export interface Room {
   settings: GameSettings;
   currentRoundIndex: number;
   activeRound: ActiveRound | null;
-  usedItemTemplateIds: Set<string>; // templates already shown this game, including passed lots
+  lotPool: ItemInstance[]; // this game's fixed pool, rolled once at start_game
+  auctionOrder: string[]; // lotPool item ids, shuffled; only the first roundsToPlay are ever auctioned
+  roundsToPlay: number; // how many lotPool items will actually go up this game
+  hiddenPoolItemIds: Set<string>; // 3 random lotPool ids blurred client-side until their round starts
+  revealedPoolItemIds: Set<string>; // lotPool ids whose round has already started
   wonItems: Map<string, ItemInstance>; // itemId -> instance, for end-game scoring lookups
   itemPricePaidMs: Map<string, number>; // itemId -> net time the winner actually paid (after any rebate)
 }
@@ -46,7 +50,11 @@ const room: Room = {
   settings: { ...DEFAULT_SETTINGS },
   currentRoundIndex: -1,
   activeRound: null,
-  usedItemTemplateIds: new Set(),
+  lotPool: [],
+  auctionOrder: [],
+  roundsToPlay: 0,
+  hiddenPoolItemIds: new Set(),
+  revealedPoolItemIds: new Set(),
   wonItems: new Map(),
   itemPricePaidMs: new Map(),
 };
@@ -74,6 +82,11 @@ export function toRoomState(r: Room, viewerId?: string): RoomState {
     itemPrices: Object.fromEntries(r.itemPricePaidMs),
     settings: r.settings,
     currentRoundIndex: r.currentRoundIndex,
+    lotPool: r.lotPool.map((item) => ({
+      id: item.id,
+      templateId: item.templateId,
+      status: r.revealedPoolItemIds.has(item.id) ? 'auctioned' : r.hiddenPoolItemIds.has(item.id) ? 'hidden' : 'upcoming',
+    })),
   };
 }
 

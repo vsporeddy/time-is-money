@@ -1,6 +1,6 @@
 import type { Server } from 'socket.io';
 import type { ClientToServerEvents, MaskedRoundItem, Player, Round, ServerToClientEvents, TimeRefundConfig } from 'shared';
-import { cloneItemInstance, computeScores, getTemplate, ITEM_TEMPLATES, rollItemInstance, rollItemInstanceForTemplate } from 'shared';
+import { cloneItemInstance, computeScores, getTemplate, ITEM_TEMPLATES, rollItemInstanceForTemplate, shuffle } from 'shared';
 import { emitRoomState, ownsItemTemplate } from './rooms.js';
 import type { ActiveRound, Room } from './rooms.js';
 import { scheduleBotEntries, scheduleBotReleases } from './bots.js';
@@ -11,9 +11,27 @@ let roundCounter = 0;
 const SOLE_BIDDER_PRICE_MS = 5_000;
 const MODIFIER_REVEAL_INTERVAL_MS = 8_000;
 
+// Rolls the whole game's fixed item pool at once: size = rounds + 3 (3 always
+// go unlisted), auctioned in a shuffled order, with 3 random slots blurred
+// client-side until their round comes up. Unlimited-round games (maxRounds
+// null) fall back to the old behavior — the entire template list, no leftovers.
+function buildLotPool(room: Room) {
+  const maxRounds = room.settings.maxRounds;
+  const poolSize = maxRounds !== null ? Math.min(maxRounds + 3, ITEM_TEMPLATES.length) : ITEM_TEMPLATES.length;
+  const roundsToPlay = maxRounds !== null ? Math.min(maxRounds, poolSize) : poolSize;
+
+  const selectedTemplates = shuffle(ITEM_TEMPLATES).slice(0, poolSize);
+  room.lotPool = selectedTemplates.map((template) => rollItemInstanceForTemplate(template.id, maxRounds));
+  room.auctionOrder = shuffle(room.lotPool.map((item) => item.id)).slice(0, roundsToPlay);
+  room.roundsToPlay = roundsToPlay;
+  room.hiddenPoolItemIds = new Set(shuffle(room.lotPool.map((item) => item.id)).slice(0, Math.min(3, room.lotPool.length)));
+  room.revealedPoolItemIds = new Set();
+}
+
 export function startGame(room: Room, io: IO) {
   if (room.status !== 'lobby') return;
   room.status = 'in_round';
+  buildLotPool(room);
   startRound(room, io);
 }
 
@@ -25,13 +43,19 @@ export function startRound(room: Room, io: IO) {
     return;
   }
 
-  if (room.usedItemTemplateIds.size >= ITEM_TEMPLATES.length) {
+  const nextIndex = room.currentRoundIndex + 1;
+  if (nextIndex >= room.auctionOrder.length) {
     finishGame(room, io);
     return;
   }
 
-  const item = rollItemInstance(room.settings.maxRounds, room.usedItemTemplateIds);
-  room.usedItemTemplateIds.add(item.templateId);
+  const item = room.lotPool.find((i) => i.id === room.auctionOrder[nextIndex]);
+  if (!item) {
+    finishGame(room, io);
+    return;
+  }
+  room.revealedPoolItemIds.add(item.id);
+
   const bidders: Round['bidders'] = {};
   for (const p of eligible) {
     bidders[p.id] = { isHolding: false, committedMs: 0, droppedAt: null };
@@ -312,8 +336,7 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
 
   ar.interRoundTimer = setTimeout(() => {
     room.activeRound = null;
-    const reachedRoundLimit =
-      room.settings.maxRounds !== null && room.currentRoundIndex + 1 >= room.settings.maxRounds;
+    const reachedRoundLimit = room.currentRoundIndex + 1 >= room.roundsToPlay;
     const stillPlaying = [...room.players.values()].some((p) => p.status === 'active');
     if (!reachedRoundLimit && stillPlaying) startRound(room, io);
     else finishGame(room, io);
@@ -344,7 +367,11 @@ export function resetRoomToLobby(room: Room) {
   room.status = 'lobby';
   room.currentRoundIndex = -1;
   room.activeRound = null;
-  room.usedItemTemplateIds.clear();
+  room.lotPool = [];
+  room.auctionOrder = [];
+  room.roundsToPlay = 0;
+  room.hiddenPoolItemIds = new Set();
+  room.revealedPoolItemIds = new Set();
   room.wonItems.clear();
   room.itemPricePaidMs.clear();
 
@@ -546,7 +573,7 @@ export function useWeapon(
     }
 
     case 'transformLot': {
-      transformLot(room, io, ar!);
+      if (!transformLot(room, io, ar!)) return { ok: false, error: 'No reserve items left to swap in.' };
       break;
     }
 
@@ -577,12 +604,21 @@ function emitRoundStart(room: Room, io: IO) {
   }
 }
 
-// Arcane Staff: replaces the active lot with a freshly rolled item mid-round.
-// Bidder state (who's in, who's holding, elapsed time) is untouched — only
-// what they're bidding on changes.
-function transformLot(room: Room, io: IO, ar: ActiveRound) {
-  const newItem = rollItemInstance(room.settings.maxRounds, room.usedItemTemplateIds);
-  room.usedItemTemplateIds.add(newItem.templateId);
+// Arcane Staff: swaps the active lot for one of the pool's reserve items —
+// the ones never scheduled for any round, so pulling one in doesn't disturb
+// what's coming later. The displaced item silently drops out (already seen,
+// never sold) and effectively becomes a new reserve in its place. Bidder
+// state (who's in, who's holding, elapsed time) is untouched — only what
+// they're bidding on changes. Returns false if no reserves remain.
+function transformLot(room: Room, io: IO, ar: ActiveRound): boolean {
+  // A reserve is a pool item never scheduled for any round (past, present, or
+  // future) and not already used up by an earlier transform this game.
+  const scheduled = new Set(room.auctionOrder);
+  const reserves = room.lotPool.filter((candidate) => !scheduled.has(candidate.id) && !room.revealedPoolItemIds.has(candidate.id));
+  if (reserves.length === 0) return false;
+
+  const newItem = reserves[Math.floor(Math.random() * reserves.length)];
+  room.revealedPoolItemIds.add(newItem.id);
   ar.item = newItem;
   ar.round.revealedFields = [];
 
@@ -593,6 +629,7 @@ function transformLot(room: Room, io: IO, ar: ActiveRound) {
     io.to(socketId).emit('lot_transformed', { roundId: ar.round.id, item: maskedItemForSocket(room, ar, socketId) });
   }
   scheduleModifierReveals(room, io);
+  return true;
 }
 
 function scheduleModifierReveals(room: Room, io: IO) {

@@ -80,6 +80,7 @@ interface GameProps {
   lastResult: LastResult | null;
   onHoldStart: () => void;
   onHoldRelease: () => void;
+  onOpenLotPool: () => void;
 }
 
 function fmt(ms: number) {
@@ -122,6 +123,7 @@ export function Game({
   lastResult,
   onHoldStart,
   onHoldRelease,
+  onOpenLotPool,
 }: GameProps) {
   const [now, setNow] = useState(Date.now());
   const isHolding = (id: string) => liveBids[id] !== undefined;
@@ -226,13 +228,18 @@ export function Game({
 
   return (
     <>
-      {maxRounds !== null && (
-        <div className="round-progress" aria-label={`Round ${roundNumber} of ${maxRounds}`}>
-          {Array.from({ length: maxRounds }, (_, index) => (
-            <span key={index} className={`round-dot${index < roundNumber ? ' complete' : ''}`} />
-          ))}
-        </div>
-      )}
+      <div className="round-header-row">
+        {maxRounds !== null && (
+          <div className="round-progress" aria-label={`Round ${roundNumber} of ${maxRounds}`}>
+            {Array.from({ length: maxRounds }, (_, index) => (
+              <span key={index} className={`round-dot${index < roundNumber ? ' complete' : ''}`} />
+            ))}
+          </div>
+        )}
+        <button type="button" className="lot-pool-trigger" onClick={onOpenLotPool}>
+          Lot Pool
+        </button>
+      </div>
       {lastResult &&
         (() => {
           const hidden = getHiddenTrait(lastResult.item.hiddenTraitId);

@@ -52,7 +52,7 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   // --- Musical (broad trait: musical) ---
   { id: 'violin', name: 'Violin', baseSpriteId: '180', valueRange: [20, 60], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['musical'] },
   { id: 'pan-flute', name: 'Pan Flute', baseSpriteId: '183', valueRange: [15, 45], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['musical'] },
-
+  { id: 'ocarina', name: 'Ocarina', baseSpriteId: '181', valueRange: [10, 35], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['musical'] },
   // --- Text (broad trait: text, narrow: book) ---
   { id: 'ancient-tome', name: 'Ancient Tome', baseSpriteId: '213', valueRange: [20, 70], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['text', 'book'] },
   { id: 'leather-journal', name: 'Leather Journal', baseSpriteId: '210', valueRange: [10, 35], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['text', 'book'] },
@@ -91,8 +91,14 @@ function randInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function pick<T>(arr: T[]): T {
-  return arr[randInt(0, arr.length - 1)];
+// Fisher-Yates — used to pick the game's fixed lot pool and randomize its auction order.
+export function shuffle<T>(arr: readonly T[]): T[] {
+  const result = [...arr];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
 }
 
 function pickWeighted<T extends { weight: number }>(arr: T[]): T {
@@ -154,13 +160,6 @@ function buildInstanceFromTemplate(template: ItemTemplate, maxRounds: number | n
     hiddenTraitId: rollHiddenTrait(),
     visual,
   };
-}
-
-export function rollItemInstance(maxRounds: number | null, excludedTemplateIds: ReadonlySet<string> = new Set()): ItemInstance {
-  const availableTemplates = ITEM_TEMPLATES.filter((template) => !excludedTemplateIds.has(template.id));
-  if (availableTemplates.length === 0) throw new Error('No unused item templates remain.');
-
-  return buildInstanceFromTemplate(pick(availableTemplates), maxRounds);
 }
 
 // Rolls an instance of a specific template, bypassing the pool/exclusion logic —

@@ -580,6 +580,42 @@ input[type='text']:focus {
   filter: grayscale(1) brightness(0.6);
 }
 
+/* --- Lot pool: the whole game's fixed item list, visible up front --- */
+
+.lot-pool-grid {
+  grid-template-columns: repeat(6, 1fr);
+}
+
+.lot-pool-slot-hidden canvas {
+  filter: blur(3px);
+}
+
+.lot-pool-slot-auctioned {
+  opacity: 0.4;
+}
+
+.lot-pool-trigger {
+  font-family: var(--font-pixel);
+  font-size: 0.55rem;
+  padding: 0.4rem 0.65rem;
+  background: var(--bg-panel-alt);
+  color: var(--gold);
+  border: 2px solid var(--border-gold);
+  cursor: pointer;
+}
+
+.lot-pool-trigger:hover {
+  border-color: var(--gold-bright);
+}
+
+.round-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 .action-error-banner {
   position: fixed;
   top: 1rem;

@@ -122,6 +122,16 @@ export interface GameSettings {
   maxRounds: number | null; // null means unlimited rounds
 }
 
+// One slot in the game's fixed lot pool. 'hidden' means the template is
+// blurred client-side (mystery) until its round starts; 'auctioned' means
+// its round has already happened; anything never auctioned by game_over
+// was one of the pool's built-in leftovers.
+export interface LotPoolItem {
+  id: string;
+  templateId: string;
+  status: 'hidden' | 'upcoming' | 'auctioned';
+}
+
 export interface RoomState {
   status: RoomStatus;
   players: Player[];
@@ -129,6 +139,7 @@ export interface RoomState {
   itemPrices: Record<string, number>; // revealed winning time per item, used for score effects
   settings: GameSettings;
   currentRoundIndex: number;
+  lotPool: LotPoolItem[]; // the whole game's fixed item pool, visible to everyone up front
 }
 
 export interface ChatMessage {
