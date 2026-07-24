@@ -149,6 +149,31 @@ input[type='text']:focus {
   border-color: var(--gold-bright);
 }
 
+.round-limit-control {
+  margin: 0 0 1.25rem;
+}
+
+.round-limit-control label {
+  display: block;
+  margin-bottom: 0.7rem;
+  color: var(--gold);
+  font-size: 0.7rem;
+}
+
+.round-limit-control input[type='range'] {
+  width: 100%;
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+
+.round-limit-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.2rem;
+  color: var(--text-dim);
+  font-size: 0.5rem;
+}
+
 /* --- Buttons --- */
 
 .btn {

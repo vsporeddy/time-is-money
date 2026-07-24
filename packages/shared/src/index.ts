@@ -114,6 +114,7 @@ export interface ClientToServerEvents {
   add_bot: () => void;
   hold_start: () => void;
   hold_release: () => void;
+  set_round_limit: (payload: { maxRounds: number }) => void;
   restart_game: () => void;
   reset_game: () => void; // dev-only escape hatch — works from any state, remove before shipping
   send_chat: (payload: { name: string; text: string }) => void;

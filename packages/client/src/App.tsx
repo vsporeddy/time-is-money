@@ -50,6 +50,7 @@ export default function App() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [selectedOpponentId, setSelectedOpponentId] = useState<string | null>(null);
   const [myInventoryOpen, setMyInventoryOpen] = useState(true);
+  const [roundLimit, setRoundLimit] = useState(10);
 
   useEffect(() => {
     socket.connect();
@@ -63,6 +64,7 @@ export default function App() {
         ...Object.fromEntries(state.knownItems.map((item) => [item.id, item])),
       }));
       setItemPrices((previous) => ({ ...previous, ...state.itemPrices }));
+      if (state.settings.maxRounds !== null) setRoundLimit(state.settings.maxRounds);
       if (state.status === 'lobby') {
         // Covers restart_game bringing us back here — clear out the last game's view.
         setGameOverPlayers(null);
@@ -353,6 +355,23 @@ export default function App() {
     screen = shellWithHeader(
       <div className="panel">
         <h2 className="panel-title">Lobby</h2>
+        <div className="round-limit-control">
+          <label htmlFor="round-limit">Rounds: {roundLimit}</label>
+          <input
+            id="round-limit"
+            type="range"
+            min="5"
+            max="20"
+            step="1"
+            value={roundLimit}
+            onChange={(event) => {
+              const maxRounds = Number(event.target.value);
+              setRoundLimit(maxRounds);
+              socket.emit('set_round_limit', { maxRounds });
+            }}
+          />
+          <div className="round-limit-labels"><span>5</span><span>20</span></div>
+        </div>
         <button
           className="btn btn-block"
           onClick={() => {

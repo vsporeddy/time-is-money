@@ -81,6 +81,16 @@ io.on('connection', (socket) => {
     handleHoldRelease(getRoom(), socket.id, io);
   });
 
+  socket.on('set_round_limit', ({ maxRounds }) => {
+    const room = getRoom();
+    if (room.status !== 'lobby') return;
+
+    const rounded = Math.round(maxRounds);
+    if (!Number.isFinite(rounded) || rounded < 5 || rounded > 20) return;
+    room.settings.maxRounds = rounded;
+    emitRoomState(room, io);
+  });
+
   socket.on('restart_game', () => {
     restartGame(getRoom(), io);
   });
