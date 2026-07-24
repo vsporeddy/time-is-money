@@ -164,6 +164,43 @@ input[type='text']:focus {
   width: 100%;
   accent-color: var(--gold);
   cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 0.5rem;
+  background: var(--bg);
+  border: 2px solid var(--border-gold);
+}
+
+.round-limit-control input[type='range']::-webkit-slider-runnable-track {
+  height: 0.5rem;
+  background: transparent;
+}
+
+.round-limit-control input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 0.9rem;
+  height: 1.1rem;
+  margin-top: -1px;
+  background: var(--gold);
+  border: 2px solid var(--border-gold);
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.round-limit-control input[type='range']::-moz-range-track {
+  height: 0.5rem;
+  background: transparent;
+  border: none;
+}
+
+.round-limit-control input[type='range']::-moz-range-thumb {
+  width: 0.9rem;
+  height: 1.1rem;
+  background: var(--gold);
+  border: 2px solid var(--border-gold);
+  border-radius: 0;
+  cursor: pointer;
 }
 
 .round-limit-labels {
@@ -309,7 +346,6 @@ input[type='text']:focus {
   height: 0.65rem;
   background: var(--bg-panel-alt-2);
   border: 2px solid var(--border-gold);
-  border-radius: 50%;
 }
 
 .round-dot.complete {
@@ -462,7 +498,6 @@ input[type='text']:focus {
   position: relative;
   padding: 0.35rem 0.45rem;
   border: 2px solid currentColor;
-  border-radius: 999px;
   background: var(--bg);
   font-size: 0.46rem;
   line-height: 1.35;
@@ -574,12 +609,12 @@ input[type='text']:focus {
 }
 
 .modifier-reveal {
-  animation: modifier-unblur 8s ease-out forwards;
+  animation: modifier-unblur 8s steps(6, end) forwards;
 }
 
 @keyframes modifier-unblur {
   from {
-    filter: blur(5px);
+    filter: blur(6px);
     opacity: 0.3;
   }
 
