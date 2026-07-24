@@ -409,6 +409,17 @@ export default function App() {
         >
           Add Bot ({botCount}/{MAX_BOTS})
         </button>
+        <button
+          className="btn btn-block"
+          style={{ marginTop: '0.75rem' }}
+          disabled={botCount === 0}
+          onClick={() => {
+            playClick();
+            socket.emit('remove_bot');
+          }}
+        >
+          Remove Bot
+        </button>
       </div>
     );
   } else {

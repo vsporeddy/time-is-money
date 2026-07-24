@@ -115,6 +115,7 @@ export interface ClientToServerEvents {
   ) => void;
   start_game: () => void;
   add_bot: () => void;
+  remove_bot: () => void;
   hold_start: () => void;
   hold_release: () => void;
   set_round_limit: (payload: { maxRounds: number }) => void;

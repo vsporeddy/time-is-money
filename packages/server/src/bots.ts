@@ -45,6 +45,18 @@ export function addBot(room: Room): Player | null {
   return bot;
 }
 
+// Removes the most recently added bot — a simple decrement to pair with addBot.
+export function removeBot(room: Room): boolean {
+  if (room.status !== 'lobby') return false;
+
+  const bots = [...room.players.entries()].filter(([, p]) => p.isBot);
+  if (bots.length === 0) return false;
+
+  const [lastBotId] = bots[bots.length - 1];
+  room.players.delete(lastBotId);
+  return true;
+}
+
 // A bot sits out roughly 30% of lots, and otherwise enters after a small
 // randomized delay so a room full of bots doesn't react in perfect lockstep.
 const BID_CHANCE = 0.7;
