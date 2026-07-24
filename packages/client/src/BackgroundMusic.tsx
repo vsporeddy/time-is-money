@@ -86,8 +86,21 @@ export function BackgroundMusic({ ducked, muffled }: BackgroundMusicProps) {
   };
 
   return (
-    <button className="music-toggle" onClick={toggleMute}>
-      {muted ? 'Music: Off' : 'Music: On'}
-    </button>
+    <div className="top-controls">
+      <button type="button" className="how-to-play-trigger" aria-label="How to play">
+        ?
+        <span className="how-to-play-tooltip" role="tooltip">
+          <b>HOW TO PLAY</b>
+          <span>Your remaining time is both your budget and your bid.</span>
+          <span>During the opening window, click BID to opt in or CANCEL BID to leave.</span>
+          <span>When bidding starts, your remaining time will start ticking down. Press withdraw to stop spending time. Regardless of whether you win the bid, the time spent will be lost. The last bidder remaining wins the item. A sole winner will automatically win the item with a 5s bid.</span>
+          <span>Collect valuable items and complete sets. A combination of your base item values, item effects, and set bonuses will determine your final value. The highest total value wins after all rounds have finished.</span>
+          <span>Hover over attributes/modifiers/set bonus bubbles for details.</span>
+        </span>
+      </button>
+      <button type="button" className="music-toggle" onClick={toggleMute}>
+        {muted ? 'Music: Off' : 'Music: On'}
+      </button>
+    </div>
   );
 }

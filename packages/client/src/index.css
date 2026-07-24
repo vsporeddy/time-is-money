@@ -1010,13 +1010,20 @@ input[type='text']:focus {
   transform: translate(1px, 1px);
 }
 
-/* --- Music toggle --- */
+/* --- Top controls --- */
 
-.music-toggle {
+.top-controls {
   position: fixed;
   top: 1rem;
   right: 1rem;
   z-index: 40;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+}
+
+.music-toggle,
+.how-to-play-trigger {
   font-family: var(--font-pixel);
   font-size: 0.55rem;
   padding: 0.5rem 0.7rem;
@@ -1026,8 +1033,51 @@ input[type='text']:focus {
   cursor: pointer;
 }
 
-.music-toggle:active {
+.how-to-play-trigger {
+  position: relative;
+  min-width: 2rem;
+  padding-inline: 0.55rem;
+}
+
+.music-toggle:active,
+.how-to-play-trigger:active {
   transform: translate(1px, 1px);
+}
+
+.how-to-play-tooltip {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  z-index: 60;
+  display: none;
+  width: min(20rem, calc(100vw - 2rem));
+  padding: 0.7rem;
+  background: var(--bg);
+  border: 2px solid var(--gold-bright);
+  box-shadow: 3px 3px 0 #000;
+  color: var(--text);
+  font-size: 0.5rem;
+  line-height: 1.55;
+  text-align: left;
+}
+
+.how-to-play-tooltip b,
+.how-to-play-tooltip span {
+  display: block;
+}
+
+.how-to-play-tooltip b {
+  margin-bottom: 0.3rem;
+  color: var(--gold-bright);
+}
+
+.how-to-play-tooltip span + span {
+  margin-top: 0.35rem;
+}
+
+.how-to-play-trigger:hover .how-to-play-tooltip,
+.how-to-play-trigger:focus .how-to-play-tooltip {
+  display: block;
 }
 
 /* --- Chat: far-right column of the bottom bar, next to the player dock --- */
