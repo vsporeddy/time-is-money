@@ -15,7 +15,7 @@ interface DisplayAttribute {
 
 function templateAttributes(template: ItemTemplate | undefined, item?: Pick<ItemInstance, 'investment' | 'fairTrade' | 'loner'>): DisplayAttribute[] {
   if (!template) return [];
-  const attributes = template.traits.map((id) => ({ label: getTraitDefinition(id)?.name ?? id, traitId: id }));
+  const attributes: DisplayAttribute[] = template.traits.map((id) => ({ label: getTraitDefinition(id)?.name ?? id, traitId: id }));
   if (item?.investment) attributes.push({ label: 'Investment', effect: true, tooltip: { title: '+1$ for each second used to bid for this item', text: '' } });
   if (template.scoreScaling === 'bargain') attributes.push({ label: 'Bargain' });
   if (item?.fairTrade) attributes.push({ label: 'Fair Trade', effect: true, tooltip: { title: 'FAIR TRADE', text: "Only costs the runner-up's time spent" } });
