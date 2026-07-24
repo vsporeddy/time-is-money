@@ -13,7 +13,8 @@ import { playChatDing, playClick, playLose, playWin } from './sound';
 
 interface CurrentRound {
   round: Round;
-  item: Omit<ItemInstance, 'trueValue'>;
+  item: Omit<ItemInstance, 'trueValue' | 'hiddenTraitId' | 'material' | 'rarity' | 'specialModifier'> &
+    Partial<Pick<ItemInstance, 'material' | 'rarity' | 'specialModifier'>>;
 }
 
 interface LastResult {
@@ -79,7 +80,9 @@ export default function App() {
       }
     };
     const onRoundStart = (payload: CurrentRound) => {
-      setCurrentRound(payload);
+      setCurrentRound((current) =>
+        current?.round.id === payload.round.id ? { ...payload, item: { ...current.item, ...payload.item } } : payload
+      );
       setLastResult(null);
       setLiveBids({});
       setHoldingPlayerIds([]);
@@ -89,6 +92,14 @@ export default function App() {
       setCurrentRound((current) =>
         current?.round.id === roundId
           ? { ...current, round: { ...current.round, bidWindowOpen: false, spendingStartedAt } }
+          : current
+      );
+    };
+    const onReveal = ({ roundId, field, value }: { roundId: string; field: string; value: string | number }) => {
+      if (field !== 'material' && field !== 'rarity' && field !== 'specialModifier') return;
+      setCurrentRound((current) =>
+        current?.round.id === roundId
+          ? { ...current, item: { ...current.item, [field]: String(value) } }
           : current
       );
     };
@@ -147,6 +158,7 @@ export default function App() {
     socket.on('disconnect', onDisconnect);
     socket.on('room_state', onRoomState);
     socket.on('round_start', onRoundStart);
+    socket.on('reveal', onReveal);
     socket.on('bid_window_closed', onBidWindowClosed);
     socket.on('bidder_cancelled', onBidderCancelled);
     socket.on('round_tick', onRoundTick);
@@ -161,6 +173,7 @@ export default function App() {
       socket.off('disconnect', onDisconnect);
       socket.off('room_state', onRoomState);
       socket.off('round_start', onRoundStart);
+      socket.off('reveal', onReveal);
       socket.off('bid_window_closed', onBidWindowClosed);
       socket.off('bidder_cancelled', onBidderCancelled);
       socket.off('round_tick', onRoundTick);

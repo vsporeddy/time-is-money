@@ -573,6 +573,22 @@ input[type='text']:focus {
   color: #c78cff;
 }
 
+.modifier-reveal {
+  animation: modifier-unblur 8s ease-out forwards;
+}
+
+@keyframes modifier-unblur {
+  from {
+    filter: blur(5px);
+    opacity: 0.3;
+  }
+
+  to {
+    filter: blur(0);
+    opacity: 1;
+  }
+}
+
 .modifier-blessed {
   color: #8fbf5a;
 }

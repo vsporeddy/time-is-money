@@ -105,8 +105,11 @@ function rollSpecialModifier(maxRounds: number | null): ItemInstance['specialMod
   return undefined;
 }
 
-export function rollItemInstance(maxRounds: number | null): ItemInstance {
-  const template = pick(ITEM_TEMPLATES);
+export function rollItemInstance(maxRounds: number | null, excludedTemplateIds: ReadonlySet<string> = new Set()): ItemInstance {
+  const availableTemplates = ITEM_TEMPLATES.filter((template) => !excludedTemplateIds.has(template.id));
+  if (availableTemplates.length === 0) throw new Error('No unused item templates remain.');
+
+  const template = pick(availableTemplates);
   const material = pickWeighted(WEIGHTED_MATERIAL_POOL).value;
   const specialModifier = rollSpecialModifier(maxRounds);
   const rarity = pickWeighted(WEIGHTED_RARITY_POOL).value;

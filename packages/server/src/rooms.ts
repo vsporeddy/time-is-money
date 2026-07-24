@@ -14,6 +14,7 @@ export interface ActiveRound {
   noBidTimer: NodeJS.Timeout | null;
   maxDurationTimer: NodeJS.Timeout | null;
   interRoundTimer: NodeJS.Timeout | null;
+  modifierRevealTimers: NodeJS.Timeout[];
 }
 
 export interface Room {
@@ -22,6 +23,7 @@ export interface Room {
   settings: GameSettings;
   currentRoundIndex: number;
   activeRound: ActiveRound | null;
+  usedItemTemplateIds: Set<string>; // templates already shown this game, including passed lots
   wonItems: Map<string, ItemInstance>; // itemId -> instance, for end-game scoring lookups
   itemPricePaidMs: Map<string, number>; // itemId -> net time the winner actually paid (after any rebate)
 }
@@ -43,6 +45,7 @@ const room: Room = {
   settings: { ...DEFAULT_SETTINGS },
   currentRoundIndex: -1,
   activeRound: null,
+  usedItemTemplateIds: new Set(),
   wonItems: new Map(),
   itemPricePaidMs: new Map(),
 };

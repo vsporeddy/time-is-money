@@ -135,7 +135,11 @@ export interface ScoreBreakdown {
 
 export interface ServerToClientEvents {
   room_state: (state: RoomState) => void;
-  round_start: (payload: { round: Round; item: Omit<ItemInstance, 'trueValue' | 'hiddenTraitId'> }) => void;
+  round_start: (payload: {
+    round: Round;
+    item: Omit<ItemInstance, 'trueValue' | 'hiddenTraitId' | 'material' | 'rarity' | 'specialModifier'> &
+      Partial<Pick<ItemInstance, 'material' | 'rarity' | 'specialModifier'>>;
+  }) => void;
   bid_window_closed: (payload: { roundId: string; spendingStartedAt: number }) => void;
   bidder_cancelled: (payload: { roundId: string; playerId: string }) => void;
   round_tick: (payload: { players: Record<string, number>; bidders: Record<string, number>; holding: string[] }) => void;

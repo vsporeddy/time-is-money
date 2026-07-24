@@ -1,6 +1,6 @@
 import type { Server } from 'socket.io';
 import type { ClientToServerEvents, Round, ServerToClientEvents, TimeRefundConfig } from 'shared';
-import { computeScores, getTemplate, rollItemInstance } from 'shared';
+import { computeScores, getTemplate, ITEM_TEMPLATES, rollItemInstance } from 'shared';
 import { emitRoomState } from './rooms.js';
 import type { Room } from './rooms.js';
 import { scheduleBotEntries, scheduleBotReleases } from './bots.js';
@@ -9,6 +9,7 @@ type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 
 let roundCounter = 0;
 const SOLE_BIDDER_PRICE_MS = 5_000;
+const MODIFIER_REVEAL_INTERVAL_MS = 8_000;
 
 export function startGame(room: Room, io: IO) {
   if (room.status !== 'lobby') return;
@@ -24,7 +25,13 @@ export function startRound(room: Room, io: IO) {
     return;
   }
 
-  const item = rollItemInstance(room.settings.maxRounds);
+  if (room.usedItemTemplateIds.size >= ITEM_TEMPLATES.length) {
+    finishGame(room, io);
+    return;
+  }
+
+  const item = rollItemInstance(room.settings.maxRounds, room.usedItemTemplateIds);
+  room.usedItemTemplateIds.add(item.templateId);
   const bidders: Round['bidders'] = {};
   for (const p of eligible) {
     bidders[p.id] = { isHolding: false, committedMs: 0, droppedAt: null };
@@ -54,9 +61,11 @@ export function startRound(room: Room, io: IO) {
     noBidTimer: null,
     maxDurationTimer: null,
     interRoundTimer: null,
+    modifierRevealTimers: [],
   };
 
   emitRoundStart(room, io);
+  scheduleModifierReveals(room, io);
   emitRoomState(room, io);
 
   setTimeout(() => activateRound(room, io), room.settings.pendingDurationMs);
@@ -202,6 +211,7 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
 
   if (ar.noBidTimer) clearTimeout(ar.noBidTimer);
   if (ar.maxDurationTimer) clearTimeout(ar.maxDurationTimer);
+  for (const timer of ar.modifierRevealTimers) clearTimeout(timer);
 
   const template = getTemplate(ar.item.templateId);
 
@@ -301,11 +311,13 @@ export function resetRoomToLobby(room: Room) {
     if (room.activeRound.noBidTimer) clearTimeout(room.activeRound.noBidTimer);
     if (room.activeRound.maxDurationTimer) clearTimeout(room.activeRound.maxDurationTimer);
     if (room.activeRound.interRoundTimer) clearTimeout(room.activeRound.interRoundTimer);
+    for (const timer of room.activeRound.modifierRevealTimers) clearTimeout(timer);
   }
 
   room.status = 'lobby';
   room.currentRoundIndex = -1;
   room.activeRound = null;
+  room.usedItemTemplateIds.clear();
   room.wonItems.clear();
   room.itemPricePaidMs.clear();
 
@@ -335,8 +347,31 @@ export function forceResetGame(room: Room, io: IO) {
 function emitRoundStart(room: Room, io: IO) {
   const ar = room.activeRound;
   if (!ar) return;
-  const { trueValue: _trueValue, hiddenTraitId: _hiddenTraitId, ...publicItem } = ar.item;
+  const { trueValue: _trueValue, hiddenTraitId: _hiddenTraitId, material: _material, rarity: _rarity, specialModifier: _specialModifier, ...publicItem } = ar.item;
   io.emit('round_start', { round: ar.round, item: publicItem });
+}
+
+function scheduleModifierReveals(room: Room, io: IO) {
+  const ar = room.activeRound;
+  if (!ar) return;
+
+  const modifiers: Array<[field: 'material' | 'rarity' | 'specialModifier', value: string | undefined]> = [
+    ['material', ar.item.material],
+    ['rarity', ar.item.rarity],
+    ['specialModifier', ar.item.specialModifier],
+  ];
+
+  modifiers.forEach(([field, value], index) => {
+    if (value === undefined) return;
+    const reveal = () => {
+      if (room.activeRound !== ar) return;
+      ar.round.revealedFields.push(field);
+      io.emit('reveal', { roundId: ar.round.id, field, value });
+    };
+
+    if (index === 0) reveal();
+    else ar.modifierRevealTimers.push(setTimeout(reveal, index * MODIFIER_REVEAL_INTERVAL_MS));
+  });
 }
 
 // Do not reveal losing bidders' spend to other players. The winner's final

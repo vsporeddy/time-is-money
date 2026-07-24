@@ -13,7 +13,7 @@ interface DisplayAttribute {
   tooltip?: { title: string; text: string };
 }
 
-function templateAttributes(template: ItemTemplate | undefined, item?: Omit<ItemInstance, 'trueValue'>): DisplayAttribute[] {
+function templateAttributes(template: ItemTemplate | undefined, item?: Pick<ItemInstance, 'investment' | 'fairTrade' | 'loner'>): DisplayAttribute[] {
   if (!template) return [];
   const attributes = template.traits.map((id) => ({ label: getTraitDefinition(id)?.name ?? id, traitId: id }));
   if (item?.investment) attributes.push({ label: 'Investment', effect: true, tooltip: { title: '+1$ for each second used to bid for this item', text: '' } });
@@ -25,7 +25,8 @@ function templateAttributes(template: ItemTemplate | undefined, item?: Omit<Item
 
 interface CurrentRound {
   round: Round;
-  item: Omit<ItemInstance, 'trueValue'>;
+  item: Omit<ItemInstance, 'trueValue' | 'hiddenTraitId' | 'material' | 'rarity' | 'specialModifier'> &
+    Partial<Pick<ItemInstance, 'material' | 'rarity' | 'specialModifier'>>;
 }
 
 interface LastResult {
@@ -133,7 +134,7 @@ export function Game({
       playCoin(COIN_MIN_VOLUME + (COIN_MAX_VOLUME - COIN_MIN_VOLUME) * urgency);
     };
     tick();
-    const interval = window.setInterval(tick, 300);
+    const interval = window.setInterval(tick, 1_000);
     return () => window.clearInterval(interval);
   }, [iAmSpending]);
 
@@ -269,10 +270,18 @@ export function Game({
             <div>
               <p>Modifiers</p>
               <ul>
-                <li className={`modifier ${modifierClass(currentRound.item.material)}`}>{currentRound.item.material} ×{getMaterialValueMultiplier(currentRound.item.material).toFixed(1)}</li>
-                <li className={`modifier ${modifierClass(currentRound.item.rarity)}`}>{currentRound.item.rarity} ×{getRarityValueMultiplier(currentRound.item.rarity).toFixed(1)}</li>
+                {currentRound.item.material && (
+                  <li className={`modifier modifier-reveal ${modifierClass(currentRound.item.material)}`}>
+                    {currentRound.item.material} ×{getMaterialValueMultiplier(currentRound.item.material).toFixed(1)}
+                  </li>
+                )}
+                {currentRound.item.rarity && (
+                  <li className={`modifier modifier-reveal ${modifierClass(currentRound.item.rarity)}`}>
+                    {currentRound.item.rarity} ×{getRarityValueMultiplier(currentRound.item.rarity).toFixed(1)}
+                  </li>
+                )}
                 {currentRound.item.specialModifier && (
-                  <li className={`modifier ${modifierClass(currentRound.item.specialModifier)}`}>
+                  <li className={`modifier modifier-reveal ${modifierClass(currentRound.item.specialModifier)}`}>
                     {currentRound.item.specialModifier === 'Cursed' ? (
                       <span className="special-modifier-trigger">
                         {cursedSetActive ? 'Cursed x1.25' : 'Cursed ×0.75'}
