@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import type { ChatMessage, ItemInstance, Player, Round, RoomState, ScoreBreakdown } from 'shared';
 import { computeScores, getTemplate, getTraitDefinition } from 'shared';
@@ -9,7 +9,7 @@ import { PortraitIcon } from './PortraitIcon';
 import { Chat } from './Chat';
 import { BackgroundMusic } from './BackgroundMusic';
 import { Inventory } from './Inventory';
-import { playChatDing, playClick } from './sound';
+import { playChatDing, playClick, playLose, playWin } from './sound';
 
 interface CurrentRound {
   round: Round;
@@ -25,6 +25,14 @@ export default function App() {
   const [connected, setConnected] = useState(false);
   const [joined, setJoined] = useState(false);
   const [myId, setMyId] = useState<string | null>(null);
+  const myIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    myIdRef.current = myId;
+  }, [myId]);
+  // Withdrawing as the last remaining bidder actually wins the lot (see
+  // handleHoldRelease in round.ts) — suppress the "lose" cue for that case
+  // so it doesn't play right before the "win" cue.
+  const suppressNextLoseRef = useRef(false);
   const [name, setName] = useState('');
   const [room, setRoom] = useState<RoomState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -98,6 +106,13 @@ export default function App() {
         delete next[payload.playerId];
         return next;
       });
+      if (payload.playerId === myIdRef.current) {
+        if (suppressNextLoseRef.current) {
+          suppressNextLoseRef.current = false;
+        } else {
+          playLose();
+        }
+      }
     };
     const onRoundEnd = (payload: LastResult) => {
       setLastResult(payload);
@@ -108,6 +123,7 @@ export default function App() {
           ...previous,
           [payload.item.id]: payload.round.bidders[payload.round.winnerId!]?.committedMs ?? 0,
         }));
+        if (payload.round.winnerId === myIdRef.current) playWin();
       }
     };
     const onGameOver = (payload: { players: Player[]; scores: ScoreBreakdown[] }) => {
@@ -352,7 +368,14 @@ export default function App() {
         droppedThisRound={droppedThisRound}
         lastResult={lastResult}
         onHoldStart={() => socket.emit('hold_start')}
-        onHoldRelease={() => socket.emit('hold_release')}
+        onHoldRelease={() => {
+          const isRealWithdraw = currentRound ? !currentRound.round.bidWindowOpen : false;
+          if (isRealWithdraw) {
+            const otherHolders = Object.keys(liveBids).filter((id) => id !== myId);
+            suppressNextLoseRef.current = otherHolders.length === 0;
+          }
+          socket.emit('hold_release');
+        }}
       />
     );
   }

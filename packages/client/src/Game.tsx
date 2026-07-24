@@ -3,7 +3,7 @@ import type { ItemInstance, ItemTemplate, Player, Round } from 'shared';
 import { getHiddenTrait, getTemplate, getTraitDefinition } from 'shared';
 import { SpriteIcon } from './SpriteIcon';
 import { PortraitIcon } from './PortraitIcon';
-import { playClick } from './sound';
+import { playClick, playCoin } from './sound';
 
 function templateAttributes(template: ItemTemplate | undefined): string[] {
   if (!template) return [];
@@ -93,6 +93,18 @@ export function Game({
   }, [currentRound?.round.id]);
 
   const iAmHolding = !iHaveDropped && (optimisticBidding || isHolding(myId));
+  // During the opt-in window, holding is free — time (and spending) only
+  // starts once the window closes, so that's when the coin cue should too.
+  const iAmSpending = iAmHolding && currentRound?.round.bidWindowOpen === false;
+
+  // Ticking "spending money" cue for as long as the player is actively spending.
+  useEffect(() => {
+    if (!iAmSpending) return;
+    playCoin();
+    const interval = window.setInterval(playCoin, 300);
+    return () => window.clearInterval(interval);
+  }, [iAmSpending]);
+
   const initialBidDeadline = currentRound?.round.initialBidDeadlineAt;
   const initialBidSeconds = initialBidDeadline === null || initialBidDeadline === undefined
     ? null

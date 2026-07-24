@@ -13,3 +13,15 @@ export function playClick() {
 export function playChatDing() {
   playSfx('ding.wav', 0.5);
 }
+
+export function playCoin() {
+  playSfx('coin.wav', 0.2);
+}
+
+export function playWin() {
+  playSfx('1up_a.wav', 0.5);
+}
+
+export function playLose() {
+  playSfx('lose_a.wav', 0.5);
+}
