@@ -114,6 +114,13 @@ export function Game({
     initialBidSeconds !== null &&
     currentRound.round.bidWindowOpen;
 
+  // Visible to everyone (bidders, folks who folded, and observers alike) once
+  // spending starts — nobody's individual spend is revealed, just the clock.
+  const spendingStartedAt = currentRound?.round.spendingStartedAt;
+  const spendingSeconds = spendingStartedAt ? Math.max(0, (now - spendingStartedAt) / 1000) : null;
+  const showSpendingTimer =
+    currentRound?.round.status === 'active' && !currentRound.round.bidWindowOpen && spendingSeconds !== null;
+
   const handleBidClick = () => {
     playClick();
     if (iAmHolding) {
@@ -138,6 +145,12 @@ export function Game({
         <div className="initial-bid-timer" role="status" aria-live="polite">
           <strong>{initialBidSeconds.toFixed(1)}s</strong>
           <small>Bid before time runs out or this lot is passed.</small>
+        </div>
+      )}
+      {showSpendingTimer && (
+        <div className="initial-bid-timer" role="status" aria-live="polite">
+          <strong>{spendingSeconds!.toFixed(1)}s</strong>
+          <small>Bidding is underway.</small>
         </div>
       )}
       {lastResult &&
@@ -237,7 +250,6 @@ export function Game({
                 >
                   {iHaveDropped ? 'Withdrawn' : iAmHolding ? (currentRound.round.bidWindowOpen ? 'Cancel Bid' : 'Withdraw') : 'Bid'}
                 </button>
-                {iAmHolding && !currentRound.round.bidWindowOpen && <p className="spend-line">Spending: {fmt(liveBids[myId] ?? 0)}</p>}
               </>
             ))}
         </div>

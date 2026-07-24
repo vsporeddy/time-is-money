@@ -40,6 +40,7 @@ export default function App() {
   const [currentRound, setCurrentRound] = useState<CurrentRound | null>(null);
   const [liveTimes, setLiveTimes] = useState<Record<string, number>>({});
   const [liveBids, setLiveBids] = useState<Record<string, number>>({});
+  const [holdingPlayerIds, setHoldingPlayerIds] = useState<string[]>([]);
   const [droppedThisRound, setDroppedThisRound] = useState<Record<string, number>>({});
   const [lastResult, setLastResult] = useState<LastResult | null>(null);
   const [knownItems, setKnownItems] = useState<Record<string, ItemInstance>>({});
@@ -79,12 +80,13 @@ export default function App() {
       setCurrentRound(payload);
       setLastResult(null);
       setLiveBids({});
+      setHoldingPlayerIds([]);
       setDroppedThisRound({});
     };
-    const onBidWindowClosed = ({ roundId }: { roundId: string }) => {
+    const onBidWindowClosed = ({ roundId, spendingStartedAt }: { roundId: string; spendingStartedAt: number }) => {
       setCurrentRound((current) =>
         current?.round.id === roundId
-          ? { ...current, round: { ...current.round, bidWindowOpen: false } }
+          ? { ...current, round: { ...current.round, bidWindowOpen: false, spendingStartedAt } }
           : current
       );
     };
@@ -95,9 +97,10 @@ export default function App() {
         return next;
       });
     };
-    const onRoundTick = (payload: { players: Record<string, number>; bidders: Record<string, number> }) => {
+    const onRoundTick = (payload: { players: Record<string, number>; bidders: Record<string, number>; holding: string[] }) => {
       setLiveTimes(payload.players);
       setLiveBids(payload.bidders);
+      setHoldingPlayerIds(payload.holding);
     };
     const onBidderDropped = (payload: { roundId: string; playerId: string; committedMs: number }) => {
       setDroppedThisRound((prev) => ({ ...prev, [payload.playerId]: payload.committedMs }));
@@ -215,7 +218,7 @@ export default function App() {
     <ul className="player-row">
       {(room?.players ?? []).map((p) => {
         const isMe = p.id === myId;
-        const holding = isMe && liveBids[p.id] !== undefined;
+        const holding = holdingPlayerIds.includes(p.id);
         const dropped = isMe && droppedThisRound[p.id] !== undefined;
         const time = liveTimes[p.id] ?? p.timeRemainingMs;
         const classes = ['player-card', isMe && 'me', holding && 'holding', dropped && 'dropped']
@@ -247,6 +250,8 @@ export default function App() {
                 {holding && <div>bidding {fmt(liveBids[p.id])}</div>}
                 {dropped && <div>withdrew — spent {fmt(droppedThisRound[p.id])}</div>}
               </>
+            ) : holding ? (
+              <div>bidding</div>
             ) : null}
           </li>
         );

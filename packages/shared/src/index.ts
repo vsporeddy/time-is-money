@@ -63,6 +63,8 @@ export interface Round {
   // The initial opt-in deadline. Bidders do not spend time until it closes.
   initialBidDeadlineAt: number | null;
   bidWindowOpen: boolean;
+  // Set once the opt-in window closes and every holder starts spending simultaneously.
+  spendingStartedAt: number | null;
   bidders: Record<string, RoundBidder>;
   revealedFields: string[];
   winnerId: string | null;
@@ -125,9 +127,9 @@ export interface ScoreBreakdown {
 export interface ServerToClientEvents {
   room_state: (state: RoomState) => void;
   round_start: (payload: { round: Round; item: Omit<ItemInstance, 'trueValue' | 'hiddenTraitId'> }) => void;
-  bid_window_closed: (payload: { roundId: string }) => void;
+  bid_window_closed: (payload: { roundId: string; spendingStartedAt: number }) => void;
   bidder_cancelled: (payload: { roundId: string; playerId: string }) => void;
-  round_tick: (payload: { players: Record<string, number>; bidders: Record<string, number> }) => void;
+  round_tick: (payload: { players: Record<string, number>; bidders: Record<string, number>; holding: string[] }) => void;
   reveal: (payload: { roundId: string; field: string; value: string | number }) => void;
   bidder_dropped: (payload: { roundId: string; playerId: string; committedMs: number }) => void;
   round_end: (payload: { round: Round; item: ItemInstance }) => void;

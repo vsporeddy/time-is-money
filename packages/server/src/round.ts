@@ -35,6 +35,7 @@ export function startRound(room: Room, io: IO) {
     status: 'pending',
     initialBidDeadlineAt: null,
     bidWindowOpen: false,
+    spendingStartedAt: null,
     bidders,
     revealedFields: [],
     winnerId: null,
@@ -89,6 +90,7 @@ function closeBidWindow(room: Room, io: IO) {
   // Everyone who opted in during the opening window starts spending at the
   // same moment, regardless of when they pressed Bid.
   const spendingStartedAt = Date.now();
+  ar.round.spendingStartedAt = spendingStartedAt;
   for (const [playerId] of activeBidders) {
     ar.holdStartedAt.set(playerId, spendingStartedAt);
   }
@@ -106,7 +108,7 @@ function closeBidWindow(room: Room, io: IO) {
     resolveRound(room, io, winnerId);
   }, room.settings.maxRoundDurationMs);
 
-  io.emit('bid_window_closed', { roundId: ar.round.id });
+  io.emit('bid_window_closed', { roundId: ar.round.id, spendingStartedAt });
   emitRoomState(room, io);
 }
 
@@ -356,14 +358,21 @@ export function tickRoom(room: Room, io: IO) {
     bidders[playerId] = now - startedAt;
   }
 
+  // Who is currently holding is public (so others can see a lot is contested),
+  // but the actual time/money each of them has committed stays private.
+  const holding = Object.entries(ar.round.bidders)
+    .filter(([, bidder]) => bidder.isHolding)
+    .map(([playerId]) => playerId);
+
   // A player sees only their own live clock and spend. This avoids exposing
-  // other players' remaining time, bid participation, or committed time.
+  // other players' remaining time or committed time.
   for (const socketId of io.sockets.sockets.keys()) {
     const ownTime = players[socketId];
     const ownBid = bidders[socketId];
     io.to(socketId).emit('round_tick', {
       players: ownTime === undefined ? {} : { [socketId]: ownTime },
       bidders: ownBid === undefined ? {} : { [socketId]: ownBid },
+      holding,
     });
   }
 
