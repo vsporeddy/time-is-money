@@ -6,7 +6,21 @@ import type { Room } from './rooms.js';
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 type HoldFn = (room: Room, playerId: string, io: IO) => void;
 
+const BOT_NAMES = [
+  'Chowder', 'Zalteo', 'Roffles', 'Spatika', 'Paperlisk',
+  'Silverwing', 'Misder', 'Asura', 'Iron Urn', 'Phantah',
+  'Doncha', 'Strawberry', 'Sapphice', 'Quasar', 'Chewpin',
+  'TimmahC', 'Oxray', 'Audacity', 'BC Guy', 'Learnt',
+];
+
 let botCounter = 0;
+
+function pickBotName(room: Room): string {
+  const taken = new Set([...room.players.values()].filter((p) => p.isBot).map((p) => p.name));
+  const available = BOT_NAMES.filter((name) => !taken.has(name));
+  const pool = available.length > 0 ? available : BOT_NAMES;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
 
 export function addBot(room: Room): Player | null {
   if (room.status !== 'lobby') return null;
@@ -18,7 +32,7 @@ export function addBot(room: Room): Player | null {
   const id = `bot-${botCounter}`;
   const bot: Player = {
     id,
-    name: `Bot ${botCount + 1}`,
+    name: pickBotName(room),
     timeRemainingMs: room.settings.startingTimeMs,
     status: 'active',
     stash: [],
