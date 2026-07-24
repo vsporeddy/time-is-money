@@ -361,10 +361,13 @@ export function tickRoom(room: Room, io: IO) {
     bidders[playerId] = now - startedAt;
   }
 
-  // Who is currently holding is public (so others can see a lot is contested),
-  // but the actual time/money each of them has committed stays private.
+  // Who has entered this lot is public (so others can see it's contested),
+  // but the actual time/money each of them has committed stays private. This
+  // stays true once someone withdraws (droppedAt set) — it's an "entered"
+  // indicator, not a "currently holding" one. A free cancel during the opt-in
+  // window resets droppedAt back to null too, so that correctly drops out.
   const holding = Object.entries(ar.round.bidders)
-    .filter(([, bidder]) => bidder.isHolding)
+    .filter(([, bidder]) => bidder.isHolding || bidder.droppedAt !== null)
     .map(([playerId]) => playerId);
 
   // A player sees only their own live clock and spend. This avoids exposing

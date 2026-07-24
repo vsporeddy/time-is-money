@@ -218,7 +218,11 @@ export default function App() {
     <ul className="player-row">
       {(room?.players ?? []).map((p) => {
         const isMe = p.id === myId;
+        // Public "entered this lot" indicator — stays true after a withdrawal.
         const holding = holdingPlayerIds.includes(p.id);
+        // Distinct from `holding` above: only true while actively spending, so
+        // the live amount swaps for the final spend line the instant you withdraw.
+        const isCurrentlyHolding = liveBids[p.id] !== undefined;
         const dropped = isMe && droppedThisRound[p.id] !== undefined;
         const time = liveTimes[p.id] ?? p.timeRemainingMs;
         const classes = ['player-card', isMe && 'me', holding && 'holding', dropped && 'dropped']
@@ -247,7 +251,7 @@ export default function App() {
             ) : isMe ? (
               <>
                 <div>{fmt(time)} left</div>
-                {holding && <div>bidding {fmt(liveBids[p.id])}</div>}
+                {isCurrentlyHolding && <div>bidding {fmt(liveBids[p.id])}</div>}
                 {dropped && <div>withdrew! Spent {fmt(droppedThisRound[p.id])}</div>}
               </>
             ) : holding ? (
