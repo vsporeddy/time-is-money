@@ -28,7 +28,7 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   { id: 'battle-axe', name: 'Battle Axe', baseSpriteId: '90', valueRange: [30, 80], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['weapon'] },
   { id: 'hunting-bow', name: 'Hunting Bow', baseSpriteId: '99', valueRange: [25, 70], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['weapon', 'bow'] },
   { id: 'crossbow', name: 'Crossbow', baseSpriteId: '100', valueRange: [35, 90], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['weapon', 'bow'] },
-  { id: 'arcane-staff', name: 'Arcane Staff', baseSpriteId: '105', valueRange: [40, 120], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['weapon', 'staff'] },
+  { id: 'arcane-staff', name: 'Arcane Staff', baseSpriteId: '105', valueRange: [40, 120], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['weapon'] },
   { id: 'riot-shield', name: 'Riot Shield', baseSpriteId: '97', valueRange: [20, 55], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['weapon'] },
 
   // --- Armor (broad trait: armor) ---

@@ -32,7 +32,6 @@ export const TRAIT_DEFINITIONS: TraitDefinition[] = [
   // --- Narrow sub-traits (nested inside a broad category above) ---
   { id: 'sword', name: 'Sword', iconSpriteId: '84', tiers: [{ count: 2, bonus: 25 }, { count: 3, bonus: 50 }] },
   { id: 'bow', name: 'Bow', iconSpriteId: '99', tiers: [{ count: 2, bonus: 30 }] },
-  { id: 'staff', name: 'Staff', iconSpriteId: '105', tiers: [{ count: 2, bonus: 35 }] },
   { id: 'book', name: 'Book', iconSpriteId: '213', tiers: [{ count: 2, bonus: 30 }] },
   { id: 'dessert', name: 'Dessert', iconSpriteId: '253', tiers: [{ count: 2, bonus: 30 }] },
 
