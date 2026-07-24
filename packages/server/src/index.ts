@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import type { ClientToServerEvents, Player, ServerToClientEvents } from 'shared';
 import { randomPortraitIndex } from 'shared';
 import { emitRoomState, getRoom, toRoomState } from './rooms.js';
+import { addBot } from './bots.js';
 import {
   forceResetGame,
   handleHoldRelease,
@@ -55,6 +56,7 @@ io.on('connection', (socket) => {
       connected: true,
       portraitIndex: randomPortraitIndex(),
       isObserver,
+      isBot: false,
     };
     room.players.set(player.id, player);
 
@@ -64,6 +66,11 @@ io.on('connection', (socket) => {
 
   socket.on('start_game', () => {
     startGame(getRoom(), io);
+  });
+
+  socket.on('add_bot', () => {
+    const room = getRoom();
+    if (addBot(room)) emitRoomState(room, io);
   });
 
   socket.on('hold_start', () => {

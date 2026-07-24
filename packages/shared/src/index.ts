@@ -14,7 +14,11 @@ export interface Player {
   connected: boolean;
   portraitIndex: number;
   isObserver: boolean; // joined while a game was already in progress — watches, never bids
+  isBot: boolean;
 }
+
+// Lobby-only cap on how many bots can be added to the room.
+export const MAX_BOTS = 3;
 
 export interface TimeRefundConfig {
   mode: 'flat' | 'catchup';
@@ -107,6 +111,7 @@ export interface ClientToServerEvents {
     ack: (res: { ok: true; playerId: string } | { ok: false; error: string }) => void
   ) => void;
   start_game: () => void;
+  add_bot: () => void;
   hold_start: () => void;
   hold_release: () => void;
   restart_game: () => void;

@@ -3,6 +3,7 @@ import type { ClientToServerEvents, Round, ServerToClientEvents, TimeRefundConfi
 import { computeScores, getTemplate, rollItemInstance } from 'shared';
 import { emitRoomState } from './rooms.js';
 import type { Room } from './rooms.js';
+import { scheduleBotEntries, scheduleBotReleases } from './bots.js';
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 
@@ -68,6 +69,7 @@ function activateRound(room: Room, io: IO) {
   ar.round.bidWindowOpen = true;
   ar.bidWindowOpen = true;
   emitRoundStart(room, io);
+  scheduleBotEntries(room, io, handleHoldStart);
 
   ar.noBidTimer = setTimeout(() => closeBidWindow(room, io), room.settings.noBidTimeoutMs);
 
@@ -94,6 +96,7 @@ function closeBidWindow(room: Room, io: IO) {
   for (const [playerId] of activeBidders) {
     ar.holdStartedAt.set(playerId, spendingStartedAt);
   }
+  scheduleBotReleases(room, io, handleHoldRelease);
 
   ar.maxDurationTimer = setTimeout(() => {
     const stillHolding = Object.entries(ar.round.bidders).filter(([, bidder]) => bidder.isHolding);

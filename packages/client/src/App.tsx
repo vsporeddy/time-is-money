@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import type { ChatMessage, ItemInstance, Player, Round, RoomState, ScoreBreakdown } from 'shared';
-import { computeScores, getTemplate, getTraitDefinition } from 'shared';
+import { MAX_BOTS, computeScores, getTemplate, getTraitDefinition } from 'shared';
 import { socket } from './socket';
 import { Logo } from './Logo';
 import { Game } from './Game';
@@ -240,7 +240,7 @@ export default function App() {
             </button>
             <div className="name">
               {p.name}
-              {isMe ? ' (you)' : ''}
+              {isMe ? ' (you)' : p.isBot ? ' (bot)' : ''}
             </div>
             {p.isObserver ? (
               <div>Observing</div>
@@ -345,6 +345,7 @@ export default function App() {
     // rank, just wait for the next game.
     screen = shellWithHeader(<p className="status-line">A game just ended! Waiting for a new one to start.</p>);
   } else if (room.status === 'lobby') {
+    const botCount = room.players.filter((p) => p.isBot).length;
     screen = shellWithHeader(
       <div className="panel">
         <h2 className="panel-title">Lobby</h2>
@@ -356,6 +357,17 @@ export default function App() {
           }}
         >
           START GAME
+        </button>
+        <button
+          className="btn btn-block"
+          style={{ marginTop: '0.75rem' }}
+          disabled={botCount >= MAX_BOTS}
+          onClick={() => {
+            playClick();
+            socket.emit('add_bot');
+          }}
+        >
+          Add Bot ({botCount}/{MAX_BOTS})
         </button>
       </div>
     );
