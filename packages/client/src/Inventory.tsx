@@ -1,5 +1,5 @@
 import type { ItemInstance, Player, ScoreBreakdown } from 'shared';
-import { getHiddenTrait, getMaterialValueMultiplier, getRarityValueMultiplier, getTemplate, getTraitDefinition } from 'shared';
+import { getHiddenTrait, getMaterialValueMultiplier, getRarityValueMultiplier, getTemplate, getTraitDefinition, TRAIT_DEFINITIONS } from 'shared';
 import { SpriteIcon } from './SpriteIcon';
 
 interface InventoryProps {
@@ -17,6 +17,41 @@ interface DisplayAttribute {
   label: string;
   traitId?: string;
   effect?: boolean;
+}
+
+type SetBonusColor = 'gray' | 'bronze' | 'silver' | 'gold';
+
+interface SetBonusTier {
+  count: number;
+  bonus: number;
+  multiplier?: number;
+}
+
+interface TraitProgress {
+  id: string;
+  name: string;
+  count: number;
+  target: number;
+  color: SetBonusColor;
+  tiers: SetBonusTier[];
+}
+
+interface BreakdownLine {
+  text: string;
+  color?: SetBonusColor;
+  className?: string;
+}
+
+function setBonusColor(tierCount: number, reachedTierIndex: number): SetBonusColor {
+  if (reachedTierIndex < 0) return 'gray';
+  if (tierCount === 1) return 'silver';
+  if (tierCount === 2) return reachedTierIndex === 0 ? 'bronze' : 'silver';
+  return reachedTierIndex === 0 ? 'bronze' : reachedTierIndex === 1 ? 'silver' : 'gold';
+}
+
+function setBonusText(traitId: string, tier: SetBonusTier): string {
+  if (traitId === 'cursed' && tier.multiplier) return 'Change modifier to 1.25x';
+  return tier.multiplier ? `×${tier.multiplier}` : `+$${tier.bonus}`;
 }
 
 function itemAttributes(item: ItemInstance): DisplayAttribute[] {
@@ -44,19 +79,37 @@ function specialModifierLabel(specialModifier: ItemInstance['specialModifier']):
 }
 
 export function Inventory({ player, items, score, side, showValue = true, onClose }: InventoryProps) {
-  const stash = player.stash.map((id) => items[id]).filter((item): item is ItemInstance => Boolean(item)).slice(0, INVENTORY_SIZE);
+  const ownedItems = player.stash.map((id) => items[id]).filter((item): item is ItemInstance => Boolean(item));
+  const stash = ownedItems.slice(0, INVENTORY_SIZE);
   const cursedSetActive = score?.traitBonuses.some((trait) => trait.traitId === 'cursed' && trait.multiplier === 1.25) ?? false;
-  const breakdown = score
+  const traitProgress = TRAIT_DEFINITIONS.map((trait) => {
+    const count = trait.materialMatch
+      ? ownedItems.filter((item) => item.specialModifier === trait.materialMatch).length
+      : ownedItems.filter((item) => getTemplate(item.templateId)?.traits.includes(trait.id)).length;
+    if (count === 0) return null;
+
+    const reachedTierIndex = trait.tiers.reduce((highest, tier, index) => (count >= tier.count ? index : highest), -1);
+    const target = trait.tiers.find((tier) => count < tier.count)?.count ?? trait.tiers[trait.tiers.length - 1].count;
+    const color = setBonusColor(trait.tiers.length, reachedTierIndex);
+
+    return { id: trait.id, name: trait.name, count, target, color, tiers: trait.tiers };
+  }).filter((progress): progress is TraitProgress => Boolean(progress));
+  const breakdown: BreakdownLine[] = score
     ? [
-        `Base Value: $${score.baseValue}`,
-        score.hiddenTraitBonus !== 0 && `Finds: ${score.hiddenTraitBonus >= 0 ? '+' : ''}$${score.hiddenTraitBonus}`,
-        score.scoreScalingBonus !== 0 && `Item effects: +$${score.scoreScalingBonus}`,
-        score.lonerBonus !== 0 && `Loner bonuses: +$${score.lonerBonus}`,
-        ...score.traitBonuses.map((trait) =>
-          `${getTraitDefinition(trait.traitId)?.name ?? trait.traitId} ×${trait.count}: ${trait.multiplier ? `×${trait.multiplier}` : `+$${trait.bonus}`}`
-        ),
-      ].filter((line): line is string => Boolean(line))
-    : ['No revealed items yet.'];
+        { text: `Base Value: $${score.baseValue}` },
+        score.hiddenTraitBonus !== 0 && { text: `Finds: ${score.hiddenTraitBonus >= 0 ? '+' : ''}$${score.hiddenTraitBonus}` },
+        score.scoreScalingBonus !== 0 && { text: `Item effects: +$${score.scoreScalingBonus}`, className: 'item-effect-label' },
+        score.lonerBonus !== 0 && { text: `Loner bonuses: +$${score.lonerBonus}` },
+        ...score.traitBonuses.map((trait) => {
+          const definition = getTraitDefinition(trait.traitId);
+          const reachedTierIndex = definition?.tiers.reduce((highest, tier, index) => (trait.count >= tier.count ? index : highest), -1) ?? -1;
+          return {
+            text: `${definition?.name ?? trait.traitId} ${trait.count}: ${trait.multiplier ? `×${trait.multiplier}` : `+$${trait.bonus}`}`,
+            color: setBonusColor(definition?.tiers.length ?? 1, reachedTierIndex),
+          };
+        }),
+      ].filter((line): line is BreakdownLine => Boolean(line))
+    : [{ text: 'No revealed items yet.' }];
 
   return (
     <aside className={`inventory-panel inventory-panel-${side}`} aria-label={`${player.name}'s inventory`}>
@@ -69,7 +122,7 @@ export function Inventory({ player, items, score, side, showValue = true, onClos
               <div className="inventory-tooltip inventory-total-tooltip">
                 <b>VALUE BREAKDOWN</b>
                 {breakdown.map((line) => (
-                  <span key={line}>{line}</span>
+                  <span key={line.text} className={line.color ? `set-bonus-tier ${line.color}` : line.className}>{line.text}</span>
                 ))}
               </div>
             </div>
@@ -120,6 +173,23 @@ export function Inventory({ player, items, score, side, showValue = true, onClos
           );
         })}
       </div>
+      {traitProgress.length > 0 && (
+        <div className="trait-progress" aria-label="Set bonus progress">
+          {traitProgress.map((progress) => (
+            <span key={progress.id} className={`trait-progress-bubble ${progress.color}`} tabIndex={0}>
+              {progress.name}: {progress.count}/{progress.target}
+              <span className="trait-progress-tooltip">
+                <b>{progress.name} SET BONUS</b>
+                {progress.tiers.map((tier, index) => (
+                  <span key={tier.count} className={`set-bonus-tier ${setBonusColor(progress.tiers.length, index)}`}>
+                    {tier.count}: {setBonusText(progress.id, tier)}
+                  </span>
+                ))}
+              </span>
+            </span>
+          ))}
+        </div>
+      )}
     </aside>
   );
 }

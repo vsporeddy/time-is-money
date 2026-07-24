@@ -450,6 +450,77 @@ input[type='text']:focus {
   height: auto;
 }
 
+.trait-progress {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-top: 0.7rem;
+}
+
+.trait-progress-bubble {
+  position: relative;
+  padding: 0.35rem 0.45rem;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+  background: var(--bg);
+  font-size: 0.46rem;
+  line-height: 1.35;
+  white-space: nowrap;
+  cursor: help;
+  outline: none;
+}
+
+.trait-progress-bubble.gray {
+  color: #5f5f5f;
+}
+
+.trait-progress-bubble.bronze {
+  color: #cd7f32;
+}
+
+.trait-progress-bubble.silver {
+  color: #d6d6d6;
+}
+
+.trait-progress-bubble.gold {
+  color: var(--gold-bright);
+}
+
+.trait-progress-tooltip {
+  position: absolute;
+  z-index: 60;
+  bottom: calc(100% + 0.35rem);
+  left: 50%;
+  display: none;
+  width: max-content;
+  padding: 0.45rem;
+  transform: translateX(-50%);
+  background: var(--bg);
+  border: 2px solid var(--gold-bright);
+  box-shadow: 3px 3px 0 #000;
+  color: var(--text);
+  font-size: 0.5rem;
+  line-height: 1.5;
+  text-align: left;
+  pointer-events: none;
+}
+
+.trait-progress-tooltip b,
+.trait-progress-tooltip span {
+  display: block;
+}
+
+.trait-progress-tooltip b {
+  margin-bottom: 0.2rem;
+  color: var(--gold-bright);
+}
+
+.trait-progress-bubble:hover .trait-progress-tooltip,
+.trait-progress-bubble:focus .trait-progress-tooltip {
+  display: block;
+}
+
 .inventory-tooltip {
   position: absolute;
   z-index: 50;
@@ -568,6 +639,18 @@ input[type='text']:focus {
 .attribute-bonus-tooltip b {
   color: var(--gold-bright);
   margin-bottom: 0.2rem;
+}
+
+.set-bonus-tier.bronze {
+  color: #cd7f32;
+}
+
+.set-bonus-tier.silver {
+  color: #d6d6d6;
+}
+
+.set-bonus-tier.gold {
+  color: var(--gold-bright);
 }
 
 .attribute-bonus-trigger:hover .attribute-bonus-tooltip,

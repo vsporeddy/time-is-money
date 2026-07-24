@@ -276,7 +276,7 @@ export function Game({
                     {currentRound.item.specialModifier === 'Cursed' ? (
                       <span className="special-modifier-trigger">
                         {cursedSetActive ? 'Cursed x1.25' : 'Cursed ×0.75'}
-                        <span className="special-modifier-tooltip"><b>CURSED SET BONUS</b><span>3: Change modifier to 1.25x</span></span>
+                        <span className="special-modifier-tooltip"><b>CURSED SET BONUS</b><span className="set-bonus-tier silver">3: Change modifier to 1.25x</span></span>
                       </span>
                     ) : specialModifierLabel(currentRound.item.specialModifier)}
                   </li>
