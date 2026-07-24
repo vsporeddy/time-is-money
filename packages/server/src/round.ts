@@ -1,8 +1,8 @@
 import type { Server } from 'socket.io';
-import type { ClientToServerEvents, Player, Round, ServerToClientEvents, TimeRefundConfig } from 'shared';
+import type { ClientToServerEvents, MaskedRoundItem, Player, Round, ServerToClientEvents, TimeRefundConfig } from 'shared';
 import { cloneItemInstance, computeScores, getTemplate, ITEM_TEMPLATES, rollItemInstance, rollItemInstanceForTemplate } from 'shared';
 import { emitRoomState, ownsItemTemplate } from './rooms.js';
-import type { Room } from './rooms.js';
+import type { ActiveRound, Room } from './rooms.js';
 import { scheduleBotEntries, scheduleBotReleases } from './bots.js';
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
@@ -49,6 +49,7 @@ export function startRound(room: Room, io: IO) {
     revealedFields: [],
     winnerId: null,
     soleBidder: false,
+    restrictedBidderIds: null,
   };
 
   room.currentRoundIndex += 1;
@@ -62,6 +63,7 @@ export function startRound(room: Room, io: IO) {
     maxDurationTimer: null,
     interRoundTimer: null,
     modifierRevealTimers: [],
+    allowedBidderIds: null,
   };
 
   emitRoundStart(room, io);
@@ -137,6 +139,7 @@ export function handleHoldStart(room: Room, playerId: string, io: IO) {
   const ar = room.activeRound;
   if (!ar || ar.round.status !== 'active') return;
   if (!ar.bidWindowOpen) return; // entrants are locked once spending begins
+  if (ar.allowedBidderIds && !ar.allowedBidderIds.has(playerId)) return; // Dual Daggers locked this lot to specific players
 
   const bidder = ar.round.bidders[playerId];
   const player = room.players.get(playerId);
@@ -157,7 +160,6 @@ export function handleHoldRelease(room: Room, playerId: string, io: IO) {
 
   const bidder = ar.round.bidders[playerId];
   const player = room.players.get(playerId);
-  const startedAt = ar.holdStartedAt.get(playerId);
   if (!bidder || !player || !bidder.isHolding) return;
 
   // Cancelling during the opt-in window costs nothing and leaves the player
@@ -170,7 +172,23 @@ export function handleHoldRelease(room: Room, playerId: string, io: IO) {
     return;
   }
 
-  if (startedAt === undefined) return;
+  if (!forceWithdraw(room, io, ar, playerId)) return;
+  emitRoomState(room, io);
+
+  // Bidding is an opt-in phase: a lone bidder stays in until they choose to
+  // withdraw. When the final active bidder withdraws, they win the lot.
+  checkResolution(room, io, playerId);
+}
+
+// Core withdrawal accounting shared by a player's own release and any weapon
+// effect that forces someone out. Charges elapsed time and reveals it to
+// whoever's entitled to see it (the player themself, or a Spyglass owner) —
+// callers decide what to do about resolution afterward.
+function forceWithdraw(room: Room, io: IO, ar: ActiveRound, playerId: string): boolean {
+  const bidder = ar.round.bidders[playerId];
+  const player = room.players.get(playerId);
+  const startedAt = ar.holdStartedAt.get(playerId);
+  if (!bidder || !player || !bidder.isHolding || startedAt === undefined) return false;
 
   const elapsed = Date.now() - startedAt;
   ar.holdStartedAt.delete(playerId);
@@ -185,14 +203,8 @@ export function handleHoldRelease(room: Room, playerId: string, io: IO) {
   bidder.committedMs = elapsed;
   bidder.droppedAt = Date.now();
 
-  // A player's spent time is private until the final result — except to
-  // whoever holds a Spyglass, which reveals it live.
   emitBidderDropped(room, io, { roundId: ar.round.id, playerId, committedMs: elapsed });
-  emitRoomState(room, io);
-
-  // Bidding is an opt-in phase: a lone bidder stays in until they choose to
-  // withdraw. When the final active bidder withdraws, they win the lot.
-  checkResolution(room, io, playerId);
+  return true;
 }
 
 function checkResolution(room: Room, io: IO, lastWithdrawerId: string | null = null) {
@@ -427,19 +439,160 @@ export function useMirror(
   return { ok: true };
 }
 
+// True while the player holds a Wooden Shield — blanket immunity to every
+// other player's weapon effects.
+function isImmune(room: Room, playerId: string | undefined): boolean {
+  return ownsItemTemplate(room, playerId, 'wooden-shield');
+}
+
+// Dispatches every weapon's one-time active effect. On success the item is
+// flagged usedActiveEffect (never removed — it just stops being usable).
+export function useWeapon(
+  room: Room,
+  io: IO,
+  playerId: string,
+  itemId: string,
+  targetPlayerId?: string,
+  targetItemId?: string
+): { ok: true } | { ok: false; error: string } {
+  const actor = room.players.get(playerId);
+  if (!actor) return { ok: false, error: 'Not in game.' };
+  if (!actor.stash.includes(itemId)) return { ok: false, error: 'Item not found in your inventory.' };
+
+  const item = room.wonItems.get(itemId);
+  const template = item ? getTemplate(item.templateId) : undefined;
+  if (!item || !template?.weapon) return { ok: false, error: 'That item has no active effect.' };
+  if (item.usedActiveEffect) return { ok: false, error: 'Already used.' };
+
+  const ar = room.activeRound;
+  const { phase, target, exclusive } = template.weapon;
+
+  if (phase === 'preBid' && !(ar && ar.round.status === 'active' && ar.bidWindowOpen)) {
+    return { ok: false, error: 'Can only be used before bidding opens on a lot.' };
+  }
+  if (phase === 'bidding' && !(ar && ar.round.status === 'active' && !ar.bidWindowOpen)) {
+    return { ok: false, error: 'Can only be used while bidding is underway.' };
+  }
+
+  switch (template.effectType) {
+    case 'destroyLot': {
+      resolveRound(room, io, null);
+      break;
+    }
+
+    case 'forceEnter': {
+      if (target === 'all') {
+        for (const [pid, bidder] of Object.entries(ar!.round.bidders)) {
+          if (pid === playerId || bidder.isHolding || bidder.droppedAt !== null || isImmune(room, pid)) continue;
+          const p = room.players.get(pid);
+          if (!p || p.status !== 'active' || p.timeRemainingMs <= 0) continue;
+          bidder.isHolding = true;
+          ar!.hasAnyoneHeld = true;
+        }
+      } else {
+        if (!targetPlayerId || targetPlayerId === playerId) return { ok: false, error: 'Choose another player to target.' };
+        const bidder = ar!.round.bidders[targetPlayerId];
+        const targetPlayer = room.players.get(targetPlayerId);
+        if (!bidder || !targetPlayer) return { ok: false, error: 'That player is not in this round.' };
+        if (isImmune(room, targetPlayerId)) return { ok: false, error: 'That player is immune to weapon effects.' };
+        if (bidder.droppedAt !== null) return { ok: false, error: 'That player already withdrew this round.' };
+
+        bidder.isHolding = true;
+        ar!.hasAnyoneHeld = true;
+
+        if (exclusive) {
+          const allowed = new Set([playerId, targetPlayerId]);
+          ar!.allowedBidderIds = allowed;
+          ar!.round.restrictedBidderIds = [...allowed];
+          for (const [pid, b] of Object.entries(ar!.round.bidders)) {
+            if (allowed.has(pid) || !b.isHolding) continue;
+            b.isHolding = false;
+            b.committedMs = 0;
+            b.droppedAt = null;
+            io.to(pid).emit('bidder_cancelled', { roundId: ar!.round.id, playerId: pid });
+          }
+          io.emit('bid_restricted', { roundId: ar!.round.id, allowedPlayerIds: [...allowed] });
+        }
+      }
+      break;
+    }
+
+    case 'forceWithdraw': {
+      const targets: string[] = [];
+      if (target === 'all') {
+        for (const [pid, bidder] of Object.entries(ar!.round.bidders)) {
+          if (pid !== playerId && bidder.isHolding && !isImmune(room, pid)) targets.push(pid);
+        }
+      } else {
+        if (!targetPlayerId) return { ok: false, error: 'Choose a player to target.' };
+        const bidder = ar!.round.bidders[targetPlayerId];
+        if (!bidder || !bidder.isHolding) return { ok: false, error: 'That player is not currently bidding.' };
+        if (isImmune(room, targetPlayerId)) return { ok: false, error: 'That player is immune to weapon effects.' };
+        targets.push(targetPlayerId);
+      }
+      for (const pid of targets) forceWithdraw(room, io, ar!, pid);
+      checkResolution(room, io, null);
+      break;
+    }
+
+    case 'destroyItem': {
+      if (!targetPlayerId || !targetItemId) return { ok: false, error: 'Choose an item to destroy.' };
+      if (targetPlayerId === playerId) return { ok: false, error: "Choose another player's item." };
+      const targetPlayer = room.players.get(targetPlayerId);
+      if (!targetPlayer || !targetPlayer.stash.includes(targetItemId)) return { ok: false, error: 'Item not found.' };
+      if (isImmune(room, targetPlayerId)) return { ok: false, error: 'That player is immune to weapon effects.' };
+      targetPlayer.stash = targetPlayer.stash.filter((id) => id !== targetItemId);
+      break;
+    }
+
+    case 'transformLot': {
+      transformLot(room, io, ar!);
+      break;
+    }
+
+    default:
+      return { ok: false, error: 'That item has no active effect.' };
+  }
+
+  item.usedActiveEffect = true;
+  emitRoomState(room, io);
+  return { ok: true };
+}
+
+// The Magnifying Glass skips the staggered reveal entirely and shows the
+// true value up front — a persistent effect re-checked every time the lot
+// is (re-)announced, including after an Arcane Staff transform.
+function maskedItemForSocket(room: Room, ar: ActiveRound, socketId: string): MaskedRoundItem {
+  const { trueValue, hiddenTraitId: _hiddenTraitId, material, rarity, specialModifier, ...publicItem } = ar.item;
+  return ownsItemTemplate(room, socketId, 'magnifying-glass')
+    ? { ...publicItem, material, rarity, specialModifier, revealedValue: trueValue }
+    : publicItem;
+}
+
 function emitRoundStart(room: Room, io: IO) {
   const ar = room.activeRound;
   if (!ar) return;
-  const { trueValue, hiddenTraitId: _hiddenTraitId, material, rarity, specialModifier, ...publicItem } = ar.item;
+  for (const socketId of io.sockets.sockets.keys()) {
+    io.to(socketId).emit('round_start', { round: ar.round, item: maskedItemForSocket(room, ar, socketId) });
+  }
+}
+
+// Arcane Staff: replaces the active lot with a freshly rolled item mid-round.
+// Bidder state (who's in, who's holding, elapsed time) is untouched — only
+// what they're bidding on changes.
+function transformLot(room: Room, io: IO, ar: ActiveRound) {
+  const newItem = rollItemInstance(room.settings.maxRounds, room.usedItemTemplateIds);
+  room.usedItemTemplateIds.add(newItem.templateId);
+  ar.item = newItem;
+  ar.round.revealedFields = [];
+
+  for (const timer of ar.modifierRevealTimers) clearTimeout(timer);
+  ar.modifierRevealTimers = [];
 
   for (const socketId of io.sockets.sockets.keys()) {
-    // The Magnifying Glass skips the staggered reveal entirely and shows the
-    // true value up front — a persistent effect re-checked every round.
-    const item = ownsItemTemplate(room, socketId, 'magnifying-glass')
-      ? { ...publicItem, material, rarity, specialModifier, revealedValue: trueValue }
-      : publicItem;
-    io.to(socketId).emit('round_start', { round: ar.round, item });
+    io.to(socketId).emit('lot_transformed', { roundId: ar.round.id, item: maskedItemForSocket(room, ar, socketId) });
   }
+  scheduleModifierReveals(room, io);
 }
 
 function scheduleModifierReveals(room: Room, io: IO) {

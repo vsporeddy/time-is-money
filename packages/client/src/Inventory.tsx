@@ -1,4 +1,4 @@
-import type { ItemInstance, Player, ScoreBreakdown } from 'shared';
+import type { ItemInstance, ItemTemplate, Player, ScoreBreakdown } from 'shared';
 import { getHiddenTrait, getMaterialValueMultiplier, getRarityValueMultiplier, getTemplate, getTraitDefinition, TRAIT_DEFINITIONS } from 'shared';
 import { SpriteIcon } from './SpriteIcon';
 
@@ -10,6 +10,15 @@ interface InventoryProps {
   showValue?: boolean;
   onClose?: () => void;
   onUseItem?: (itemId: string) => void; // present only for the viewer's own inventory
+  roundPhase?: 'preBid' | 'bidding' | null; // gates weapon effects tied to a round phase
+}
+
+function isEffectUsableNow(template: ItemTemplate | undefined, roundPhase: 'preBid' | 'bidding' | null | undefined): boolean {
+  if (!template) return false;
+  if (template.effectType === 'copyItem') return true; // Mirror of Desire: usable anytime
+  if (!template.weapon) return false;
+  if (template.weapon.phase === 'anytime') return true; // Crossbow: usable anytime
+  return template.weapon.phase === roundPhase;
 }
 
 const INVENTORY_SIZE = 12;
@@ -55,11 +64,15 @@ function setBonusText(traitId: string, tier: SetBonusTier): string {
   return tier.multiplier ? `×${tier.multiplier}` : `+$${tier.bonus}`;
 }
 
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 function itemAttributes(item: ItemInstance): DisplayAttribute[] {
   const template = getTemplate(item.templateId);
   const attributes: DisplayAttribute[] = [];
 
-  for (const traitId of template?.traits ?? []) attributes.push({ label: getTraitDefinition(traitId)?.name ?? traitId, traitId });
+  for (const traitId of template?.traits ?? []) attributes.push({ label: getTraitDefinition(traitId)?.name ?? capitalize(traitId), traitId });
   if (item.investment) attributes.push({ label: 'Investment', effect: true });
   if (template?.scoreScaling === 'bargain') attributes.push({ label: 'Bargain' });
   if (item.fairTrade) attributes.push({ label: 'Fair Trade', effect: true });
@@ -71,6 +84,14 @@ function itemAttributes(item: ItemInstance): DisplayAttribute[] {
   if (template?.effectType === 'key') attributes.push({ label: 'Opens Chests', effect: true });
   if (template?.effectType === 'refundOnLoss') attributes.push({ label: 'Refunds Losses', effect: true });
   if (template?.effectType === 'copyItem') attributes.push({ label: 'Copies an Item (click to use)', effect: true });
+  if (template?.effectType === 'destroyLot') attributes.push({ label: 'Destroys the Lot', effect: true });
+  if (template?.effectType === 'forceEnter') attributes.push({ label: template.weapon?.exclusive ? 'Forces a Duel' : 'Forces All to Bid', effect: true });
+  if (template?.effectType === 'forceWithdraw') attributes.push({ label: template.weapon?.target === 'all' ? 'Clears the Field' : 'Forces a Withdrawal', effect: true });
+  if (template?.effectType === 'destroyItem') attributes.push({ label: 'Destroys an Item', effect: true });
+  if (template?.effectType === 'transformLot') attributes.push({ label: 'Transforms the Lot', effect: true });
+  if (template?.effectType === 'weaponImmunity') attributes.push({ label: 'Weapon Immunity', effect: true });
+  if (template?.effectType === 'weaponMultiplier') attributes.push({ label: 'Weapon Value x3', effect: true });
+  if (item.usedActiveEffect) attributes.push({ label: 'Effect Used' });
 
   return attributes;
 }
@@ -85,7 +106,7 @@ function specialModifierLabel(specialModifier: ItemInstance['specialModifier']):
   return '';
 }
 
-export function Inventory({ player, items, score, side, showValue = true, onClose, onUseItem }: InventoryProps) {
+export function Inventory({ player, items, score, side, showValue = true, onClose, onUseItem, roundPhase = null }: InventoryProps) {
   const ownedItems = player.stash.map((id) => items[id]).filter((item): item is ItemInstance => Boolean(item));
   const stash = ownedItems.slice(0, INVENTORY_SIZE);
   const cursedSetActive = score?.traitBonuses.some((trait) => trait.traitId === 'cursed' && trait.multiplier === 1.25) ?? false;
@@ -142,9 +163,11 @@ export function Inventory({ player, items, score, side, showValue = true, onClos
           const item = stash[index];
           const template = item ? getTemplate(item.templateId) : undefined;
           const hiddenTrait = item ? getHiddenTrait(item.hiddenTraitId) : undefined;
-          const usable = Boolean(item && onUseItem && template?.effectType === 'copyItem');
+          const used = item?.usedActiveEffect === true;
+          const usable = Boolean(item && onUseItem && !used && isEffectUsableNow(template, roundPhase));
+          const slotClasses = ['inventory-slot', usable && 'inventory-slot-usable', used && 'inventory-slot-used'].filter(Boolean).join(' ');
           return (
-            <div className={`inventory-slot${usable ? ' inventory-slot-usable' : ''}`} key={item?.id ?? `empty-${index}`}>
+            <div className={slotClasses} key={item?.id ?? `empty-${index}`}>
               {item && (
                 <>
                   {usable ? (

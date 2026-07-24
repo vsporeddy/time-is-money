@@ -20,17 +20,16 @@ const FORCE_CURSED_OVERLAY = false;
 // (index = row * 16 + col, 0-indexed top-left). Starting trait/flag
 // assignments below are a first pass — tune freely while playtesting.
 export const ITEM_TEMPLATES: ItemTemplate[] = [
-  // --- Weapons (broad trait: weapon) ---
-  { id: 'rusty-sword', name: 'Rusty Sword', baseSpriteId: '80', valueRange: [15, 45], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['weapon', 'sword'] },
-  { id: 'iron-sword', name: 'Iron Sword', baseSpriteId: '81', valueRange: [25, 65], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['weapon', 'sword'] },
-  { id: 'ornate-sword', name: 'Ornate Sword', baseSpriteId: '84', valueRange: [50, 140], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['weapon', 'sword'] },
-  { id: 'combat-dagger', name: 'Combat Dagger', baseSpriteId: '87', valueRange: [10, 35], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['weapon'] },
-  { id: 'battle-axe', name: 'Battle Axe', baseSpriteId: '90', valueRange: [30, 80], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['weapon'] },
-  { id: 'hunting-bow', name: 'Hunting Bow', baseSpriteId: '99', valueRange: [25, 70], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['weapon', 'bow'] },
-  { id: 'crossbow', name: 'Crossbow', baseSpriteId: '100', valueRange: [35, 90], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['weapon', 'bow'] },
-  { id: 'arcane-staff', name: 'Arcane Staff', baseSpriteId: '105', valueRange: [40, 120], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['weapon'] },
-  { id: 'riot-shield', name: 'Riot Shield', baseSpriteId: '97', valueRange: [20, 55], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['weapon'] },
-
+  // --- Weapons (low base value; each carries a unique one-time active effect) ---
+  { id: 'wooden-sword', name: 'Wooden Sword', baseSpriteId: '80', valueRange: [5, 15], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['weapon', 'sword'] },
+  { id: 'flail', name: 'Flail', baseSpriteId: '92', valueRange: [5, 15], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'destroyLot', weapon: { phase: 'preBid', target: 'none' }, traits: ['weapon'] },
+  { id: 'scimitar', name: 'Scimitar', baseSpriteId: '85', valueRange: [5, 15], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'forceWithdraw', weapon: { phase: 'bidding', target: 'all' }, traits: ['weapon', 'sword'] },
+  { id: 'wooden-dagger', name: 'Wooden Dagger', baseSpriteId: '87', valueRange: [5, 15], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'forceWithdraw', weapon: { phase: 'bidding', target: 'one' }, traits: ['weapon'] },
+  { id: 'dkga', name: "Dark Knight's Greataxe", baseSpriteId: '91', valueRange: [5, 15], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'forceEnter', weapon: { phase: 'preBid', target: 'all' }, traits: ['weapon'] },
+  { id: 'crossbow', name: 'Crossbow', baseSpriteId: '100', valueRange: [5, 15], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'destroyItem', weapon: { phase: 'anytime', target: 'one' }, traits: ['weapon', 'bow'] },
+  { id: 'arcane-staff', name: 'Arcane Staff', baseSpriteId: '103', valueRange: [5, 15], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'transformLot', weapon: { phase: 'bidding', target: 'none' }, traits: ['weapon'] },
+  { id: 'wooden-shield', name: 'Wooden Shield', baseSpriteId: '97', valueRange: [5, 15], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'weaponImmunity', traits: ['weapon'] },
+  { id: 'dual-daggers', name: 'Dual Daggers', baseSpriteId: '89', valueRange: [5, 15], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'forceEnter', weapon: { phase: 'preBid', target: 'one', exclusive: true }, traits: ['weapon'] },
   // --- Armor (broad trait: armor) ---
   { id: 'horned-helm', name: 'Horned Helm', baseSpriteId: '115', valueRange: [30, 75], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['armor'] },
   { id: 'leather-vest', name: 'Leather Vest', baseSpriteId: '118', valueRange: [20, 55], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['armor'] },
@@ -85,6 +84,7 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   { id: 'rusty-key', name: 'Rusty Key', baseSpriteId: '185', valueRange: [1, 1], materials: ['Ordinary'], rarities: ['Common'], effectType: 'key', flatValue: true, traits: [] },
   { id: 'chronomancers-hourglass', name: "Chronomancer's Hourglass", baseSpriteId: '352', valueRange: [0, 0], materials: ['Ordinary'], rarities: ['Common'], effectType: 'refundOnLoss', flatValue: true, traits: [] },
   { id: 'mirror-of-desire', name: 'Mirror of Desire', baseSpriteId: '177', valueRange: [5, 5], materials: ['Ordinary'], rarities: ['Common'], effectType: 'copyItem', flatValue: true, traits: [] },
+  { id: 'contraband-permit', name: 'Contraband Permit', baseSpriteId: '219', valueRange: [5, 5], materials: ['Ordinary'], rarities: ['Common'], effectType: 'weaponMultiplier', flatValue: true, traits: [] },
 ];
 
 function randInt(min: number, max: number): number {

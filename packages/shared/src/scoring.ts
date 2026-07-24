@@ -5,6 +5,7 @@ import { getHiddenTrait, TRAIT_DEFINITIONS } from './traits.js';
 const INVESTMENT_RATE_PER_SEC = 1;
 const BARGAIN_CAP_SECONDS = 5;
 const BARGAIN_RATE_PER_SEC = 8;
+const CONTRABAND_WEAPON_MULTIPLIER = 3;
 
 const RARITY_MULTIPLIERS: Record<string, number> = {
   Common: 1,
@@ -81,6 +82,7 @@ export function computeScores(
     let hiddenTraitBonus = 0;
     let scoreScalingBonus = 0;
     const lonerBonus = items.filter((item) => item.loner).length === 1 ? 20 : 0;
+    const hasContrabandPermit = items.some((item) => getTemplate(item.templateId)?.effectType === 'weaponMultiplier');
 
     const seenSoFarByTemplate = new Map<string, number>();
     for (const item of items) {
@@ -92,12 +94,14 @@ export function computeScores(
         ? activeTraitTiers.get(item.specialModifier.toLowerCase())?.multiplier
         : undefined;
       const specialMultiplier = specialSetMultiplier ?? getSpecialModifierValueMultiplier(item.specialModifier);
+      const weaponMultiplier = hasContrabandPermit && template?.traits.includes('weapon') ? CONTRABAND_WEAPON_MULTIPLIER : 1;
       baseValue +=
         item.trueValue *
         diminishingMultiplier(copyIndex) *
         getRarityValueMultiplier(item.rarity) *
         getMaterialValueMultiplier(item.material) *
-        specialMultiplier;
+        specialMultiplier *
+        weaponMultiplier;
 
       const hidden = getHiddenTrait(item.hiddenTraitId);
       if (hidden) hiddenTraitBonus += hidden.scoreBonus;

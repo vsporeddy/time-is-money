@@ -31,6 +31,13 @@ export interface ChestConfig {
   grantsCountRange: [number, number];
 }
 
+// Weapon active effects: one-time use, triggered from the owner's inventory.
+export interface WeaponEffectConfig {
+  phase: 'preBid' | 'bidding' | 'anytime'; // preBid: opt-in window; bidding: spending underway; anytime: no round restriction
+  target: 'one' | 'all' | 'none';
+  exclusive?: boolean; // dual-daggers: also locks bidding to just the actor + chosen target
+}
+
 export interface ItemTemplate {
   id: string;
   name: string;
@@ -38,9 +45,25 @@ export interface ItemTemplate {
   valueRange: [number, number];
   materials: string[];
   rarities: string[];
-  effectType: 'none' | 'timeRefund' | 'revealValue' | 'revealBidding' | 'chest' | 'key' | 'refundOnLoss' | 'copyItem';
+  effectType:
+    | 'none'
+    | 'timeRefund'
+    | 'revealValue'
+    | 'revealBidding'
+    | 'chest'
+    | 'key'
+    | 'refundOnLoss'
+    | 'copyItem'
+    | 'destroyLot'
+    | 'forceEnter'
+    | 'forceWithdraw'
+    | 'destroyItem'
+    | 'transformLot'
+    | 'weaponImmunity'
+    | 'weaponMultiplier';
   timeRefund?: TimeRefundConfig; // present when effectType === 'timeRefund'
   chest?: ChestConfig; // present when effectType === 'chest'
+  weapon?: WeaponEffectConfig; // present for the active-use weapon effect types above
   flatValue?: boolean; // skips material/rarity/specialModifier/loner/investment/fairTrade/hiddenTrait rolls; trueValue is fixed at valueRange[0]
   traits: string[]; // TraitDefinition ids this template's items count toward (category traits, may nest)
   scoreScaling?: 'bargain'; // template-specific score effect
@@ -57,6 +80,7 @@ export interface ItemInstance {
   rarity: string;
   trueValue: number;
   hiddenTraitId?: string; // secret like trueValue — stripped from round_start, revealed at round_end
+  usedActiveEffect?: boolean; // one-time weapon effects flip this after use; item stays in the stash, just spent
   visual: {
     baseSpriteId: string;
     paletteId: string;
@@ -83,6 +107,7 @@ export interface Round {
   revealedFields: string[];
   winnerId: string | null;
   soleBidder: boolean;
+  restrictedBidderIds: string[] | null; // set by Dual Daggers — only these players may bid this round
 }
 
 export type RoomStatus = 'lobby' | 'in_round' | 'round_reveal' | 'game_over';
@@ -134,6 +159,10 @@ export interface ClientToServerEvents {
     payload: { itemId: string; copyItemId: string },
     ack: (res: { ok: true } | { ok: false; error: string }) => void
   ) => void;
+  use_weapon: (
+    payload: { itemId: string; targetPlayerId?: string; targetItemId?: string },
+    ack: (res: { ok: true } | { ok: false; error: string }) => void
+  ) => void;
 }
 
 export interface ScoreBreakdown {
@@ -146,13 +175,15 @@ export interface ScoreBreakdown {
   total: number;
 }
 
+// What every client sees of the active lot: true value/rarity/material/specialModifier/
+// hidden trait are stripped unless individually revealed — except for a Magnifying
+// Glass owner, who gets material/rarity/specialModifier plus revealedValue up front.
+export type MaskedRoundItem = Omit<ItemInstance, 'trueValue' | 'hiddenTraitId' | 'material' | 'rarity' | 'specialModifier'> &
+  Partial<Pick<ItemInstance, 'material' | 'rarity' | 'specialModifier'>> & { revealedValue?: number };
+
 export interface ServerToClientEvents {
   room_state: (state: RoomState) => void;
-  round_start: (payload: {
-    round: Round;
-    item: Omit<ItemInstance, 'trueValue' | 'hiddenTraitId' | 'material' | 'rarity' | 'specialModifier'> &
-      Partial<Pick<ItemInstance, 'material' | 'rarity' | 'specialModifier'>> & { revealedValue?: number };
-  }) => void;
+  round_start: (payload: { round: Round; item: MaskedRoundItem }) => void;
   bid_window_closed: (payload: { roundId: string; spendingStartedAt: number }) => void;
   bidder_cancelled: (payload: { roundId: string; playerId: string }) => void;
   round_tick: (payload: { players: Record<string, number>; bidders: Record<string, number>; holding: string[] }) => void;
@@ -162,4 +193,8 @@ export interface ServerToClientEvents {
   game_over: (payload: { players: Player[]; scores: ScoreBreakdown[] }) => void;
   chat_history: (messages: ChatMessage[]) => void;
   chat_message: (message: ChatMessage) => void;
+  // Arcane Staff: the current lot was swapped for a fresh item mid-round.
+  lot_transformed: (payload: { roundId: string; item: MaskedRoundItem }) => void;
+  // Dual Daggers: bidding on this lot is now locked to the listed player ids.
+  bid_restricted: (payload: { roundId: string; allowedPlayerIds: string[] }) => void;
 }

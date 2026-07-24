@@ -15,6 +15,7 @@ export interface ActiveRound {
   maxDurationTimer: NodeJS.Timeout | null;
   interRoundTimer: NodeJS.Timeout | null;
   modifierRevealTimers: NodeJS.Timeout[];
+  allowedBidderIds: Set<string> | null; // set by Dual Daggers — enforced in handleHoldStart
 }
 
 export interface Room {

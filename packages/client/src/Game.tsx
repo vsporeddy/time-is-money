@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ItemInstance, ItemTemplate, Player, Round, ScoreBreakdown } from 'shared';
+import type { ItemInstance, ItemTemplate, MaskedRoundItem, Player, Round, ScoreBreakdown } from 'shared';
 import { getHiddenTrait, getMaterialValueMultiplier, getRarityValueMultiplier, getTemplate, getTraitDefinition } from 'shared';
 import { SpriteIcon } from './SpriteIcon';
 import { PortraitIcon } from './PortraitIcon';
@@ -13,9 +13,13 @@ interface DisplayAttribute {
   tooltip?: { title: string; text: string };
 }
 
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 function templateAttributes(template: ItemTemplate | undefined, item?: Pick<ItemInstance, 'investment' | 'fairTrade' | 'loner'>): DisplayAttribute[] {
   if (!template) return [];
-  const attributes: DisplayAttribute[] = template.traits.map((id) => ({ label: getTraitDefinition(id)?.name ?? id, traitId: id }));
+  const attributes: DisplayAttribute[] = template.traits.map((id) => ({ label: getTraitDefinition(id)?.name ?? capitalize(id), traitId: id }));
   if (item?.investment) attributes.push({ label: 'Investment', effect: true, tooltip: { title: '+1$ for each second used to bid for this item', text: '' } });
   if (template.scoreScaling === 'bargain') attributes.push({ label: 'Bargain' });
   if (item?.fairTrade) attributes.push({ label: 'Fair Trade', effect: true, tooltip: { title: 'FAIR TRADE', text: "Only costs the runner-up's time spent" } });
@@ -30,13 +34,31 @@ function templateAttributes(template: ItemTemplate | undefined, item?: Pick<Item
   if (template.effectType === 'key') attributes.push({ label: 'Opens Chests', effect: true, tooltip: { title: 'RUSTY KEY', text: 'Combine with a matching locked chest — both are consumed' } });
   if (template.effectType === 'refundOnLoss') attributes.push({ label: 'Refunds Losses', effect: true, tooltip: { title: "CHRONOMANCER'S HOURGLASS", text: "Your time is always refunded if you don't win the bid" } });
   if (template.effectType === 'copyItem') attributes.push({ label: 'Copies an Item', effect: true, tooltip: { title: 'MIRROR OF DESIRE', text: 'Click it in your inventory to copy one item from another player. One-time use.' } });
+  if (template.effectType === 'destroyLot') attributes.push({ label: 'Destroys the Lot', effect: true, tooltip: { title: 'FLAIL', text: 'Pre-bid: instantly pass the current lot. One-time use.' } });
+  if (template.effectType === 'forceEnter' && template.weapon) {
+    attributes.push(
+      template.weapon.exclusive
+        ? { label: 'Forces a Duel', effect: true, tooltip: { title: 'DUAL DAGGERS', text: 'Pre-bid: force one chosen player to bid, and lock everyone else out of this lot. One-time use.' } }
+        : { label: 'Forces All to Bid', effect: true, tooltip: { title: "DARK KNIGHT'S GREATAXE", text: 'Pre-bid: force every other player to enter this lot. One-time use.' } }
+    );
+  }
+  if (template.effectType === 'forceWithdraw' && template.weapon) {
+    attributes.push(
+      template.weapon.target === 'all'
+        ? { label: 'Clears the Field', effect: true, tooltip: { title: 'SCIMITAR', text: 'During bidding: force every other bidder to withdraw. One-time use.' } }
+        : { label: 'Forces a Withdrawal', effect: true, tooltip: { title: 'WOODEN DAGGER', text: 'During bidding: force one chosen bidder to withdraw. One-time use.' } }
+    );
+  }
+  if (template.effectType === 'destroyItem') attributes.push({ label: 'Destroys an Item', effect: true, tooltip: { title: 'CROSSBOW', text: "Anytime: destroy an item from another player's inventory. One-time use." } });
+  if (template.effectType === 'transformLot') attributes.push({ label: 'Transforms the Lot', effect: true, tooltip: { title: 'ARCANE STAFF', text: 'During bidding: randomly replace the current lot with a new item. One-time use.' } });
+  if (template.effectType === 'weaponImmunity') attributes.push({ label: 'Weapon Immunity', effect: true, tooltip: { title: 'WOODEN SHIELD', text: "Passive: immune to every other player's weapon effects while held." } });
+  if (template.effectType === 'weaponMultiplier') attributes.push({ label: 'Weapon Value x3', effect: true, tooltip: { title: 'CONTRABAND PERMIT', text: 'Passive: multiplies the value of every weapon you own by 3x while held.' } });
   return attributes;
 }
 
 interface CurrentRound {
   round: Round;
-  item: Omit<ItemInstance, 'trueValue' | 'hiddenTraitId' | 'material' | 'rarity' | 'specialModifier'> &
-    Partial<Pick<ItemInstance, 'material' | 'rarity' | 'specialModifier'>> & { revealedValue?: number };
+  item: MaskedRoundItem;
 }
 
 interface LastResult {
@@ -113,10 +135,14 @@ export function Game({
 
   const iHaveDropped = isDropped(myId);
   const myTime = liveTimes[myId] ?? players.find((p) => p.id === myId)?.timeRemainingMs ?? 0;
+  // Dual Daggers can lock a lot to just its two chosen players.
+  const restrictedBidderIds = currentRound?.round.restrictedBidderIds ?? null;
+  const amRestrictedOut = restrictedBidderIds !== null && !restrictedBidderIds.includes(myId);
   const canHold =
     !isObserver &&
     currentRound?.round.status === 'active' &&
     !iHaveDropped &&
+    !amRestrictedOut &&
     myTime > 0 &&
     (currentRound.round.bidWindowOpen || isHolding(myId));
 
@@ -329,6 +355,12 @@ export function Game({
 
           {currentRound.round.status === 'pending' && <p className="status-line">Get ready…</p>}
 
+          {restrictedBidderIds && (
+            <p className="status-line">
+              Dual Daggers: only {restrictedBidderIds.map((id) => players.find((p) => p.id === id)?.name ?? id).join(' and ')} may bid on this lot.
+            </p>
+          )}
+
           {currentRound.round.status === 'active' &&
             (isObserver ? (
               <p className="status-line">You're observing this round.</p>
@@ -340,7 +372,15 @@ export function Game({
                   className={`bid-button${iAmHolding ? ' active' : ''}`}
                   style={{ marginTop: '1rem' }}
                 >
-                  {iHaveDropped ? 'WITHDRAWN' : iAmHolding ? (currentRound.round.bidWindowOpen ? 'CANCEL BID' : 'WITHDRAW') : 'BID'}
+                  {iHaveDropped
+                    ? 'WITHDRAWN'
+                    : amRestrictedOut
+                    ? 'LOCKED OUT'
+                    : iAmHolding
+                    ? currentRound.round.bidWindowOpen
+                      ? 'CANCEL BID'
+                      : 'WITHDRAW'
+                    : 'BID'}
                 </button>
               </>
             ))}

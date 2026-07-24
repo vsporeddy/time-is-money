@@ -20,7 +20,7 @@ export interface TraitDefinition {
 
 export const TRAIT_DEFINITIONS: TraitDefinition[] = [
   // --- Broad categories (nested: a Sword counts for both "sword" and "weapon") ---
-  { id: 'weapon', name: 'Weapon', iconSpriteId: '89', tiers: [{ count: 2, bonus: 10 }, { count: 4, bonus: 25 }, { count: 6, bonus: 45 }] },
+  // Weapon has no set bonus — each weapon instead carries its own unique active effect.
   { id: 'armor', name: 'Armor', iconSpriteId: '97', tiers: [{ count: 3, bonus: 25 }, { count: 5, bonus: 50 }] },
   { id: 'trinket', name: 'Trinket', iconSpriteId: '133', tiers: [{ count: 2, bonus: 25 }, { count: 3, bonus: 50 }] },
   { id: 'tool', name: 'Tool', iconSpriteId: '162', tiers: [{ count: 2, bonus: 20 }, { count: 3, bonus: 30 }, { count: 4, bonus: 40 }] },

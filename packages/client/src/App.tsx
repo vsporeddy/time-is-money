@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import type { ChatMessage, ItemInstance, Player, Round, RoomState, ScoreBreakdown } from 'shared';
+import type { ChatMessage, ItemInstance, MaskedRoundItem, Player, Round, RoomState, ScoreBreakdown } from 'shared';
 import { MAX_BOTS, computeScores, getTemplate, getTraitDefinition } from 'shared';
 import { socket } from './socket';
 import { Logo } from './Logo';
@@ -9,13 +9,13 @@ import { PortraitIcon } from './PortraitIcon';
 import { Chat } from './Chat';
 import { BackgroundMusic } from './BackgroundMusic';
 import { Inventory } from './Inventory';
-import { MirrorPicker } from './MirrorPicker';
+import { ItemTargetPicker } from './ItemTargetPicker';
+import { PlayerPicker } from './PlayerPicker';
 import { playChatDing, playClick, playLose, playWin } from './sound';
 
 interface CurrentRound {
   round: Round;
-  item: Omit<ItemInstance, 'trueValue' | 'hiddenTraitId' | 'material' | 'rarity' | 'specialModifier'> &
-    Partial<Pick<ItemInstance, 'material' | 'rarity' | 'specialModifier'>> & { revealedValue?: number };
+  item: MaskedRoundItem;
 }
 
 interface LastResult {
@@ -53,8 +53,20 @@ export default function App() {
   const [selectedOpponentId, setSelectedOpponentId] = useState<string | null>(null);
   const [myInventoryOpen, setMyInventoryOpen] = useState(true);
   const [roundLimit, setRoundLimit] = useState(10);
-  const [mirrorItemId, setMirrorItemId] = useState<string | null>(null);
-  const [mirrorError, setMirrorError] = useState<string | null>(null);
+  // Mirror of Desire (copy) and Crossbow (destroy) both target an item in
+  // someone else's inventory — one picker overlay serves both.
+  const [itemPickerItemId, setItemPickerItemId] = useState<string | null>(null);
+  const [itemPickerError, setItemPickerError] = useState<string | null>(null);
+  // Dual Daggers and Wooden Dagger target a player directly.
+  const [playerPickerItemId, setPlayerPickerItemId] = useState<string | null>(null);
+  const [playerPickerError, setPlayerPickerError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!actionError) return;
+    const timer = window.setTimeout(() => setActionError(null), 3500);
+    return () => window.clearTimeout(timer);
+  }, [actionError]);
 
   useEffect(() => {
     socket.connect();
@@ -103,6 +115,18 @@ export default function App() {
       setCurrentRound((current) =>
         current?.round.id === roundId
           ? { ...current, item: { ...current.item, [field]: String(value) } }
+          : current
+      );
+    };
+    // Arcane Staff: the lot itself changed — replace wholesale, don't merge
+    // with the old item's already-revealed fields.
+    const onLotTransformed = (payload: { roundId: string; item: MaskedRoundItem }) => {
+      setCurrentRound((current) => (current?.round.id === payload.roundId ? { ...current, item: payload.item } : current));
+    };
+    const onBidRestricted = (payload: { roundId: string; allowedPlayerIds: string[] }) => {
+      setCurrentRound((current) =>
+        current?.round.id === payload.roundId
+          ? { ...current, round: { ...current.round, restrictedBidderIds: payload.allowedPlayerIds } }
           : current
       );
     };
@@ -162,6 +186,8 @@ export default function App() {
     socket.on('room_state', onRoomState);
     socket.on('round_start', onRoundStart);
     socket.on('reveal', onReveal);
+    socket.on('lot_transformed', onLotTransformed);
+    socket.on('bid_restricted', onBidRestricted);
     socket.on('bid_window_closed', onBidWindowClosed);
     socket.on('bidder_cancelled', onBidderCancelled);
     socket.on('round_tick', onRoundTick);
@@ -177,6 +203,8 @@ export default function App() {
       socket.off('room_state', onRoomState);
       socket.off('round_start', onRoundStart);
       socket.off('reveal', onReveal);
+      socket.off('lot_transformed', onLotTransformed);
+      socket.off('bid_restricted', onBidRestricted);
       socket.off('bid_window_closed', onBidWindowClosed);
       socket.off('bidder_cancelled', onBidderCancelled);
       socket.off('round_tick', onRoundTick);
@@ -210,27 +238,100 @@ export default function App() {
     }
   };
 
-  const handleUseMirror = (itemId: string) => {
+  // Wooden Shield grants blanket immunity to every other player's weapon effects.
+  const isImmune = (playerId: string) =>
+    room?.players.find((p) => p.id === playerId)?.stash.some((id) => knownItems[id]?.templateId === 'wooden-shield') ?? false;
+
+  // Dispatches a click on a usable inventory item to the right UI: an item
+  // picker (copy/destroy), a player picker (force-enter/force-withdraw one),
+  // or straight to the server for effects with no target to choose.
+  const handleUseItem = (itemId: string) => {
+    const item = knownItems[itemId];
+    const template = item ? getTemplate(item.templateId) : undefined;
+    if (!template) return;
     playClick();
-    setMirrorError(null);
-    setMirrorItemId(itemId);
+
+    if (template.effectType === 'copyItem' || template.effectType === 'destroyItem') {
+      setItemPickerError(null);
+      setItemPickerItemId(itemId);
+      return;
+    }
+
+    if (template.weapon?.target === 'one') {
+      setPlayerPickerError(null);
+      setPlayerPickerItemId(itemId);
+      return;
+    }
+
+    socket.emit('use_weapon', { itemId }, (res) => {
+      if (!res.ok) setActionError(res.error);
+    });
   };
 
-  const handleMirrorSelect = (copyItemId: string) => {
-    if (!mirrorItemId) return;
-    socket.emit('use_mirror', { itemId: mirrorItemId, copyItemId }, (res) => {
+  const itemPickerItem = itemPickerItemId ? knownItems[itemPickerItemId] : undefined;
+  const itemPickerTemplate = itemPickerItem ? getTemplate(itemPickerItem.templateId) : undefined;
+  const itemPickerMode: 'copy' | 'destroy' = itemPickerTemplate?.effectType === 'destroyItem' ? 'destroy' : 'copy';
+
+  const handleItemPickerSelect = (targetPlayerId: string, targetItemId: string) => {
+    if (!itemPickerItemId) return;
+    if (itemPickerMode === 'destroy') {
+      socket.emit('use_weapon', { itemId: itemPickerItemId, targetPlayerId, targetItemId }, (res) => {
+        if (res.ok) {
+          setItemPickerItemId(null);
+          setItemPickerError(null);
+        } else {
+          setItemPickerError(res.error);
+        }
+      });
+    } else {
+      socket.emit('use_mirror', { itemId: itemPickerItemId, copyItemId: targetItemId }, (res) => {
+        if (res.ok) {
+          setItemPickerItemId(null);
+          setItemPickerError(null);
+        } else {
+          setItemPickerError(res.error);
+        }
+      });
+    }
+  };
+
+  const handleItemPickerCancel = () => {
+    setItemPickerItemId(null);
+    setItemPickerError(null);
+  };
+
+  const playerPickerItem = playerPickerItemId ? knownItems[playerPickerItemId] : undefined;
+  const playerPickerTemplate = playerPickerItem ? getTemplate(playerPickerItem.templateId) : undefined;
+
+  const playerPickerCandidates = useMemo(() => {
+    if (!playerPickerTemplate?.weapon || !room) return [];
+    if (playerPickerTemplate.effectType === 'forceEnter') {
+      const bidders = currentRound?.round.bidders;
+      if (!bidders) return [];
+      return room.players.filter((p) => p.id !== myId && bidders[p.id] && bidders[p.id].droppedAt === null && !isImmune(p.id));
+    }
+    if (playerPickerTemplate.effectType === 'forceWithdraw') {
+      return room.players.filter((p) => p.id !== myId && liveBids[p.id] !== undefined && !isImmune(p.id));
+    }
+    return [];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playerPickerTemplate, room, currentRound, liveBids, myId, knownItems]);
+
+  const handlePlayerPickerSelect = (targetPlayerId: string) => {
+    if (!playerPickerItemId) return;
+    socket.emit('use_weapon', { itemId: playerPickerItemId, targetPlayerId }, (res) => {
       if (res.ok) {
-        setMirrorItemId(null);
-        setMirrorError(null);
+        setPlayerPickerItemId(null);
+        setPlayerPickerError(null);
       } else {
-        setMirrorError(res.error);
+        setPlayerPickerError(res.error);
       }
     });
   };
 
-  const handleMirrorCancel = () => {
-    setMirrorItemId(null);
-    setMirrorError(null);
+  const handlePlayerPickerCancel = () => {
+    setPlayerPickerItemId(null);
+    setPlayerPickerError(null);
   };
 
   const shellWithHeader = (children: ReactNode) => (
@@ -247,6 +348,17 @@ export default function App() {
   // A Spyglass reveals everyone's time/bids — the server already sends that
   // data once owned, this just decides whether the dock renders it.
   const hasSpyglass = myPlayer?.stash.some((id) => knownItems[id]?.templateId === 'spyglass') ?? false;
+  // preBid: the opt-in window (free to enter/cancel); bidding: spending underway.
+  const roundPhase: 'preBid' | 'bidding' | null =
+    !currentRound || currentRound.round.status !== 'active' ? null : currentRound.round.bidWindowOpen ? 'preBid' : 'bidding';
+
+  const itemPickerTitle = itemPickerMode === 'destroy' ? 'CROSSBOW' : 'MIRROR OF DESIRE';
+  const itemPickerSubtitle = itemPickerMode === 'destroy' ? 'Choose an item to destroy.' : 'Choose an item to copy for yourself.';
+  const itemPickerExclude = itemPickerMode === 'destroy' ? (room?.players ?? []).filter((p) => isImmune(p.id)).map((p) => p.id) : undefined;
+
+  const playerPickerTitle = playerPickerTemplate?.effectType === 'forceEnter' ? 'DUAL DAGGERS' : 'WOODEN DAGGER';
+  const playerPickerSubtitle =
+    playerPickerTemplate?.effectType === 'forceEnter' ? 'Choose a player to force into this bid.' : 'Choose a bidder to force out.';
   const scoresByPlayer = useMemo(() => {
     if (!room) return new Map<string, ScoreBreakdown>();
     const wonItems = new Map(Object.entries(knownItems));
@@ -488,19 +600,34 @@ export default function App() {
           score={scoresByPlayer.get(myPlayer.id)}
           side="left"
           onClose={() => setMyInventoryOpen(false)}
-          onUseItem={handleUseMirror}
+          onUseItem={handleUseItem}
+          roundPhase={roundPhase}
         />
       )}
-      {joined && mirrorItemId && room && (
-        <MirrorPicker
+      {joined && itemPickerItemId && room && (
+        <ItemTargetPicker
+          title={itemPickerTitle}
+          subtitle={itemPickerSubtitle}
           players={room.players}
           myId={myId!}
           items={knownItems}
-          error={mirrorError}
-          onSelect={handleMirrorSelect}
-          onCancel={handleMirrorCancel}
+          excludePlayerIds={itemPickerExclude}
+          error={itemPickerError}
+          onSelect={handleItemPickerSelect}
+          onCancel={handleItemPickerCancel}
         />
       )}
+      {joined && playerPickerItemId && (
+        <PlayerPicker
+          title={playerPickerTitle}
+          subtitle={playerPickerSubtitle}
+          players={playerPickerCandidates}
+          error={playerPickerError}
+          onSelect={handlePlayerPickerSelect}
+          onCancel={handlePlayerPickerCancel}
+        />
+      )}
+      {actionError && <div className="action-error-banner">{actionError}</div>}
       {joined && selectedOpponentId && room?.players.find((player) => player.id === selectedOpponentId) && (
         <Inventory
           player={room.players.find((player) => player.id === selectedOpponentId)!}

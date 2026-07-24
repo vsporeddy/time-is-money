@@ -14,6 +14,7 @@ import {
   startGame,
   tickRoom,
   useMirror,
+  useWeapon,
 } from './round.js';
 import { addChatMessage, getChatHistory } from './chat.js';
 
@@ -110,6 +111,11 @@ io.on('connection', (socket) => {
     const result = useMirror(room, socket.id, itemId, copyItemId);
     ack(result);
     if (result.ok) emitRoomState(room, io);
+  });
+
+  socket.on('use_weapon', ({ itemId, targetPlayerId, targetItemId }, ack) => {
+    const result = useWeapon(getRoom(), io, socket.id, itemId, targetPlayerId, targetItemId);
+    ack(result);
   });
 
   socket.on('disconnect', () => {
