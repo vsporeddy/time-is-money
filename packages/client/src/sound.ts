@@ -14,6 +14,10 @@ export function playChatDing() {
   playSfx('ding.wav', 0.5);
 }
 
+export function playCountdownTick() {
+  playSfx('ding.wav', 0.35);
+}
+
 export function playCoin() {
   playSfx('coin.wav', 0.2);
 }

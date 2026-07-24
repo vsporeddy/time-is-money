@@ -276,7 +276,7 @@ export default function App() {
               <input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <button type="submit" className="btn btn-block" disabled={!connected}>
-              Join
+              JOIN
             </button>
           </form>
           {error && <p className="error-text">{error}</p>}
@@ -333,7 +333,7 @@ export default function App() {
             socket.emit('restart_game');
           }}
         >
-          Play Again
+          PLAY AGAIN
         </button>
       </div>
     );
@@ -406,7 +406,7 @@ export default function App() {
           onClose={() => setSelectedOpponentId(null)}
         />
       )}
-      <BackgroundMusic />
+      <BackgroundMusic ducked={currentRound !== null} muffled={!joined || room?.status === 'lobby'} />
       <button className="dev-reset-button" onClick={handleResetGame}>
         Reset Game
       </button>

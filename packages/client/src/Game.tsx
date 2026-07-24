@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ItemInstance, ItemTemplate, Player, Round } from 'shared';
 import { getHiddenTrait, getTemplate, getTraitDefinition } from 'shared';
 import { SpriteIcon } from './SpriteIcon';
 import { PortraitIcon } from './PortraitIcon';
-import { playClick, playCoin } from './sound';
+import { playClick, playCoin, playCountdownTick } from './sound';
 
 function templateAttributes(template: ItemTemplate | undefined): string[] {
   if (!template) return [];
@@ -114,6 +114,21 @@ export function Game({
     initialBidSeconds !== null &&
     currentRound.round.bidWindowOpen;
 
+  // Ticks once per whole second while the pre-bid countdown is visible.
+  const initialBidWholeSeconds = initialBidSeconds !== null ? Math.ceil(initialBidSeconds) : null;
+  const prevInitialBidWholeRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!showInitialBidTimer || initialBidWholeSeconds === null) {
+      prevInitialBidWholeRef.current = null;
+      return;
+    }
+    const previous = prevInitialBidWholeRef.current;
+    if (previous !== null && initialBidWholeSeconds < previous) {
+      playCountdownTick();
+    }
+    prevInitialBidWholeRef.current = initialBidWholeSeconds;
+  }, [showInitialBidTimer, initialBidWholeSeconds]);
+
   // Visible to everyone (bidders, folks who folded, and observers alike) once
   // spending starts — nobody's individual spend is revealed, just the clock.
   const spendingStartedAt = currentRound?.round.spendingStartedAt;
@@ -139,18 +154,6 @@ export function Game({
           {Array.from({ length: maxRounds }, (_, index) => (
             <span key={index} className={`round-dot${index < roundNumber ? ' complete' : ''}`} />
           ))}
-        </div>
-      )}
-      {showInitialBidTimer && (
-        <div className="initial-bid-timer" role="status" aria-live="polite">
-          <strong>{initialBidSeconds.toFixed(1)}s</strong>
-          <small>Bid before time runs out or this lot is passed.</small>
-        </div>
-      )}
-      {showSpendingTimer && (
-        <div className="initial-bid-timer" role="status" aria-live="polite">
-          <strong>{spendingSeconds!.toFixed(1)}s</strong>
-          <small>Bidding is underway.</small>
         </div>
       )}
       {lastResult &&
@@ -213,7 +216,7 @@ export function Game({
       {!lastResult && currentRound && (
         <div className="item-card">
           <div className="item-sprite">
-            <SpriteIcon index={Number(currentRound.item.visual.baseSpriteId)} scale={5} />
+            <SpriteIcon index={Number(currentRound.item.visual.baseSpriteId)} scale={4} />
           </div>
           <h3 className="item-name">{getTemplate(currentRound.item.templateId)?.name}</h3>
           <div className="auction-details">
@@ -248,10 +251,22 @@ export function Game({
                   className={`bid-button${iAmHolding ? ' active' : ''}`}
                   style={{ marginTop: '1rem' }}
                 >
-                  {iHaveDropped ? 'Withdrawn' : iAmHolding ? (currentRound.round.bidWindowOpen ? 'Cancel Bid' : 'Withdraw') : 'Bid'}
+                  {iHaveDropped ? 'WITHDRAWN' : iAmHolding ? (currentRound.round.bidWindowOpen ? 'CANCEL BID' : 'WITHDRAW') : 'BID'}
                 </button>
               </>
             ))}
+        </div>
+      )}
+      {showInitialBidTimer && (
+        <div className="initial-bid-timer" role="status" aria-live="polite">
+          <strong>-{initialBidSeconds.toFixed(1)}s</strong>
+          <small>Bid before time runs out or this lot is passed.</small>
+        </div>
+      )}
+      {showSpendingTimer && (
+        <div className="initial-bid-timer" role="status" aria-live="polite">
+          <strong>{spendingSeconds!.toFixed(1)}s</strong>
+          <small>Bidding is underway.</small>
         </div>
       )}
     </>
