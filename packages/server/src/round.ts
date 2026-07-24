@@ -1,6 +1,6 @@
 import type { Server } from 'socket.io';
 import type { ClientToServerEvents, Player, Round, ServerToClientEvents, TimeRefundConfig } from 'shared';
-import { computeScores, getTemplate, ITEM_TEMPLATES, rollItemInstance, rollItemInstanceForTemplate } from 'shared';
+import { cloneItemInstance, computeScores, getTemplate, ITEM_TEMPLATES, rollItemInstance, rollItemInstanceForTemplate } from 'shared';
 import { emitRoomState, ownsItemTemplate } from './rooms.js';
 import type { Room } from './rooms.js';
 import { scheduleBotEntries, scheduleBotReleases } from './bots.js';
@@ -283,6 +283,18 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
     }
   }
 
+  // Chronomancer's Hourglass: anyone who spent time on this lot and didn't
+  // win it gets that time back.
+  for (const [playerId, bidder] of Object.entries(ar.round.bidders)) {
+    if (playerId === winnerId || bidder.droppedAt === null || bidder.committedMs <= 0) continue;
+    if (!ownsItemTemplate(room, playerId, 'chronomancers-hourglass')) continue;
+
+    const loser = room.players.get(playerId);
+    if (!loser) continue;
+    loser.timeRemainingMs += bidder.committedMs;
+    if (loser.status === 'out_of_time' && loser.timeRemainingMs > 0) loser.status = 'active';
+  }
+
   io.emit('round_end', { round: publicRoundResult(ar.round), item: ar.item });
   emitRoomState(room, io);
 
@@ -382,6 +394,37 @@ function tryOpenChests(room: Room, player: Player) {
       player.stash.push(grantedItem.id);
     }
   }
+}
+
+// Mirror of Desire: consumes itself and grants an exact duplicate of another
+// player's chosen item. Usable any time it's owned, not just mid-round.
+export function useMirror(
+  room: Room,
+  playerId: string,
+  itemId: string,
+  copyItemId: string
+): { ok: true } | { ok: false; error: string } {
+  const player = room.players.get(playerId);
+  if (!player) return { ok: false, error: 'Not in game.' };
+  if (!player.stash.includes(itemId)) return { ok: false, error: 'Item not found in your inventory.' };
+
+  const mirrorItem = room.wonItems.get(itemId);
+  const template = mirrorItem ? getTemplate(mirrorItem.templateId) : undefined;
+  if (!mirrorItem || template?.effectType !== 'copyItem') return { ok: false, error: 'That item has no copy effect.' };
+
+  const targetItem = room.wonItems.get(copyItemId);
+  const ownedByOther = targetItem
+    ? [...room.players.values()].some((p) => p.id !== playerId && p.stash.includes(copyItemId))
+    : false;
+  if (!targetItem || !ownedByOther) return { ok: false, error: 'That item is no longer available to copy.' };
+
+  player.stash = player.stash.filter((id) => id !== itemId);
+  const copy = cloneItemInstance(targetItem);
+  room.wonItems.set(copy.id, copy);
+  player.stash.push(copy.id);
+  tryOpenChests(room, player);
+
+  return { ok: true };
 }
 
 function emitRoundStart(room: Room, io: IO) {

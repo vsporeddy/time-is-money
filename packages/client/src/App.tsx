@@ -9,6 +9,7 @@ import { PortraitIcon } from './PortraitIcon';
 import { Chat } from './Chat';
 import { BackgroundMusic } from './BackgroundMusic';
 import { Inventory } from './Inventory';
+import { MirrorPicker } from './MirrorPicker';
 import { playChatDing, playClick, playLose, playWin } from './sound';
 
 interface CurrentRound {
@@ -52,6 +53,8 @@ export default function App() {
   const [selectedOpponentId, setSelectedOpponentId] = useState<string | null>(null);
   const [myInventoryOpen, setMyInventoryOpen] = useState(true);
   const [roundLimit, setRoundLimit] = useState(10);
+  const [mirrorItemId, setMirrorItemId] = useState<string | null>(null);
+  const [mirrorError, setMirrorError] = useState<string | null>(null);
 
   useEffect(() => {
     socket.connect();
@@ -205,6 +208,29 @@ export default function App() {
     if (window.confirm('Reset the game for everyone? This clears all progress.')) {
       socket.emit('reset_game');
     }
+  };
+
+  const handleUseMirror = (itemId: string) => {
+    playClick();
+    setMirrorError(null);
+    setMirrorItemId(itemId);
+  };
+
+  const handleMirrorSelect = (copyItemId: string) => {
+    if (!mirrorItemId) return;
+    socket.emit('use_mirror', { itemId: mirrorItemId, copyItemId }, (res) => {
+      if (res.ok) {
+        setMirrorItemId(null);
+        setMirrorError(null);
+      } else {
+        setMirrorError(res.error);
+      }
+    });
+  };
+
+  const handleMirrorCancel = () => {
+    setMirrorItemId(null);
+    setMirrorError(null);
   };
 
   const shellWithHeader = (children: ReactNode) => (
@@ -462,6 +488,17 @@ export default function App() {
           score={scoresByPlayer.get(myPlayer.id)}
           side="left"
           onClose={() => setMyInventoryOpen(false)}
+          onUseItem={handleUseMirror}
+        />
+      )}
+      {joined && mirrorItemId && room && (
+        <MirrorPicker
+          players={room.players}
+          myId={myId!}
+          items={knownItems}
+          error={mirrorError}
+          onSelect={handleMirrorSelect}
+          onCancel={handleMirrorCancel}
         />
       )}
       {joined && selectedOpponentId && room?.players.find((player) => player.id === selectedOpponentId) && (

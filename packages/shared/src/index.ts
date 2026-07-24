@@ -38,7 +38,7 @@ export interface ItemTemplate {
   valueRange: [number, number];
   materials: string[];
   rarities: string[];
-  effectType: 'none' | 'timeRefund' | 'revealValue' | 'revealBidding' | 'chest' | 'key';
+  effectType: 'none' | 'timeRefund' | 'revealValue' | 'revealBidding' | 'chest' | 'key' | 'refundOnLoss' | 'copyItem';
   timeRefund?: TimeRefundConfig; // present when effectType === 'timeRefund'
   chest?: ChestConfig; // present when effectType === 'chest'
   flatValue?: boolean; // skips material/rarity/specialModifier/loner/investment/fairTrade/hiddenTrait rolls; trueValue is fixed at valueRange[0]
@@ -130,6 +130,10 @@ export interface ClientToServerEvents {
   restart_game: () => void;
   reset_game: () => void; // dev-only escape hatch — works from any state, remove before shipping
   send_chat: (payload: { name: string; text: string }) => void;
+  use_mirror: (
+    payload: { itemId: string; copyItemId: string },
+    ack: (res: { ok: true } | { ok: false; error: string }) => void
+  ) => void;
 }
 
 export interface ScoreBreakdown {

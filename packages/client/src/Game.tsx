@@ -28,6 +28,8 @@ function templateAttributes(template: ItemTemplate | undefined, item?: Pick<Item
     attributes.push({ label: 'Needs Key', effect: true, tooltip: { title: template.name.toUpperCase(), text: `Combine with a Rusty Key to receive ${min}-${max} ${traitName} item${max > 1 ? 's' : ''}` } });
   }
   if (template.effectType === 'key') attributes.push({ label: 'Opens Chests', effect: true, tooltip: { title: 'RUSTY KEY', text: 'Combine with a matching locked chest — both are consumed' } });
+  if (template.effectType === 'refundOnLoss') attributes.push({ label: 'Refunds Losses', effect: true, tooltip: { title: "CHRONOMANCER'S HOURGLASS", text: "Your time is always refunded if you don't win the bid" } });
+  if (template.effectType === 'copyItem') attributes.push({ label: 'Copies an Item', effect: true, tooltip: { title: 'MIRROR OF DESIRE', text: 'Click it in your inventory to copy one item from another player. One-time use.' } });
   return attributes;
 }
 

@@ -47,7 +47,6 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   // --- Tools (broad trait: tool) ---
   { id: 'pickaxe', name: 'Pickaxe', baseSpriteId: '162', valueRange: [10, 30], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['tool'] },
   { id: 'rusted-lantern', name: 'Rusted Lantern', baseSpriteId: '169', valueRange: [8, 25], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'timeRefund', timeRefund: { mode: 'catchup', amountMs: 15_000 }, traits: ['tool'] },
-  // { id: 'signal-hourglass', name: 'Signal Hourglass', baseSpriteId: '175', valueRange: [15, 40], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'timeRefund', timeRefund: { mode: 'flat', amountMs: 8_000 }, traits: ['tool'] },
   { id: 'apothecary-kit', name: 'Apothecary Kit', baseSpriteId: '188', valueRange: [12, 35], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['tool'] },
   { id: 'bear-trap', name: 'Bear Trap', baseSpriteId: '174', valueRange: [10, 28], materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['tool'] },
 
@@ -84,6 +83,8 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   { id: 'treasure-chest', name: 'Treasure Chest', baseSpriteId: '187', valueRange: [10, 10], materials: ['Ordinary'], rarities: ['Common'], effectType: 'chest', flatValue: true, traits: [], chest: { keyTemplateId: 'rusty-key', grantsTraitId: 'trinket', grantsCountRange: [1, 3] } },
   { id: 'sunken-treasure-chest', name: 'Sunken Treasure Chest', baseSpriteId: '270', valueRange: [0, 0], materials: ['Ordinary'], rarities: ['Common'], effectType: 'chest', flatValue: true, traits: [], chest: { keyTemplateId: 'rusty-key', grantsTraitId: 'aquatic', grantsCountRange: [3, 5] } },
   { id: 'rusty-key', name: 'Rusty Key', baseSpriteId: '185', valueRange: [1, 1], materials: ['Ordinary'], rarities: ['Common'], effectType: 'key', flatValue: true, traits: [] },
+  { id: 'chronomancers-hourglass', name: "Chronomancer's Hourglass", baseSpriteId: '352', valueRange: [0, 0], materials: ['Ordinary'], rarities: ['Common'], effectType: 'refundOnLoss', flatValue: true, traits: [] },
+  { id: 'mirror-of-desire', name: 'Mirror of Desire', baseSpriteId: '177', valueRange: [5, 5], materials: ['Ordinary'], rarities: ['Common'], effectType: 'copyItem', flatValue: true, traits: [] },
 ];
 
 function randInt(min: number, max: number): number {
@@ -168,6 +169,13 @@ export function rollItemInstanceForTemplate(templateId: string, maxRounds: numbe
   const template = getTemplate(templateId);
   if (!template) throw new Error(`Unknown item template: ${templateId}`);
   return buildInstanceFromTemplate(template, maxRounds);
+}
+
+// Duplicates an existing instance's exact rolled stats under a fresh id —
+// used by the Mirror of Desire to copy another player's item.
+export function cloneItemInstance(source: ItemInstance): ItemInstance {
+  instanceCounter += 1;
+  return { ...source, id: `item-${instanceCounter}` };
 }
 
 export function getTemplate(templateId: string): ItemTemplate | undefined {

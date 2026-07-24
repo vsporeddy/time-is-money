@@ -13,6 +13,7 @@ import {
   restartGame,
   startGame,
   tickRoom,
+  useMirror,
 } from './round.js';
 import { addChatMessage, getChatHistory } from './chat.js';
 
@@ -102,6 +103,13 @@ io.on('connection', (socket) => {
 
   socket.on('reset_game', () => {
     forceResetGame(getRoom(), io);
+  });
+
+  socket.on('use_mirror', ({ itemId, copyItemId }, ack) => {
+    const room = getRoom();
+    const result = useMirror(room, socket.id, itemId, copyItemId);
+    ack(result);
+    if (result.ok) emitRoomState(room, io);
   });
 
   socket.on('disconnect', () => {

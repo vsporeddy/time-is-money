@@ -9,6 +9,7 @@ interface InventoryProps {
   side: 'left' | 'right';
   showValue?: boolean;
   onClose?: () => void;
+  onUseItem?: (itemId: string) => void; // present only for the viewer's own inventory
 }
 
 const INVENTORY_SIZE = 12;
@@ -68,6 +69,8 @@ function itemAttributes(item: ItemInstance): DisplayAttribute[] {
   if (template?.effectType === 'revealBidding') attributes.push({ label: 'Scouts Bidders', effect: true });
   if (template?.effectType === 'chest') attributes.push({ label: 'Needs Key', effect: true });
   if (template?.effectType === 'key') attributes.push({ label: 'Opens Chests', effect: true });
+  if (template?.effectType === 'refundOnLoss') attributes.push({ label: 'Refunds Losses', effect: true });
+  if (template?.effectType === 'copyItem') attributes.push({ label: 'Copies an Item (click to use)', effect: true });
 
   return attributes;
 }
@@ -82,7 +85,7 @@ function specialModifierLabel(specialModifier: ItemInstance['specialModifier']):
   return '';
 }
 
-export function Inventory({ player, items, score, side, showValue = true, onClose }: InventoryProps) {
+export function Inventory({ player, items, score, side, showValue = true, onClose, onUseItem }: InventoryProps) {
   const ownedItems = player.stash.map((id) => items[id]).filter((item): item is ItemInstance => Boolean(item));
   const stash = ownedItems.slice(0, INVENTORY_SIZE);
   const cursedSetActive = score?.traitBonuses.some((trait) => trait.traitId === 'cursed' && trait.multiplier === 1.25) ?? false;
@@ -139,11 +142,18 @@ export function Inventory({ player, items, score, side, showValue = true, onClos
           const item = stash[index];
           const template = item ? getTemplate(item.templateId) : undefined;
           const hiddenTrait = item ? getHiddenTrait(item.hiddenTraitId) : undefined;
+          const usable = Boolean(item && onUseItem && template?.effectType === 'copyItem');
           return (
-            <div className="inventory-slot" key={item?.id ?? `empty-${index}`}>
+            <div className={`inventory-slot${usable ? ' inventory-slot-usable' : ''}`} key={item?.id ?? `empty-${index}`}>
               {item && (
                 <>
-                  <SpriteIcon index={Number(item.visual.baseSpriteId)} scale={2} />
+                  {usable ? (
+                    <button type="button" className="inventory-slot-use-button" onClick={() => onUseItem!(item.id)} aria-label={`Use ${template?.name ?? item.templateId}`}>
+                      <SpriteIcon index={Number(item.visual.baseSpriteId)} scale={2} />
+                    </button>
+                  ) : (
+                    <SpriteIcon index={Number(item.visual.baseSpriteId)} scale={2} />
+                  )}
                   <div className="inventory-tooltip inventory-item-tooltip">
                     <b>{template?.name ?? item.templateId}</b>
                     {showValue && <span>Value: ${item.trueValue}</span>}
