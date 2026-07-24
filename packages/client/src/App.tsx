@@ -375,6 +375,7 @@ export default function App() {
           items={knownItems}
           score={scoresByPlayer.get(selectedOpponentId)}
           side="right"
+          onClose={() => setSelectedOpponentId(null)}
         />
       )}
       <BackgroundMusic />
