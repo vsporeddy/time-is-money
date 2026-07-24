@@ -7,6 +7,7 @@
 export interface TraitTier {
   count: number;
   bonus: number;
+  multiplier?: number;
 }
 
 export interface TraitDefinition {
@@ -19,34 +20,32 @@ export interface TraitDefinition {
 
 export const TRAIT_DEFINITIONS: TraitDefinition[] = [
   // --- Broad categories (nested: a Sword counts for both "sword" and "weapon") ---
-  { id: 'weapon', name: 'Weapon', iconSpriteId: '89', tiers: [{ count: 2, bonus: 20 }, { count: 4, bonus: 55 }] },
-  { id: 'armor', name: 'Armor', iconSpriteId: '97', tiers: [{ count: 2, bonus: 20 }, { count: 4, bonus: 55 }] },
-  { id: 'trinket', name: 'Trinket', iconSpriteId: '133', tiers: [{ count: 2, bonus: 20 }, { count: 3, bonus: 50 }] },
-  { id: 'tool', name: 'Tool', iconSpriteId: '162', tiers: [{ count: 2, bonus: 20 }, { count: 4, bonus: 55 }] },
-  { id: 'musical', name: 'Musical', iconSpriteId: '179', tiers: [{ count: 2, bonus: 25 }, { count: 3, bonus: 55 }] },
-  { id: 'text', name: 'Text', iconSpriteId: '217', tiers: [{ count: 2, bonus: 20 }, { count: 3, bonus: 45 }] },
-  { id: 'food', name: 'Food', iconSpriteId: '224', tiers: [{ count: 3, bonus: 25 }, { count: 5, bonus: 60 }] },
-  { id: 'aquatic', name: 'Aquatic', iconSpriteId: '262', tiers: [{ count: 2, bonus: 20 }, { count: 3, bonus: 50 }] },
+  { id: 'weapon', name: 'Weapon', iconSpriteId: '89', tiers: [{ count: 2, bonus: 10 }, { count: 4, bonus: 25 }, { count: 6, bonus: 45 }] },
+  { id: 'armor', name: 'Armor', iconSpriteId: '97', tiers: [{ count: 3, bonus: 25 }, { count: 5, bonus: 50 }] },
+  { id: 'trinket', name: 'Trinket', iconSpriteId: '133', tiers: [{ count: 2, bonus: 25 }, { count: 3, bonus: 50 }] },
+  { id: 'tool', name: 'Tool', iconSpriteId: '162', tiers: [{ count: 2, bonus: 20 }, { count: 3, bonus: 30 }, { count: 4, bonus: 40 }] },
+  { id: 'musical', name: 'Musical', iconSpriteId: '179', tiers: [{ count: 2, bonus: 30 }] },
+  { id: 'text', name: 'Text', iconSpriteId: '217', tiers: [{ count: 2, bonus: 20 }, { count: 3, bonus: 30 }, { count: 4, bonus: 40 }] },
+  { id: 'food', name: 'Food', iconSpriteId: '224', tiers: [{ count: 3, bonus: 25 }, { count: 5, bonus: 50 }] },
+  { id: 'aquatic', name: 'Aquatic', iconSpriteId: '262', tiers: [{ count: 2, bonus: 25 }, { count: 3, bonus: 50 }] },
 
   // --- Narrow sub-traits (nested inside a broad category above) ---
-  { id: 'sword', name: 'Sword', iconSpriteId: '84', tiers: [{ count: 2, bonus: 20 }, { count: 3, bonus: 45 }] },
-  { id: 'bow', name: 'Bow', iconSpriteId: '99', tiers: [{ count: 2, bonus: 25 }] },
-  { id: 'staff', name: 'Staff', iconSpriteId: '105', tiers: [{ count: 2, bonus: 25 }] },
-  { id: 'book', name: 'Book', iconSpriteId: '213', tiers: [{ count: 2, bonus: 20 }, { count: 3, bonus: 45 }] },
-  { id: 'dessert', name: 'Dessert', iconSpriteId: '253', tiers: [{ count: 2, bonus: 20 }] },
+  { id: 'sword', name: 'Sword', iconSpriteId: '84', tiers: [{ count: 2, bonus: 25 }, { count: 3, bonus: 50 }] },
+  { id: 'bow', name: 'Bow', iconSpriteId: '99', tiers: [{ count: 2, bonus: 30 }] },
+  { id: 'staff', name: 'Staff', iconSpriteId: '105', tiers: [{ count: 2, bonus: 35 }] },
+  { id: 'book', name: 'Book', iconSpriteId: '213', tiers: [{ count: 2, bonus: 30 }] },
+  { id: 'dessert', name: 'Dessert', iconSpriteId: '253', tiers: [{ count: 2, bonus: 30 }] },
 
   // --- Modifier-driven (matches rolled material, cuts across every category) ---
-  { id: 'cursed', name: 'Cursed', iconSpriteId: '0', tiers: [{ count: 2, bonus: 20 }, { count: 3, bonus: 45 }], materialMatch: 'Cursed' },
-  { id: 'blessed', name: 'Blessed', iconSpriteId: '5', tiers: [{ count: 2, bonus: 20 }, { count: 3, bonus: 45 }], materialMatch: 'Blessed' },
+  { id: 'cursed', name: 'Cursed', iconSpriteId: '0', tiers: [{ count: 3, bonus: 0, multiplier: 1.25 }], materialMatch: 'Cursed' },
 ];
 
 export function getTraitDefinition(id: string): TraitDefinition | undefined {
   return TRAIT_DEFINITIONS.find((t) => t.id === id);
 }
 
-// Shared material pool — every template draws from this so "Cursed"/"Blessed"
-// can land on anything (a weapon, a snack, a trinket), not just one category.
-export const MATERIAL_POOL = ['Ordinary', 'Weathered', 'Pristine', 'Cursed', 'Blessed'];
+// Base material rolls are independent from the optional Blessed/Cursed overlay.
+export const MATERIAL_POOL = ['Ordinary', 'Weathered', 'Pristine'];
 
 // Hidden traits: a per-instance secret, like trueValue — not shown during
 // bidding, revealed only at round_end. Flat bonus/penalty, not a collection set.

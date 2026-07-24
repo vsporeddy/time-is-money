@@ -1,5 +1,5 @@
 import type { ItemInstance, Player, ScoreBreakdown } from 'shared';
-import { getHiddenTrait, getTemplate, getTraitDefinition } from 'shared';
+import { getHiddenTrait, getMaterialValueMultiplier, getRarityValueMultiplier, getTemplate, getTraitDefinition } from 'shared';
 import { SpriteIcon } from './SpriteIcon';
 
 interface InventoryProps {
@@ -13,16 +13,22 @@ interface InventoryProps {
 
 const INVENTORY_SIZE = 12;
 
-function itemAttributes(item: ItemInstance): string[] {
-  const template = getTemplate(item.templateId);
-  const attributes: string[] = [];
+interface DisplayAttribute {
+  label: string;
+  traitId?: string;
+  effect?: boolean;
+}
 
-  for (const traitId of template?.traits ?? []) attributes.push(getTraitDefinition(traitId)?.name ?? traitId);
-  if (template?.scoreScaling === 'investment') attributes.push('Investment');
-  if (template?.scoreScaling === 'bargain') attributes.push('Bargain');
-  if (template?.secondPriceRebate) attributes.push('Fair Trade');
-  if (template?.effectType === 'timeRefund') attributes.push('Time Refund');
-  if (template?.loner) attributes.push(`Loner +${template.loner}`);
+function itemAttributes(item: ItemInstance): DisplayAttribute[] {
+  const template = getTemplate(item.templateId);
+  const attributes: DisplayAttribute[] = [];
+
+  for (const traitId of template?.traits ?? []) attributes.push({ label: getTraitDefinition(traitId)?.name ?? traitId, traitId });
+  if (item.investment) attributes.push({ label: 'Investment', effect: true });
+  if (template?.scoreScaling === 'bargain') attributes.push({ label: 'Bargain' });
+  if (item.fairTrade) attributes.push({ label: 'Fair Trade', effect: true });
+  if (template?.effectType === 'timeRefund') attributes.push({ label: 'Time Refund' });
+  if (item.loner) attributes.push({ label: 'Loner', effect: true });
 
   return attributes;
 }
@@ -31,15 +37,24 @@ function modifierClass(value: string): string {
   return `modifier-${value.toLowerCase().replace(/\s+/g, '-')}`;
 }
 
+function specialModifierLabel(specialModifier: ItemInstance['specialModifier']): string {
+  if (specialModifier === 'Cursed') return 'Cursed';
+  if (specialModifier === 'Blessed') return 'Blessed ×1.1';
+  return '';
+}
+
 export function Inventory({ player, items, score, side, showValue = true, onClose }: InventoryProps) {
   const stash = player.stash.map((id) => items[id]).filter((item): item is ItemInstance => Boolean(item)).slice(0, INVENTORY_SIZE);
+  const cursedSetActive = score?.traitBonuses.some((trait) => trait.traitId === 'cursed' && trait.multiplier === 1.25) ?? false;
   const breakdown = score
     ? [
         `Base Value: $${score.baseValue}`,
         score.hiddenTraitBonus !== 0 && `Finds: ${score.hiddenTraitBonus >= 0 ? '+' : ''}$${score.hiddenTraitBonus}`,
         score.scoreScalingBonus !== 0 && `Item effects: +$${score.scoreScalingBonus}`,
         score.lonerBonus !== 0 && `Loner bonuses: +$${score.lonerBonus}`,
-        ...score.traitBonuses.map((trait) => `${getTraitDefinition(trait.traitId)?.name ?? trait.traitId} ×${trait.count}: +$${trait.bonus}`),
+        ...score.traitBonuses.map((trait) =>
+          `${getTraitDefinition(trait.traitId)?.name ?? trait.traitId} ×${trait.count}: ${trait.multiplier ? `×${trait.multiplier}` : `+$${trait.bonus}`}`
+        ),
       ].filter((line): line is string => Boolean(line))
     : ['No revealed items yet.'];
 
@@ -77,18 +92,25 @@ export function Inventory({ player, items, score, side, showValue = true, onClos
                     {showValue && <span>Value: ${item.trueValue}</span>}
                     <span>Modifiers:</span>
                     <ul className="inventory-detail-list">
-                      <li className={`modifier ${modifierClass(item.material)}`}>{item.material}</li>
-                      <li className={`modifier ${modifierClass(item.rarity)}`}>{item.rarity}</li>
+                      <li className={`modifier ${modifierClass(item.material)}`}>{item.material} ×{getMaterialValueMultiplier(item.material).toFixed(1)}</li>
+                      <li className={`modifier ${modifierClass(item.rarity)}`}>{item.rarity} ×{getRarityValueMultiplier(item.rarity).toFixed(1)}</li>
+                      {item.specialModifier && (
+                        <li className={`modifier ${modifierClass(item.specialModifier)}`}>
+                          {item.specialModifier === 'Cursed' ? (cursedSetActive ? 'Cursed x1.25' : 'Cursed ×0.75') : specialModifierLabel(item.specialModifier)}
+                        </li>
+                      )}
                     </ul>
                     <span>Attributes:</span>
                     <ul className="inventory-detail-list">
                       {itemAttributes(item).map((attribute) => (
-                        <li key={attribute}>{attribute}</li>
+                        <li key={attribute.label}>
+                          <span className={attribute.traitId ? 'attribute-set-label' : attribute.effect ? 'item-effect-label' : undefined}>{attribute.label}</span>
+                        </li>
                       ))}
                     </ul>
                     {hiddenTrait && (
                       <span className={`inventory-find ${hiddenTrait.id === 'cursed-find' ? 'find-cursed' : hiddenTrait.id === 'blessed-find' ? 'find-blessed' : ''}`}>
-                        {hiddenTrait.name} {hiddenTrait.scoreBonus >= 0 ? '+' : ''}{hiddenTrait.scoreBonus}
+                        {hiddenTrait.name} {hiddenTrait.scoreBonus >= 0 ? '+$' : '-$'}{Math.abs(hiddenTrait.scoreBonus)}
                       </span>
                     )}
                   </div>

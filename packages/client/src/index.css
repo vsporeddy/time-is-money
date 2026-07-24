@@ -523,6 +523,95 @@ input[type='text']:focus {
   margin-top: 0.35rem;
 }
 
+.attribute-bonus-trigger {
+  position: relative;
+  color: #ff9ecf;
+  cursor: help;
+  outline: none;
+}
+
+.attribute-set-label {
+  color: #ff9ecf;
+}
+
+.item-effect-label {
+  color: #8fbf5a;
+}
+
+.attribute-bonus-tooltip {
+  position: absolute;
+  z-index: 60;
+  bottom: calc(100% + 0.35rem);
+  left: 50%;
+  display: none;
+  width: max-content;
+  padding: 0.45rem;
+  transform: translateX(-50%);
+  background: var(--bg);
+  border: 2px solid var(--gold);
+  box-shadow: 3px 3px 0 var(--shadow);
+  color: var(--text);
+  font-size: 0.48rem;
+  line-height: 1.6;
+  pointer-events: none;
+}
+
+.inventory-item-tooltip {
+  pointer-events: auto;
+}
+
+.attribute-bonus-tooltip b,
+.attribute-bonus-tooltip span {
+  display: block;
+}
+
+.attribute-bonus-tooltip b {
+  color: var(--gold-bright);
+  margin-bottom: 0.2rem;
+}
+
+.attribute-bonus-trigger:hover .attribute-bonus-tooltip,
+.attribute-bonus-trigger:focus .attribute-bonus-tooltip {
+  display: block;
+}
+
+.special-modifier-trigger {
+  position: relative;
+  cursor: help;
+}
+
+.special-modifier-tooltip {
+  position: absolute;
+  z-index: 60;
+  bottom: calc(100% + 0.35rem);
+  left: 50%;
+  display: none;
+  width: max-content;
+  max-width: 13rem;
+  padding: 0.45rem;
+  transform: translateX(-50%);
+  background: var(--bg);
+  border: 2px solid var(--gold);
+  box-shadow: 3px 3px 0 var(--shadow);
+  color: var(--text);
+  font-size: 0.48rem;
+  line-height: 1.5;
+}
+
+.special-modifier-tooltip b,
+.special-modifier-tooltip span {
+  display: block;
+}
+
+.special-modifier-tooltip b {
+  margin-bottom: 0.2rem;
+  color: var(--gold-bright);
+}
+
+.special-modifier-trigger:hover .special-modifier-tooltip {
+  display: block;
+}
+
 .inventory-slot:hover .inventory-item-tooltip,
 .inventory-slot:focus-within .inventory-item-tooltip,
 .inventory-total:hover .inventory-total-tooltip,
@@ -624,6 +713,18 @@ input[type='text']:focus {
   padding-left: 1.1rem;
   font-size: 0.58rem;
   line-height: 1.8;
+}
+
+.item-effect-callout {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0.8rem auto;
+  padding: 0.55rem 0.7rem;
+  border: 2px solid var(--gold);
+  background: var(--bg-panel-alt-2);
+  color: var(--gold-bright);
+  font-size: 0.55rem;
+  line-height: 1.55;
 }
 
 .tag-row {
@@ -735,6 +836,12 @@ input[type='text']:focus {
 .sold-detail strong {
   color: var(--gold-bright);
   font-size: 0.82rem;
+}
+
+.sole-bidder-label {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.55rem;
 }
 
 .sold-detail .portrait-icon {

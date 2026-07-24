@@ -35,15 +35,17 @@ export interface ItemTemplate {
   effectType: 'none' | 'timeRefund';
   timeRefund?: TimeRefundConfig; // present when effectType === 'timeRefund'
   traits: string[]; // TraitDefinition ids this template's items count toward (category traits, may nest)
-  scoreScaling?: 'investment' | 'bargain'; // scores based on time spent winning it, instead of/alongside trueValue
-  loner?: number; // bonus applied only if this is the sole copy of this template in a player's stash
-  secondPriceRebate?: boolean; // winner only "pays" the runner-up's committed time, rest refunded
+  scoreScaling?: 'bargain'; // template-specific score effect
 }
 
 export interface ItemInstance {
   id: string;
   templateId: string;
   material: string;
+  specialModifier?: 'Cursed' | 'Blessed'; // rolls independently of the base material
+  loner?: boolean; // 5% independent roll; scores only when it is the sole Loner owned
+  investment?: boolean; // 5% independent roll; scores from time spent bidding
+  fairTrade?: boolean; // 5% independent roll; winner pays runner-up time on contested lots
   rarity: string;
   trueValue: number;
   hiddenTraitId?: string; // secret like trueValue — stripped from round_start, revealed at round_end
@@ -72,6 +74,7 @@ export interface Round {
   bidders: Record<string, RoundBidder>;
   revealedFields: string[];
   winnerId: string | null;
+  soleBidder: boolean;
 }
 
 export type RoomStatus = 'lobby' | 'in_round' | 'round_reveal' | 'game_over';
@@ -126,7 +129,7 @@ export interface ScoreBreakdown {
   hiddenTraitBonus: number;
   scoreScalingBonus: number; // investment/bargain, from price paid
   lonerBonus: number;
-  traitBonuses: { traitId: string; count: number; bonus: number }[];
+  traitBonuses: { traitId: string; count: number; bonus: number; multiplier?: number }[];
   total: number;
 }
 

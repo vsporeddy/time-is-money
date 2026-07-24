@@ -8,6 +8,7 @@ import { scheduleBotEntries, scheduleBotReleases } from './bots.js';
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 
 let roundCounter = 0;
+const SOLE_BIDDER_PRICE_MS = 5_000;
 
 export function startGame(room: Room, io: IO) {
   if (room.status !== 'lobby') return;
@@ -23,7 +24,7 @@ export function startRound(room: Room, io: IO) {
     return;
   }
 
-  const item = rollItemInstance();
+  const item = rollItemInstance(room.settings.maxRounds);
   const bidders: Round['bidders'] = {};
   for (const p of eligible) {
     bidders[p.id] = { isHolding: false, committedMs: 0, droppedAt: null };
@@ -40,6 +41,7 @@ export function startRound(room: Room, io: IO) {
     bidders,
     revealedFields: [],
     winnerId: null,
+    soleBidder: false,
   };
 
   room.currentRoundIndex += 1;
@@ -86,6 +88,13 @@ function closeBidWindow(room: Room, io: IO) {
   const activeBidders = Object.entries(ar.round.bidders).filter(([, bidder]) => bidder.isHolding);
   if (activeBidders.length === 0) {
     resolveRound(room, io, null);
+    return;
+  }
+
+  // One bidder means the opening window ended uncontested. Award the lot
+  // immediately; resolveRound applies the fixed five-second sole-bid price.
+  if (activeBidders.length === 1) {
+    resolveRound(room, io, activeBidders[0][0]);
     return;
   }
 
@@ -196,16 +205,7 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
 
   const template = getTemplate(ar.item.templateId);
 
-  // The highest amount any already-folded bidder paid this round — the
-  // "runner-up" price. Second-price-rebate items only charge the winner up
-  // to this, refunding the rest as time (uncontested wins already cost
-  // almost nothing; this covers the contested case too).
-  const secondPrice = Math.max(
-    0,
-    ...Object.values(ar.round.bidders)
-      .filter((b) => b.droppedAt !== null)
-      .map((b) => b.committedMs)
-  );
+  const bidderCount = Object.values(ar.round.bidders).filter((bidder) => bidder.isHolding || bidder.droppedAt !== null).length;
 
   // Whoever is still mid-hold at resolution (normally just the winner, but
   // possibly several in a max-duration stalemate) has to pay for that time
@@ -217,36 +217,48 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
     const player = room.players.get(playerId);
     if (!bidder || !player) continue;
 
-    const isWinner = playerId === winnerId;
     const rawElapsed = now - startedAt;
-    const netElapsed = isWinner && template?.secondPriceRebate ? Math.min(rawElapsed, secondPrice) : rawElapsed;
 
-    player.timeRemainingMs = Math.max(0, player.timeRemainingMs - netElapsed);
+    player.timeRemainingMs = Math.max(0, player.timeRemainingMs - rawElapsed);
     if (player.timeRemainingMs <= 0) {
       player.timeRemainingMs = 0;
       player.status = 'out_of_time';
     }
 
     bidder.isHolding = false;
-    bidder.committedMs = netElapsed;
+    bidder.committedMs = rawElapsed;
     bidder.droppedAt = now;
     ar.holdStartedAt.delete(playerId);
 
-    if (isWinner) room.itemPricePaidMs.set(ar.item.id, netElapsed);
   }
 
   ar.round.status = 'resolved';
   ar.round.winnerId = winnerId;
+  ar.round.soleBidder = winnerId !== null && bidderCount === 1;
 
   if (winnerId) {
     const winner = room.players.get(winnerId);
     if (winner) {
+      const winnerBidder = ar.round.bidders[winnerId];
+      const runnerUpPrice = Math.max(
+        0,
+        ...Object.entries(ar.round.bidders)
+          .filter(([playerId, bidder]) => playerId !== winnerId && bidder.droppedAt !== null)
+          .map(([, bidder]) => bidder.committedMs)
+      );
+      const rawPrice = winnerBidder?.committedMs ?? 0;
+      const requestedPrice = bidderCount === 1 ? SOLE_BIDDER_PRICE_MS : ar.item.fairTrade ? runnerUpPrice : rawPrice;
+      const paidPrice = Math.min(requestedPrice, winner.timeRemainingMs + rawPrice);
+
+      // The bid was initially charged at raw time. Refund or charge the
+      // difference for Fair Trade and the fixed uncontested price.
+      winner.timeRemainingMs = Math.max(0, winner.timeRemainingMs + rawPrice - paidPrice);
+      if (winner.timeRemainingMs > 0 && winner.status === 'out_of_time') winner.status = 'active';
+      if (winnerBidder) winnerBidder.committedMs = paidPrice;
+      room.itemPricePaidMs.set(ar.item.id, paidPrice);
+
       winner.stash.push(ar.item.id);
       room.wonItems.set(ar.item.id, ar.item);
-
-      if (!room.itemPricePaidMs.has(ar.item.id)) {
-        room.itemPricePaidMs.set(ar.item.id, ar.round.bidders[winnerId]?.committedMs ?? 0);
-      }
 
       if (template?.effectType === 'timeRefund' && template.timeRefund) {
         const refund = computeTimeRefund(template.timeRefund, winner.timeRemainingMs, room.settings.startingTimeMs);

@@ -122,6 +122,8 @@ export default function App() {
     const onRoundEnd = (payload: LastResult) => {
       setLastResult(payload);
       setCurrentRound(null);
+      setLiveTimes({});
+      setLiveBids({});
       setKnownItems((prev) => ({ ...prev, [payload.item.id]: payload.item }));
       if (payload.round.winnerId) {
         setItemPrices((previous) => ({
@@ -308,7 +310,9 @@ export default function App() {
             if (s.scoreScalingBonus !== 0) extras.push(`scaling +${s.scoreScalingBonus}`);
             if (s.lonerBonus !== 0) extras.push(`loner +${s.lonerBonus}`);
             for (const t of s.traitBonuses) {
-              extras.push(`${getTraitDefinition(t.traitId)?.name ?? t.traitId} x${t.count} +${t.bonus}`);
+              extras.push(
+                `${getTraitDefinition(t.traitId)?.name ?? t.traitId} x${t.count} ${t.multiplier ? `×${t.multiplier}` : `+${t.bonus}`}`
+              );
             }
 
             return (
@@ -399,6 +403,7 @@ export default function App() {
       <Game
         players={room.players}
         myId={myId!}
+        myScore={scoresByPlayer.get(myId!)}
         isObserver={isObserver}
         roundNumber={room.currentRoundIndex + 1}
         maxRounds={room.settings.maxRounds}

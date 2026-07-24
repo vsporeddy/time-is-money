@@ -1,20 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ItemInstance, ItemTemplate, Player, Round } from 'shared';
-import { getHiddenTrait, getTemplate, getTraitDefinition } from 'shared';
+import type { ItemInstance, ItemTemplate, Player, Round, ScoreBreakdown } from 'shared';
+import { getHiddenTrait, getMaterialValueMultiplier, getRarityValueMultiplier, getTemplate, getTraitDefinition } from 'shared';
 import { SpriteIcon } from './SpriteIcon';
 import { PortraitIcon } from './PortraitIcon';
+import { AttributeLabel } from './AttributeLabel';
 import { playClick, playCoin, playCountdownTick } from './sound';
 
-function templateAttributes(template: ItemTemplate | undefined): string[] {
+interface DisplayAttribute {
+  label: string;
+  traitId?: string;
+  effect?: boolean;
+  tooltip?: { title: string; text: string };
+}
+
+function templateAttributes(template: ItemTemplate | undefined, item?: Omit<ItemInstance, 'trueValue'>): DisplayAttribute[] {
   if (!template) return [];
-  const attributes = template.traits.map((id) => getTraitDefinition(id)?.name ?? id);
-  if (template.scoreScaling === 'investment') attributes.push('Investment');
-  if (template.scoreScaling === 'bargain') attributes.push('Bargain');
-  if (template.secondPriceRebate) attributes.push('Fair Trade');
-  if (template.effectType === 'timeRefund' && template.timeRefund) {
-    attributes.push(template.timeRefund.mode === 'catchup' ? 'Emergency Refund' : 'Time Refund');
-  }
-  if (template.loner) attributes.push('Loner');
+  const attributes = template.traits.map((id) => ({ label: getTraitDefinition(id)?.name ?? id, traitId: id }));
+  if (item?.investment) attributes.push({ label: 'Investment', effect: true, tooltip: { title: '+1$ for each second used to bid for this item', text: '' } });
+  if (template.scoreScaling === 'bargain') attributes.push({ label: 'Bargain' });
+  if (item?.fairTrade) attributes.push({ label: 'Fair Trade', effect: true, tooltip: { title: 'FAIR TRADE', text: "Only costs the runner-up's time spent" } });
+  if (item?.loner) attributes.push({ label: 'Loner', effect: true, tooltip: { title: 'If you own only one Loner item: +$20', text: '' } });
   return attributes;
 }
 
@@ -31,6 +36,7 @@ interface LastResult {
 interface GameProps {
   players: Player[];
   myId: string;
+  myScore?: ScoreBreakdown;
   isObserver: boolean;
   roundNumber: number;
   maxRounds: number | null;
@@ -51,6 +57,12 @@ function modifierClass(value: string): string {
   return `modifier-${value.toLowerCase().replace(/\s+/g, '-')}`;
 }
 
+function specialModifierLabel(specialModifier: ItemInstance['specialModifier']): string {
+  if (specialModifier === 'Cursed') return 'Cursed';
+  if (specialModifier === 'Blessed') return 'Blessed ×1.1';
+  return '';
+}
+
 function lerpColor(from: [number, number, number], to: [number, number, number], t: number): string {
   const r = Math.round(from[0] + (to[0] - from[0]) * t);
   const g = Math.round(from[1] + (to[1] - from[1]) * t);
@@ -66,6 +78,7 @@ const COIN_MAX_VOLUME = 0.4;
 export function Game({
   players,
   myId,
+  myScore,
   isObserver,
   roundNumber,
   maxRounds,
@@ -79,6 +92,7 @@ export function Game({
 }: GameProps) {
   const [now, setNow] = useState(Date.now());
   const isHolding = (id: string) => liveBids[id] !== undefined;
+  const cursedSetActive = myScore?.traitBonuses.some((trait) => trait.traitId === 'cursed' && trait.multiplier === 1.25) ?? false;
   const isDropped = (id: string) => droppedThisRound[id] !== undefined;
 
   useEffect(() => {
@@ -196,12 +210,18 @@ export function Game({
                 <span className={`modifier ${modifierClass(lastResult.item.material)}`}>{lastResult.item.material}</span>
                 {', '}
                 <span className={`modifier ${modifierClass(lastResult.item.rarity)}`}>{lastResult.item.rarity}</span>
+                {lastResult.item.specialModifier && (
+                  <>
+                    {', '}
+                    <span className={`modifier ${modifierClass(lastResult.item.specialModifier)}`}>{lastResult.item.specialModifier}</span>
+                  </>
+                )}
                 {')'}
               </p>
               {hidden && (
                 <p className={`hidden-trait ${hidden.scoreBonus >= 0 ? 'positive' : 'negative'}`}>
-                  {hidden.name} ({hidden.scoreBonus >= 0 ? '+' : ''}
-                  {hidden.scoreBonus})
+                  {hidden.name} ({hidden.scoreBonus >= 0 ? '+$' : '-$'}
+                  {Math.abs(hidden.scoreBonus)})
                 </p>
               )}
               {winner ? (
@@ -213,7 +233,10 @@ export function Game({
                   </div>
                   <div className="sold-detail">
                     <span>Time Spent</span>
-                    <strong>{fmt(winningTime)}</strong>
+                    <strong>
+                      {fmt(winningTime)}
+                      {lastResult.round.soleBidder && <span className="sole-bidder-label">(Sole Bidder)</span>}
+                    </strong>
                   </div>
                   <div className="sold-detail">
                     <span>True Value</span>
@@ -246,19 +269,40 @@ export function Game({
             <div>
               <p>Modifiers</p>
               <ul>
-                <li className={`modifier ${modifierClass(currentRound.item.material)}`}>{currentRound.item.material}</li>
-                <li className={`modifier ${modifierClass(currentRound.item.rarity)}`}>{currentRound.item.rarity}</li>
+                <li className={`modifier ${modifierClass(currentRound.item.material)}`}>{currentRound.item.material} ×{getMaterialValueMultiplier(currentRound.item.material).toFixed(1)}</li>
+                <li className={`modifier ${modifierClass(currentRound.item.rarity)}`}>{currentRound.item.rarity} ×{getRarityValueMultiplier(currentRound.item.rarity).toFixed(1)}</li>
+                {currentRound.item.specialModifier && (
+                  <li className={`modifier ${modifierClass(currentRound.item.specialModifier)}`}>
+                    {currentRound.item.specialModifier === 'Cursed' ? (
+                      <span className="special-modifier-trigger">
+                        {cursedSetActive ? 'Cursed x1.25' : 'Cursed ×0.75'}
+                        <span className="special-modifier-tooltip"><b>CURSED SET BONUS</b><span>3: Change modifier to 1.25x</span></span>
+                      </span>
+                    ) : specialModifierLabel(currentRound.item.specialModifier)}
+                  </li>
+                )}
               </ul>
             </div>
             <div>
               <p>Attributes</p>
               <ul>
-                {templateAttributes(getTemplate(currentRound.item.templateId)).map((attribute) => (
-                  <li key={attribute}>{attribute}</li>
+                {templateAttributes(getTemplate(currentRound.item.templateId), currentRound.item).map((attribute) => (
+                  <li key={attribute.label}>
+                    {attribute.tooltip ? (
+                      <span className={`attribute-bonus-trigger${attribute.effect ? ' item-effect-label' : ''}`}>
+                        {attribute.label}
+                        <span className="attribute-bonus-tooltip"><b>{attribute.tooltip.title}</b><span>{attribute.tooltip.text}</span></span>
+                      </span>
+                    ) : <AttributeLabel {...attribute} />}
+                  </li>
                 ))}
               </ul>
             </div>
           </div>
+          {getTemplate(currentRound.item.templateId)?.effectType === 'timeRefund' &&
+            getTemplate(currentRound.item.templateId)?.timeRefund?.mode === 'catchup' && (
+              <div className="item-effect-callout">Emergency Refund: Refunds time based on remaining time</div>
+            )}
           <p className="item-meta">Value: ???</p>
 
           {currentRound.round.status === 'pending' && <p className="status-line">Get ready…</p>}
