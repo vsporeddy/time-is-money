@@ -7,6 +7,7 @@ interface InventoryProps {
   items: Record<string, ItemInstance>;
   score?: ScoreBreakdown;
   side: 'left' | 'right';
+  showValue?: boolean;
   onClose?: () => void;
 }
 
@@ -30,7 +31,7 @@ function modifierClass(value: string): string {
   return `modifier-${value.toLowerCase().replace(/\s+/g, '-')}`;
 }
 
-export function Inventory({ player, items, score, side, onClose }: InventoryProps) {
+export function Inventory({ player, items, score, side, showValue = true, onClose }: InventoryProps) {
   const stash = player.stash.map((id) => items[id]).filter((item): item is ItemInstance => Boolean(item)).slice(0, INVENTORY_SIZE);
   const breakdown = score
     ? [
@@ -47,15 +48,17 @@ export function Inventory({ player, items, score, side, onClose }: InventoryProp
       <div className="inventory-heading">
         <h2>{side === 'left' ? 'YOUR INVENTORY' : `${player.name.toUpperCase()}'S INVENTORY`}</h2>
         <div className="inventory-heading-actions">
-          <div className="inventory-total" tabIndex={0}>
-            <strong>${score?.total ?? 0}</strong>
-            <div className="inventory-tooltip inventory-total-tooltip">
-              <b>VALUE BREAKDOWN</b>
-              {breakdown.map((line) => (
-                <span key={line}>{line}</span>
-              ))}
+          {showValue && (
+            <div className="inventory-total" tabIndex={0}>
+              <strong>${score?.total ?? 0}</strong>
+              <div className="inventory-tooltip inventory-total-tooltip">
+                <b>VALUE BREAKDOWN</b>
+                {breakdown.map((line) => (
+                  <span key={line}>{line}</span>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
           {onClose && <button type="button" className="inventory-close" aria-label="Minimize inventory" onClick={onClose}>×</button>}
         </div>
       </div>
@@ -71,7 +74,7 @@ export function Inventory({ player, items, score, side, onClose }: InventoryProp
                   <SpriteIcon index={Number(item.visual.baseSpriteId)} scale={2} />
                   <div className="inventory-tooltip inventory-item-tooltip">
                     <b>{template?.name ?? item.templateId}</b>
-                    <span>Value: ${item.trueValue}</span>
+                    {showValue && <span>Value: ${item.trueValue}</span>}
                     <span>Modifiers:</span>
                     <ul className="inventory-detail-list">
                       <li className={`modifier ${modifierClass(item.material)}`}>{item.material}</li>
