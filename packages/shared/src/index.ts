@@ -5,6 +5,7 @@ export * from './traits.js';
 export * from './scoring.js';
 export * from './portraits.js';
 export * from './classes.js';
+export * from './roomCode.js';
 
 export interface Player {
   id: string;
@@ -109,6 +110,9 @@ export interface Round {
   revealedFields: string[];
   winnerId: string | null;
   soleBidder: boolean;
+  // Non-empty only when the lot hit the max-duration cutoff with players still
+  // holding: nobody wins, and everyone listed here got their held time back.
+  stalematePlayerIds: string[];
   restrictedBidderIds: string[] | null; // set by Dual Daggers — only these players may bid this round
 }
 
@@ -136,6 +140,8 @@ export interface LotPoolItem {
 }
 
 export interface RoomState {
+  code: string; // the lobby's canonical share code
+  hostId: string | null; // the one player allowed to start/configure the game; null only while the room is empty
   status: RoomStatus;
   players: Player[];
   knownItems: ItemInstance[]; // every item already won, for inventory backfill on join
@@ -153,12 +159,25 @@ export interface ChatMessage {
 }
 
 // --- Socket event contract ---
-// A single global room — no room codes. Everyone who joins is in the same game.
+// Every room is identified by a share code. A socket belongs to exactly one
+// room, established by join_room, so no other event needs to carry the code.
+
+export type JoinFailureReason =
+  | 'invalid_name'
+  | 'invalid_code' // the code was malformed (or the socket already joined a lobby)
+  | 'not_found' // well-formed code, but no such lobby — expired, or the server restarted
+  | 'room_full' // every class is taken
+  | 'server_full'; // the server is hosting too many lobbies to create another
 
 export interface ClientToServerEvents {
+  // Omitting `code` creates a brand-new lobby with this player as its host.
   join_room: (
-    payload: { playerName: string },
-    ack: (res: { ok: true; playerId: string } | { ok: false; error: string }) => void
+    payload: { playerName: string; code?: string | null },
+    ack: (
+      res:
+        | { ok: true; code: string; playerId: string; state: RoomState }
+        | { ok: false; reason: JoinFailureReason; error: string }
+    ) => void
   ) => void;
   start_game: () => void;
   add_bot: () => void;
@@ -188,6 +207,7 @@ export interface ScoreBreakdown {
   hoarderBonus: number; // Hoarder: flat bonus per item owned
   traitBonuses: { traitId: string; count: number; bonus: number; multiplier?: number }[];
   total: number;
+  itemCount: number; // stash size — the first tiebreak on equal totals (fewer items wins)
 }
 
 // What every client sees of the active lot. trueValue is always shown (base

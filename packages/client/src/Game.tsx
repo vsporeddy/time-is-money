@@ -292,9 +292,14 @@ export function Game({
           const winningTime = lastResult.round.winnerId
             ? lastResult.round.bidders[lastResult.round.winnerId]?.committedMs ?? 0
             : 0;
+          const stalematePlayers = lastResult.round.stalematePlayerIds
+            .map((id) => players.find((player) => player.id === id))
+            .filter((player): player is Player => Boolean(player));
           return (
             <div className="item-card">
-              <h3 className="sold-title">{lastResult.round.winnerId ? 'SOLD' : 'PASSED'}</h3>
+              <h3 className="sold-title">
+                {lastResult.round.winnerId ? 'SOLD' : stalematePlayers.length > 0 ? 'STALEMATE' : 'PASSED'}
+              </h3>
               <p className="item-meta">
                 {getTemplate(lastResult.item.templateId)?.name}
                 {!getTemplate(lastResult.item.templateId)?.flatValue && (
@@ -344,7 +349,11 @@ export function Game({
                 </div>
               ) : (
                 <>
-                  <p className="item-meta">No one bid! Item goes unclaimed.</p>
+                  <p className="item-meta">
+                    {stalematePlayers.length > 0
+                      ? `${stalematePlayers.map((player) => player.name).join(' and ')} held to the buzzer — nobody wins, and their time was refunded.`
+                      : 'No one bid! Item goes unclaimed.'}
+                  </p>
                   <div className="sold-details passed-details">
                     <div className="sold-detail">
                       <span>True Value</span>
@@ -353,7 +362,9 @@ export function Game({
                   </div>
                 </>
               )}
-              <p className="next-lot-line">Next lot incoming…</p>
+              <p className="next-lot-line">
+                {maxRounds !== null && roundNumber === maxRounds ? 'Final Sale!' : 'Next lot incoming…'}
+              </p>
             </div>
           );
         })()}

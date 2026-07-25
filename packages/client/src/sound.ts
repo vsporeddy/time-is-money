@@ -1,5 +1,7 @@
+import { loadAudioSettings } from './audioSettings';
+
 const SFX_BASE = `${import.meta.env.BASE_URL}sounds/interface/`;
-let sfxEnabled = true;
+let sfxEnabled = loadAudioSettings().sfxEnabled;
 
 export function setSfxEnabled(enabled: boolean) {
   sfxEnabled = enabled;

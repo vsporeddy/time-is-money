@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:pages": "vite build --mode pages",
+    "build:itch": "vite build --mode itch",
     "preview": "vite preview"
   },
   "dependencies": {

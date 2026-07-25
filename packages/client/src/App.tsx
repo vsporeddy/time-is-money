@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import type { ChatMessage, ItemInstance, MaskedRoundItem, Player, Round, RoomState, ScoreBreakdown } from 'shared';
-import { MAX_BOTS, computeScores, getClassDefinition, getTemplate, getTraitDefinition } from 'shared';
+import type { ChatMessage, ItemInstance, JoinFailureReason, MaskedRoundItem, Player, Round, RoomState, ScoreBreakdown } from 'shared';
+import { MAX_PLAYERS_PER_ROOM, computeScores, getClassDefinition, getTemplate, getTraitDefinition, rankScores } from 'shared';
 import { socket } from './socket';
+import { buildInviteLink, clearLobbyCodeFromUrl, readLobbyCodeFromUrl, writeLobbyCodeToUrl } from './lobbyLink';
 import { Logo } from './Logo';
 import { Game } from './Game';
+import { Lobby } from './Lobby';
 import { PortraitIcon } from './PortraitIcon';
 import { Chat } from './Chat';
 import { BackgroundMusic } from './BackgroundMusic';
@@ -43,6 +45,14 @@ export default function App() {
   const [room, setRoom] = useState<RoomState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // The code we're trying to join, seeded once from the URL. Empty means
+  // "create a new lobby". Read lazily so nothing re-reads the hash later —
+  // after joining, the hash is write-only.
+  const [pendingLobbyCode, setPendingLobbyCode] = useState<string | null>(() => readLobbyCodeFromUrl());
+  const [lobbyCode, setLobbyCode] = useState<string | null>(null);
+  const [joining, setJoining] = useState(false);
+  const [joinErrorReason, setJoinErrorReason] = useState<JoinFailureReason | null>(null);
+
   const [currentRound, setCurrentRound] = useState<CurrentRound | null>(null);
   const [liveTimes, setLiveTimes] = useState<Record<string, number>>({});
   const [liveBids, setLiveBids] = useState<Record<string, number>>({});
@@ -80,6 +90,12 @@ export default function App() {
     const onDisconnect = () => setConnected(false);
     const onRoomState = (state: RoomState) => {
       setRoom(state);
+      // Belt-and-braces against a raced ack or a hash the user wiped.
+      // replaceState to an identical URL is a no-op, so this is cheap.
+      if (state.code) {
+        setLobbyCode(state.code);
+        writeLobbyCodeToUrl(state.code);
+      }
       setKnownItems((previous) => ({
         ...previous,
         ...Object.fromEntries(state.knownItems.map((item) => [item.id, item])),
@@ -227,19 +243,41 @@ export default function App() {
     e.preventDefault();
     playClick();
     setError(null);
-    socket.emit('join_room', { playerName: name }, (res) => {
+    setJoinErrorReason(null);
+    setJoining(true);
+    socket.emit('join_room', { playerName: name, code: pendingLobbyCode }, (res) => {
       if (res.ok) {
-        setJoined(true);
         setMyId(res.playerId);
-      } else {
-        setError(res.error);
+        setRoom(res.state);
+        setLobbyCode(res.code);
+        writeLobbyCodeToUrl(res.code);
+        setJoined(true);
+        return;
+      }
+
+      setJoining(false);
+      setJoinErrorReason(res.reason);
+      setError(res.error);
+      // A dead code shouldn't linger — retrying then just creates a fresh lobby.
+      if (res.reason === 'not_found' || res.reason === 'invalid_code') {
+        setPendingLobbyCode(null);
+        clearLobbyCodeFromUrl();
       }
     });
   };
 
+  // Bails out of a full lobby into a brand-new one of your own.
+  const handleStartOwnLobby = () => {
+    playClick();
+    setPendingLobbyCode(null);
+    clearLobbyCodeFromUrl();
+    setError(null);
+    setJoinErrorReason(null);
+  };
+
   const handleResetGame = () => {
     playClick();
-    if (window.confirm('Reset the game for everyone? This clears all progress.')) {
+    if (window.confirm('Reset this lobby for everyone? This clears all progress.')) {
       socket.emit('reset_game');
     }
   };
@@ -351,6 +389,12 @@ export default function App() {
 
   const myPlayer = room?.players.find((p) => p.id === myId);
   const isObserver = myPlayer?.isObserver ?? false;
+  // Derived, never mirrored into state: host migration then costs zero client
+  // logic — the server rebroadcasts room_state and the controls simply move.
+  const hostId = room?.hostId ?? null;
+  const isHost = !!myId && hostId === myId;
+  const hostName = room?.players.find((p) => p.id === hostId)?.name ?? null;
+  const inviteLink = useMemo(() => (lobbyCode ? buildInviteLink(lobbyCode) : null), [lobbyCode]);
   // A Spyglass reveals everyone's time/bids — the server already sends that
   // data once owned, this just decides whether the dock renders it.
   const hasSpyglass = myPlayer?.stash.some((id) => knownItems[id]?.templateId === 'spyglass') ?? false;
@@ -417,6 +461,7 @@ export default function App() {
                 </div>
               </div>
             )}
+            {p.id === hostId && <div className="host-badge">HOST</div>}
             <div className="name">
               {p.name}
               {isMe ? ' (you)' : p.isBot ? ' (bot)' : ''}
@@ -446,30 +491,35 @@ export default function App() {
         <Logo scale={5} />
         <div className="panel">
           <p className="status-line">{connected ? 'Connected to server' : 'Connecting…'}</p>
-          {room && room.status !== 'lobby' && (
-            <p className="status-line">A game is already in progress. You'll join as an observer.</p>
-          )}
+          <p className="status-line">
+            {pendingLobbyCode ? `Joining lobby ${pendingLobbyCode}` : 'A new lobby will be created for you.'}
+          </p>
           <form onSubmit={handleJoin}>
             <div className="field">
               <label htmlFor="name">Your name</label>
               <input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} />
             </div>
-            <button type="submit" className="btn btn-block" disabled={!connected}>
-              JOIN
+            <button type="submit" className="btn btn-block" disabled={!connected || joining || !name.trim()}>
+              {joining ? 'JOINING…' : 'JOIN'}
             </button>
           </form>
           {error && <p className="error-text">{error}</p>}
+          {joinErrorReason === 'room_full' && (
+            <button className="btn btn-block" style={{ marginTop: '0.75rem' }} onClick={handleStartOwnLobby}>
+              START A NEW LOBBY INSTEAD
+            </button>
+          )}
         </div>
       </main>
     );
   } else if (gameOverPlayers && scores) {
-    const ranked = [...scores].sort((a, b) => b.total - a.total);
+    const ranked = rankScores(scores, gameOverPlayers);
 
     screen = shellWithHeader(
       <div className="panel">
         <h2 className="panel-title">GAME OVER</h2>
         <ol className="results-list">
-          {ranked.map((s) => {
+          {ranked.map(({ score: s, rank, shared }) => {
             const player = gameOverPlayers.find((p) => p.id === s.playerId);
             const itemNames = (player?.stash ?? [])
               .map((id) => knownItems[id])
@@ -493,8 +543,9 @@ export default function App() {
                   {player && <PortraitIcon index={player.portraitIndex} size={40} />}
                   <div>
                     <div className="rank-total">
-                      {player?.name}
+                      {shared ? `T${rank}` : `#${rank}`} {player?.name}
                       {s.playerId === myId ? ' (you)' : ''}: ${s.total}
+                      {shared && <span className="tied-label"> (tied)</span>}
                     </div>
                     <div className="rank-breakdown">
                       base ${s.baseValue}
@@ -507,16 +558,22 @@ export default function App() {
             );
           })}
         </ol>
-        <button
-          className="btn btn-block"
-          style={{ marginTop: '1rem' }}
-          onClick={() => {
-            playClick();
-            socket.emit('restart_game');
-          }}
-        >
-          PLAY AGAIN
-        </button>
+        {isHost ? (
+          <button
+            className="btn btn-block"
+            style={{ marginTop: '1rem' }}
+            onClick={() => {
+              playClick();
+              socket.emit('restart_game');
+            }}
+          >
+            PLAY AGAIN
+          </button>
+        ) : (
+          <p className="status-line" style={{ marginTop: '1rem' }}>
+            Waiting for {hostName ?? 'the host'} to start another game…
+          </p>
+        )}
       </div>
     );
   } else if (!room) {
@@ -527,59 +584,24 @@ export default function App() {
     // rank, just wait for the next game.
     screen = shellWithHeader(<p className="status-line">A game just ended! Waiting for a new one to start.</p>);
   } else if (room.status === 'lobby') {
-    const botCount = room.players.filter((p) => p.isBot).length;
     screen = shellWithHeader(
-      <div className="panel">
-        <h2 className="panel-title">Lobby</h2>
-        <div className="round-limit-control">
-          <label htmlFor="round-limit">Rounds: {roundLimit}</label>
-          <input
-            id="round-limit"
-            type="range"
-            min="10"
-            max="25"
-            step="1"
-            value={roundLimit}
-            onChange={(event) => {
-              const maxRounds = Number(event.target.value);
-              setRoundLimit(maxRounds);
-              socket.emit('set_round_limit', { maxRounds });
-            }}
-          />
-          <div className="round-limit-labels"><span>10</span><span>25</span></div>
-        </div>
-        <button
-          className="btn btn-block"
-          onClick={() => {
-            playClick();
-            socket.emit('start_game');
-          }}
-        >
-          START GAME
-        </button>
-        <button
-          className="btn btn-block"
-          style={{ marginTop: '0.75rem' }}
-          disabled={botCount >= MAX_BOTS}
-          onClick={() => {
-            playClick();
-            socket.emit('add_bot');
-          }}
-        >
-          Add Bot ({botCount}/{MAX_BOTS})
-        </button>
-        <button
-          className="btn btn-block"
-          style={{ marginTop: '0.75rem' }}
-          disabled={botCount === 0}
-          onClick={() => {
-            playClick();
-            socket.emit('remove_bot');
-          }}
-        >
-          Remove Bot
-        </button>
-      </div>
+      <Lobby
+        lobbyCode={lobbyCode ?? room.code}
+        inviteLink={inviteLink}
+        isHost={isHost}
+        hostName={hostName}
+        playerCount={room.players.length}
+        maxPlayers={MAX_PLAYERS_PER_ROOM}
+        botCount={room.players.filter((p) => p.isBot).length}
+        roundLimit={roundLimit}
+        onRoundLimitChange={(maxRounds) => {
+          setRoundLimit(maxRounds);
+          socket.emit('set_round_limit', { maxRounds });
+        }}
+        onStartGame={() => socket.emit('start_game')}
+        onAddBot={() => socket.emit('add_bot')}
+        onRemoveBot={() => socket.emit('remove_bot')}
+      />
     );
   } else {
     screen = shellWithHeader(
@@ -659,9 +681,11 @@ export default function App() {
         />
       )}
       <BackgroundMusic ducked={currentRound !== null} muffled={!joined || room?.status === 'lobby'} />
-      <button className="dev-reset-button" onClick={handleResetGame}>
-        Reset Game
-      </button>
+      {isHost && (
+        <button className="dev-reset-button" onClick={handleResetGame}>
+          Reset Game
+        </button>
+      )}
       <div className="bottom-bar">
         {playerDock}
         <Chat messages={chatMessages} onSend={(text) => socket.emit('send_chat', { name: name || 'Guest', text })} />

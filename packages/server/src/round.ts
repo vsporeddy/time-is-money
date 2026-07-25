@@ -1,13 +1,9 @@
-import type { Server } from 'socket.io';
-import type { ClientToServerEvents, ItemTemplate, MaskedRoundItem, Player, Round, ServerToClientEvents, TimeRefundConfig } from 'shared';
+import type { ItemTemplate, MaskedRoundItem, Player, Round, TimeRefundConfig } from 'shared';
 import { cloneItemInstance, computeScores, getTemplate, ITEM_TEMPLATES, rollItemInstanceForTemplate, shuffle } from 'shared';
-import { emitRoomState, ownsItemTemplate, playerHasClass } from './rooms.js';
-import type { ActiveRound, Room } from './rooms.js';
+import { emitRoomState, humanPlayerIds, ownsItemTemplate, playerHasClass } from './rooms.js';
+import type { ActiveRound, IO, Room } from './rooms.js';
 import { scheduleBotEntries, scheduleBotReleases } from './bots.js';
 
-type IO = Server<ClientToServerEvents, ServerToClientEvents>;
-
-let roundCounter = 0;
 const SOLE_BIDDER_PRICE_MS = 5_000;
 const MODIFIER_REVEAL_INTERVAL_MS = 7_000;
 const INVESTOR_INTEREST_RATE = 0.03; // Investor: % of unspent time added at the end of every round
@@ -182,9 +178,9 @@ export function startRound(room: Room, io: IO) {
     bidders[p.id] = { isHolding: false, committedMs: 0, droppedAt: null };
   }
 
-  roundCounter += 1;
+  room.roundCounter += 1;
   const round: Round = {
-    id: `round-${roundCounter}`,
+    id: `round-${room.roundCounter}`,
     itemInstanceId: item.id,
     status: 'pending',
     initialBidDeadlineAt: null,
@@ -194,6 +190,7 @@ export function startRound(room: Room, io: IO) {
     revealedFields: [],
     winnerId: null,
     soleBidder: false,
+    stalematePlayerIds: [],
     restrictedBidderIds: null,
   };
 
@@ -263,20 +260,18 @@ function closeBidWindow(room: Room, io: IO) {
   }
   scheduleBotReleases(room, io, handleHoldRelease);
 
+  // Holding to the buzzer is a mutual failure, not a win for anyone: every
+  // holder started spending at the same instant, so there is nothing to
+  // separate them. The lot passes, they get their time back, and it counts as
+  // a loss for everyone who bid on it.
   ar.maxDurationTimer = setTimeout(() => {
     const stillHolding = Object.entries(ar.round.bidders).filter(([, bidder]) => bidder.isHolding);
     if (stillHolding.length === 0) return; // already resolved via checkResolution
 
-    const now = Date.now();
-    const [winnerId] = stillHolding.reduce((best, current) => {
-      const bestElapsed = now - (ar.holdStartedAt.get(best[0]) ?? now);
-      const currentElapsed = now - (ar.holdStartedAt.get(current[0]) ?? now);
-      return currentElapsed > bestElapsed ? current : best;
-    });
-    resolveRound(room, io, winnerId);
+    resolveRound(room, io, null, { stalemateIds: stillHolding.map(([playerId]) => playerId) });
   }, room.settings.maxRoundDurationMs);
 
-  io.emit('bid_window_closed', { roundId: ar.round.id, spendingStartedAt });
+  io.to(room.code).emit('bid_window_closed', { roundId: ar.round.id, spendingStartedAt });
   emitRoomState(room, io);
 }
 
@@ -363,9 +358,11 @@ function checkResolution(room: Room, io: IO, lastWithdrawerId: string | null = n
   }
 }
 
-function resolveRound(room: Room, io: IO, winnerId: string | null) {
+function resolveRound(room: Room, io: IO, winnerId: string | null, opts?: { stalemateIds: string[] }) {
   const ar = room.activeRound;
   if (!ar || ar.round.status === 'resolved') return;
+
+  const stalemateIds = new Set(opts?.stalemateIds ?? []);
 
   if (ar.noBidTimer) clearTimeout(ar.noBidTimer);
   if (ar.maxDurationTimer) clearTimeout(ar.maxDurationTimer);
@@ -386,6 +383,9 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
     if (!bidder || !player) continue;
 
     const rawElapsed = now - startedAt;
+    // What the clock could actually absorb — a player who ran out mid-hold was
+    // charged less than they held for, and a stalemate must not refund more.
+    const charged = Math.min(rawElapsed, player.timeRemainingMs);
 
     player.timeRemainingMs = Math.max(0, player.timeRemainingMs - rawElapsed);
     if (player.timeRemainingMs <= 0) {
@@ -398,16 +398,32 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
     bidder.droppedAt = now;
     ar.holdStartedAt.delete(playerId);
 
+    // Stalemate: hand back exactly what the buzzer cost them.
+    if (stalemateIds.has(playerId) && charged > 0) {
+      player.timeRemainingMs += charged;
+      if (player.timeRemainingMs > 0) player.status = 'active';
+    }
   }
 
   ar.round.status = 'resolved';
   ar.round.winnerId = winnerId;
   ar.round.soleBidder = winnerId !== null && bidderCount === 1;
+  ar.round.stalematePlayerIds = [...stalemateIds];
+
+  // A stalemate counts as a loss for everyone who bid on the lot, so nobody's
+  // streak survives it — unlike a lot that simply went unbid.
+  if (stalemateIds.size > 0) {
+    for (const playerId of Object.keys(ar.round.bidders)) {
+      const player = room.players.get(playerId);
+      if (player) player.winStreak = 0;
+    }
+  }
 
   if (winnerId) {
     // Win streaks (Gambler): a sold lot extends the winner's streak and
-    // resets everyone else who was eligible this round. A passed lot (no
-    // winner) leaves every streak untouched — nothing was won away from anyone.
+    // resets everyone else who was eligible this round. A lot that simply went
+    // unbid leaves every streak untouched — nothing was won away from anyone.
+    // (A stalemate does break them; that's handled above.)
     for (const playerId of Object.keys(ar.round.bidders)) {
       const player = room.players.get(playerId);
       if (!player) continue;
@@ -468,13 +484,17 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
   // Chronomancer's Hourglass: anyone who spent time on this lot and didn't
   // win it gets that time back in full. Insurer is the same idea as a
   // passive class ability, but only a partial refund — the two don't stack.
+  // Stalemate holders were already made whole above, so the Hourglass has
+  // nothing left to give them; the Insurer still pays out on top, coming out
+  // of the stalemate ahead. Anyone who folded earlier in the round is a normal
+  // loser and gets the normal treatment either way.
   for (const [playerId, bidder] of Object.entries(ar.round.bidders)) {
     if (playerId === winnerId || bidder.droppedAt === null || bidder.committedMs <= 0) continue;
 
     const loser = room.players.get(playerId);
     if (!loser) continue;
 
-    if (ownsItemTemplate(room, playerId, 'chronomancers-hourglass')) {
+    if (ownsItemTemplate(room, playerId, 'chronomancers-hourglass') && !stalemateIds.has(playerId)) {
       loser.timeRemainingMs += bidder.committedMs;
     } else if (loser.classId === 'insurer') {
       loser.timeRemainingMs += Math.round(bidder.committedMs * INSURER_REFUND_RATE);
@@ -490,7 +510,7 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
     player.timeRemainingMs += Math.round(player.timeRemainingMs * INVESTOR_INTEREST_RATE);
   }
 
-  io.emit('round_end', { round: publicRoundResult(ar.round), item: ar.item });
+  io.to(room.code).emit('round_end', { round: publicRoundResult(ar.round), item: ar.item });
   emitRoomState(room, io);
 
   ar.interRoundTimer = setTimeout(() => {
@@ -511,7 +531,7 @@ function finishGame(room: Room, io: IO) {
 
   const players = [...room.players.values()].filter((p) => !p.isObserver);
   const scores = computeScores(players, room.wonItems, room.itemPricePaidMs);
-  io.emit('game_over', { players, scores });
+  io.to(room.code).emit('game_over', { players, scores });
 }
 
 // Clears round/round-timers/status back to a fresh lobby. Also promotes any
@@ -563,9 +583,9 @@ export function forceResetGame(room: Room, io: IO) {
 // Sends the winner's amount to whoever is entitled to see it: the withdrawer
 // themself, plus anyone currently holding a Spyglass.
 function emitBidderDropped(room: Room, io: IO, payload: { roundId: string; playerId: string; committedMs: number }) {
-  for (const socketId of io.sockets.sockets.keys()) {
-    if (socketId === payload.playerId || ownsItemTemplate(room, socketId, 'spyglass')) {
-      io.to(socketId).emit('bidder_dropped', payload);
+  for (const viewerId of humanPlayerIds(room)) {
+    if (viewerId === payload.playerId || ownsItemTemplate(room, viewerId, 'spyglass')) {
+      io.to(viewerId).emit('bidder_dropped', payload);
     }
   }
 }
@@ -703,7 +723,7 @@ export function useWeapon(
             b.droppedAt = null;
             io.to(pid).emit('bidder_cancelled', { roundId: ar!.round.id, playerId: pid });
           }
-          io.emit('bid_restricted', { roundId: ar!.round.id, allowedPlayerIds: [...allowed] });
+          io.to(room.code).emit('bid_restricted', { roundId: ar!.round.id, allowedPlayerIds: [...allowed] });
         }
       }
       break;
@@ -767,8 +787,8 @@ function maskedItemForSocket(room: Room, ar: ActiveRound, socketId: string): Mas
 function emitRoundStart(room: Room, io: IO) {
   const ar = room.activeRound;
   if (!ar) return;
-  for (const socketId of io.sockets.sockets.keys()) {
-    io.to(socketId).emit('round_start', { round: ar.round, item: maskedItemForSocket(room, ar, socketId) });
+  for (const viewerId of humanPlayerIds(room)) {
+    io.to(viewerId).emit('round_start', { round: ar.round, item: maskedItemForSocket(room, ar, viewerId) });
   }
 }
 
@@ -793,8 +813,8 @@ function transformLot(room: Room, io: IO, ar: ActiveRound): boolean {
   for (const timer of ar.modifierRevealTimers) clearTimeout(timer);
   ar.modifierRevealTimers = [];
 
-  for (const socketId of io.sockets.sockets.keys()) {
-    io.to(socketId).emit('lot_transformed', { roundId: ar.round.id, item: maskedItemForSocket(room, ar, socketId) });
+  for (const viewerId of humanPlayerIds(room)) {
+    io.to(viewerId).emit('lot_transformed', { roundId: ar.round.id, item: maskedItemForSocket(room, ar, viewerId) });
   }
   scheduleModifierReveals(room, io);
   return true;
@@ -815,7 +835,7 @@ function scheduleModifierReveals(room: Room, io: IO) {
     const reveal = () => {
       if (room.activeRound !== ar) return;
       ar.round.revealedFields.push(field);
-      io.emit('reveal', { roundId: ar.round.id, field, value });
+      io.to(room.code).emit('reveal', { roundId: ar.round.id, field, value });
     };
 
     if (index === 0) reveal();
@@ -828,8 +848,10 @@ function scheduleModifierReveals(room: Room, io: IO) {
 function publicRoundResult(round: Round): Round {
   const bidders: Round['bidders'] = {};
   for (const [playerId, bidder] of Object.entries(round.bidders)) {
+    // Stalemate holders are revealed alongside the winner — they've been
+    // refunded, so there's nothing left to keep secret about what they held.
     bidders[playerId] =
-      playerId === round.winnerId
+      playerId === round.winnerId || round.stalematePlayerIds.includes(playerId)
         ? { ...bidder }
         : { isHolding: false, committedMs: 0, droppedAt: null };
   }
@@ -871,13 +893,13 @@ export function tickRoom(room: Room, io: IO) {
 
   // A player sees only their own live clock and spend, unless they hold a
   // Spyglass — that reveals everyone's.
-  for (const socketId of io.sockets.sockets.keys()) {
-    const hasSpyglass = ownsItemTemplate(room, socketId, 'spyglass');
-    const ownTime = players[socketId];
-    const ownBid = bidders[socketId];
-    io.to(socketId).emit('round_tick', {
-      players: hasSpyglass ? players : ownTime === undefined ? {} : { [socketId]: ownTime },
-      bidders: hasSpyglass ? bidders : ownBid === undefined ? {} : { [socketId]: ownBid },
+  for (const viewerId of humanPlayerIds(room)) {
+    const hasSpyglass = ownsItemTemplate(room, viewerId, 'spyglass');
+    const ownTime = players[viewerId];
+    const ownBid = bidders[viewerId];
+    io.to(viewerId).emit('round_tick', {
+      players: hasSpyglass ? players : ownTime === undefined ? {} : { [viewerId]: ownTime },
+      bidders: hasSpyglass ? bidders : ownBid === undefined ? {} : { [viewerId]: ownBid },
       holding,
     });
   }
