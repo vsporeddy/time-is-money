@@ -38,7 +38,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   refundOnFold: false,
   pendingDurationMs: 3_000,
   noBidTimeoutMs: 4_000,
-  maxRoundDurationMs: 45_000,
+  maxRoundDurationMs: 60_000,
   interRoundDelayMs: 4_000,
   maxRounds: ROUND_LIMIT_ENABLED ? ROUND_LIMIT : null,
 };

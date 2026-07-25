@@ -165,6 +165,7 @@ export function startRound(room: Room, io: IO) {
     revealedFields: [],
     winnerId: null,
     soleBidder: false,
+    stalematePlayerIds: [],
     restrictedBidderIds: null,
   };
 
@@ -234,17 +235,15 @@ function closeBidWindow(room: Room, io: IO) {
   }
   scheduleBotReleases(room, io, handleHoldRelease);
 
+  // Holding to the buzzer is a mutual failure, not a win for anyone: every
+  // holder started spending at the same instant, so there is nothing to
+  // separate them. The lot passes, they get their time back, and it counts as
+  // a loss for everyone who bid on it.
   ar.maxDurationTimer = setTimeout(() => {
     const stillHolding = Object.entries(ar.round.bidders).filter(([, bidder]) => bidder.isHolding);
     if (stillHolding.length === 0) return; // already resolved via checkResolution
 
-    const now = Date.now();
-    const [winnerId] = stillHolding.reduce((best, current) => {
-      const bestElapsed = now - (ar.holdStartedAt.get(best[0]) ?? now);
-      const currentElapsed = now - (ar.holdStartedAt.get(current[0]) ?? now);
-      return currentElapsed > bestElapsed ? current : best;
-    });
-    resolveRound(room, io, winnerId);
+    resolveRound(room, io, null, { stalemateIds: stillHolding.map(([playerId]) => playerId) });
   }, room.settings.maxRoundDurationMs);
 
   io.emit('bid_window_closed', { roundId: ar.round.id, spendingStartedAt });
@@ -334,9 +333,11 @@ function checkResolution(room: Room, io: IO, lastWithdrawerId: string | null = n
   }
 }
 
-function resolveRound(room: Room, io: IO, winnerId: string | null) {
+function resolveRound(room: Room, io: IO, winnerId: string | null, opts?: { stalemateIds: string[] }) {
   const ar = room.activeRound;
   if (!ar || ar.round.status === 'resolved') return;
+
+  const stalemateIds = new Set(opts?.stalemateIds ?? []);
 
   if (ar.noBidTimer) clearTimeout(ar.noBidTimer);
   if (ar.maxDurationTimer) clearTimeout(ar.maxDurationTimer);
@@ -357,6 +358,9 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
     if (!bidder || !player) continue;
 
     const rawElapsed = now - startedAt;
+    // What the clock could actually absorb — a player who ran out mid-hold was
+    // charged less than they held for, and a stalemate must not refund more.
+    const charged = Math.min(rawElapsed, player.timeRemainingMs);
 
     player.timeRemainingMs = Math.max(0, player.timeRemainingMs - rawElapsed);
     if (player.timeRemainingMs <= 0) {
@@ -369,16 +373,32 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
     bidder.droppedAt = now;
     ar.holdStartedAt.delete(playerId);
 
+    // Stalemate: hand back exactly what the buzzer cost them.
+    if (stalemateIds.has(playerId) && charged > 0) {
+      player.timeRemainingMs += charged;
+      if (player.timeRemainingMs > 0) player.status = 'active';
+    }
   }
 
   ar.round.status = 'resolved';
   ar.round.winnerId = winnerId;
   ar.round.soleBidder = winnerId !== null && bidderCount === 1;
+  ar.round.stalematePlayerIds = [...stalemateIds];
+
+  // A stalemate counts as a loss for everyone who bid on the lot, so nobody's
+  // streak survives it — unlike a lot that simply went unbid.
+  if (stalemateIds.size > 0) {
+    for (const playerId of Object.keys(ar.round.bidders)) {
+      const player = room.players.get(playerId);
+      if (player) player.winStreak = 0;
+    }
+  }
 
   if (winnerId) {
     // Win streaks (Gambler): a sold lot extends the winner's streak and
-    // resets everyone else who was eligible this round. A passed lot (no
-    // winner) leaves every streak untouched — nothing was won away from anyone.
+    // resets everyone else who was eligible this round. A lot that simply went
+    // unbid leaves every streak untouched — nothing was won away from anyone.
+    // (A stalemate does break them; that's handled above.)
     for (const playerId of Object.keys(ar.round.bidders)) {
       const player = room.players.get(playerId);
       if (!player) continue;
@@ -439,13 +459,17 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
   // Chronomancer's Hourglass: anyone who spent time on this lot and didn't
   // win it gets that time back in full. Insurer is the same idea as a
   // passive class ability, but only a partial refund — the two don't stack.
+  // Stalemate holders were already made whole above, so the Hourglass has
+  // nothing left to give them; the Insurer still pays out on top, coming out
+  // of the stalemate ahead. Anyone who folded earlier in the round is a normal
+  // loser and gets the normal treatment either way.
   for (const [playerId, bidder] of Object.entries(ar.round.bidders)) {
     if (playerId === winnerId || bidder.droppedAt === null || bidder.committedMs <= 0) continue;
 
     const loser = room.players.get(playerId);
     if (!loser) continue;
 
-    if (ownsItemTemplate(room, playerId, 'chronomancers-hourglass')) {
+    if (ownsItemTemplate(room, playerId, 'chronomancers-hourglass') && !stalemateIds.has(playerId)) {
       loser.timeRemainingMs += bidder.committedMs;
     } else if (loser.classId === 'insurer') {
       loser.timeRemainingMs += Math.round(bidder.committedMs * INSURER_REFUND_RATE);
@@ -799,8 +823,10 @@ function scheduleModifierReveals(room: Room, io: IO) {
 function publicRoundResult(round: Round): Round {
   const bidders: Round['bidders'] = {};
   for (const [playerId, bidder] of Object.entries(round.bidders)) {
+    // Stalemate holders are revealed alongside the winner — they've been
+    // refunded, so there's nothing left to keep secret about what they held.
     bidders[playerId] =
-      playerId === round.winnerId
+      playerId === round.winnerId || round.stalematePlayerIds.includes(playerId)
         ? { ...bidder }
         : { isHolding: false, committedMs: 0, droppedAt: null };
   }

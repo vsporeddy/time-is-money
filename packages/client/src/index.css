@@ -1276,6 +1276,11 @@ input[type='text']:focus {
   font-size: 0.95rem;
 }
 
+.results-item .tied-label {
+  color: var(--text-dim);
+  font-size: 0.65rem;
+}
+
 .results-item .rank-breakdown {
   color: var(--text-dim);
   font-size: 0.65rem;

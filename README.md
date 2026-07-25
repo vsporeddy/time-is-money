@@ -8,6 +8,7 @@ A browser-based multiplayer party game built for a game jam (theme: **COUNT DOWN
 - Each round, an item comes up for auction. Its true dollar value is hidden — you only see its material/rarity flavor and its traits until it sells.
 - During each auction's 6-second opt-in window, click **Bid** to join without spending time, or **Cancel Bid** to change your mind and bid again later in the same window. When it closes, every opted-in player's time ticks down live. Click **Withdraw** to bail out — but time you've already spent is gone either way (sunk cost).
 - The final active bidder to withdraw wins the lot and pays for however long they held. If nobody remains opted in when the opening window closes, the item goes unclaimed.
+- Holding past the lot's max duration is a **stalemate**: nobody wins it, everyone still holding gets their time back, and it counts as a loss for every bidder (streaks break, Insurer still pays out).
 - Some items have special behavior, all visible as tags on the item card before you bid:
   - **Investment** — scores higher the longer you held to win it.
   - **Bargain** — scores higher the *cheaper* you win it (rewards sniping uncontested lots).
@@ -16,7 +17,7 @@ A browser-based multiplayer party game built for a game jam (theme: **COUNT DOWN
   - **Solitaire** — bonus if it's the only copy of that item in your stash.
 - Items also carry category traits (Weapon, Armor, Musical, etc., some nested — a Sword counts for both "Sword" and "Weapon") that pay out a bonus once you own enough of a kind, TFT-trait style. A couple of hidden traits (Windfall/Flawed/Sleeper) can roll on any item and are only revealed once it sells.
 - Owning multiple exact copies of the same item has diminishing returns, so trait-hunting across different items beats hoarding one thing.
-- Game ends once every player is out of time; final ranking is base item value + all bonuses, shown with a full breakdown.
+- Game ends once every player is out of time; final ranking is base item value + all bonuses, shown with a full breakdown. Equal totals are broken by the smaller stash first (same money from fewer lots is the better collection), then by time left over; anything still level is a genuine shared rank.
 - By default, the game also ends after 10 resolved lots. Set `ROUND_LIMIT_ENABLED` to `false` in `packages/server/src/rooms.ts` for unlimited rounds.
 - Joining after a game has already started makes you an **Observer** (visible in the player list, can't bid) instead of being locked out — see "Known rough edges" below for why that matters.
 

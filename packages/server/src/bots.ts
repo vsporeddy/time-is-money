@@ -16,8 +16,8 @@ const BOT_NAMES = [
 let botCounter = 0;
 
 function pickBotName(room: Room): string {
-  const taken = new Set([...room.players.values()].filter((p) => p.isBot).map((p) => p.name));
-  const available = BOT_NAMES.filter((name) => !taken.has(name));
+  const taken = new Set([...room.players.values()].map((p) => p.name.toLowerCase()));
+  const available = BOT_NAMES.filter((name) => !taken.has(name.toLowerCase()));
   const pool = available.length > 0 ? available : BOT_NAMES;
   return pool[Math.floor(Math.random() * pool.length)];
 }

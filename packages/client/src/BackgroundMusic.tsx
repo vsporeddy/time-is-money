@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { loadAudioSettings, saveAudioSettings } from './audioSettings';
 import { setSfxEnabled } from './sound';
 
 const MUSIC_SRC = `${import.meta.env.BASE_URL}sounds/music/menu.mp3`;
@@ -19,12 +20,12 @@ export function BackgroundMusic({ ducked, muffled }: BackgroundMusicProps) {
   const ctxRef = useRef<AudioContext | null>(null);
   const gainRef = useRef<GainNode | null>(null);
   const filterRef = useRef<BiquadFilterNode | null>(null);
-  const [muted, setMuted] = useState(false);
-  const [sfxEnabled, setSfxEnabledState] = useState(true);
+  const [audioSettings, setAudioSettings] = useState(loadAudioSettings);
 
   useEffect(() => {
     const audio = new Audio(MUSIC_SRC);
     audio.loop = true;
+    audio.muted = !audioSettings.musicEnabled;
     audioRef.current = audio;
 
     // Routed through a filter (muffled in menus) and a gain node (ducked
@@ -85,14 +86,19 @@ export function BackgroundMusic({ ducked, muffled }: BackgroundMusicProps) {
     const audio = audioRef.current;
     if (!audio) return;
     audio.muted = !audio.muted;
-    setMuted(audio.muted);
+    setAudioSettings((settings) => {
+      const nextSettings = { ...settings, musicEnabled: !audio.muted };
+      saveAudioSettings(nextSettings);
+      return nextSettings;
+    });
   };
 
   const toggleSfx = () => {
-    setSfxEnabledState((enabled) => {
-      const nextEnabled = !enabled;
-      setSfxEnabled(nextEnabled);
-      return nextEnabled;
+    setAudioSettings((settings) => {
+      const nextSettings = { ...settings, sfxEnabled: !settings.sfxEnabled };
+      setSfxEnabled(nextSettings.sfxEnabled);
+      saveAudioSettings(nextSettings);
+      return nextSettings;
     });
   };
 
@@ -116,7 +122,7 @@ export function BackgroundMusic({ ducked, muffled }: BackgroundMusicProps) {
           </span>
           <span className="how-to-play-row">
             <img src={`${HELP_MEDIA_SRC}bid-finish.gif`} alt="Auction finish" />
-            <span>The last bidder remaining wins the item. A sole bidder will automatically win  with a 5s bid.</span>
+            <span>The last bidder remaining wins the item. A sole bidder will automatically win  with a 5s bid. If everyone holds until time runs out, it's a stalemate — nobody wins and the time spent is refunded.</span>
           </span>
           <span className="how-to-play-row">
             <img src={`${HELP_MEDIA_SRC}hover.gif`} alt="Hovering item details" />
@@ -124,15 +130,15 @@ export function BackgroundMusic({ ducked, muffled }: BackgroundMusicProps) {
           </span>
           <span className="how-to-play-row">
             <img className="how-to-play-items-media" src={`${HELP_MEDIA_SRC}items.gif`} alt="Item inventory" />
-            <span>Collect valuable items and complete sets. Your base item values, item effects, and set bonuses will determine your collection's final value. The player with the most valuable collection is the winner!</span>
+            <span>Collect valuable items and complete sets. Your base item values, item effects, and set bonuses will determine your collection's final value. The player with the most valuable collection is the winner! On a tie, the smaller collection wins, then whoever has the most time left.</span>
           </span>
         </span>
       </button>
       <button type="button" className="music-toggle" onClick={toggleMute}>
-        {muted ? 'Music: Off' : 'Music: On'}
+        {audioSettings.musicEnabled ? 'Music: On' : 'Music: Off'}
       </button>
       <button type="button" className="sfx-toggle" onClick={toggleSfx}>
-        {sfxEnabled ? 'SFX: On' : 'SFX: Off'}
+        {audioSettings.sfxEnabled ? 'SFX: On' : 'SFX: Off'}
       </button>
     </div>
   );

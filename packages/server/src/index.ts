@@ -48,6 +48,15 @@ io.on('connection', (socket) => {
 
     const room = getRoom();
 
+    const normalizedName = name.toLowerCase();
+    const isNameTaken = [...room.players.values()].some(
+      (player) => player.name.toLowerCase() === normalizedName
+    );
+    if (isNameTaken) {
+      ack({ ok: false, error: 'That name is already taken!' });
+      return;
+    }
+
     const classId = pickAvailableClassId([...room.players.values()].map((p) => p.classId));
     if (!classId) {
       ack({ ok: false, error: 'The game is full — every class is already taken.' });
