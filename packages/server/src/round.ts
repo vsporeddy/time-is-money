@@ -126,7 +126,9 @@ export function startGame(room: Room, io: IO) {
 }
 
 export function startRound(room: Room, io: IO) {
-  const eligible = [...room.players.values()].filter((p) => p.status === 'active' && !p.isObserver);
+  const eligible = [...room.players.values()].filter(
+    (p) => p.status === 'active' && p.timeRemainingMs > 0 && !p.isObserver
+  );
 
   if (eligible.length === 0) {
     finishGame(room, io);
@@ -399,7 +401,7 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
       // The bid was initially charged at raw time. Refund or charge the
       // difference for Fair Trade and the fixed uncontested price.
       winner.timeRemainingMs = Math.max(0, winner.timeRemainingMs + rawPrice - paidPrice);
-      if (winner.timeRemainingMs > 0 && winner.status === 'out_of_time') winner.status = 'active';
+      winner.status = winner.timeRemainingMs > 0 ? 'active' : 'out_of_time';
       if (winnerBidder) winnerBidder.committedMs = paidPrice;
       room.itemPricePaidMs.set(ar.item.id, paidPrice);
 
@@ -465,7 +467,9 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
   ar.interRoundTimer = setTimeout(() => {
     room.activeRound = null;
     const reachedRoundLimit = room.currentRoundIndex + 1 >= room.roundsToPlay;
-    const stillPlaying = [...room.players.values()].some((p) => p.status === 'active');
+    const stillPlaying = [...room.players.values()].some(
+      (p) => p.status === 'active' && p.timeRemainingMs > 0 && !p.isObserver
+    );
     if (!reachedRoundLimit && stillPlaying) startRound(room, io);
     else finishGame(room, io);
   }, room.settings.interRoundDelayMs);

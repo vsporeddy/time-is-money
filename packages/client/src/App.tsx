@@ -13,6 +13,7 @@ import { ItemTargetPicker } from './ItemTargetPicker';
 import { PlayerPicker } from './PlayerPicker';
 import { LotPool } from './LotPool';
 import { playChatDing, playClick, playLose, playWin } from './sound';
+import { useViewportTooltips } from './useViewportTooltips';
 
 interface CurrentRound {
   round: Round;
@@ -25,6 +26,8 @@ interface LastResult {
 }
 
 export default function App() {
+  useViewportTooltips();
+
   const [connected, setConnected] = useState(false);
   const [joined, setJoined] = useState(false);
   const [myId, setMyId] = useState<string | null>(null);
