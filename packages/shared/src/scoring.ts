@@ -8,12 +8,13 @@ const BARGAIN_CAP_SECONDS = 5;
 const BARGAIN_RATE_PER_SEC = 8;
 const CONTRABAND_WEAPON_MULTIPLIER = 2;
 
-// Antiquarian/Smuggler: class-gated set bonuses for trait categories that get
+// Jeweller/Smuggler: class-gated set bonuses for trait categories that get
 // no bonus otherwise (trinket is explicitly noSetBonus; weapon isn't even a
 // TraitDefinition) — same shape as TraitTier, just applied outside the
 // TRAIT_DEFINITIONS loop since they're conditional on the owner's class.
-const ANTIQUARIAN_TRINKET_TIERS: TraitTier[] = [{ count: 2, bonus: 10 }, { count: 4, bonus: 25 }, { count: 6, bonus: 45 }];
+const JEWELLER_TRINKET_TIERS: TraitTier[] = [{ count: 2, bonus: 10 }, { count: 4, bonus: 25 }, { count: 6, bonus: 45 }];
 const SMUGGLER_WEAPON_TIERS: TraitTier[] = [{ count: 2, bonus: 10 }, { count: 4, bonus: 25 }];
+const HOARDER_BONUS_PER_ITEM = 3; // Hoarder: flat bonus per item owned, regardless of value — rewards volume over quality
 
 const RARITY_MULTIPLIERS: Record<string, number> = {
   Common: 1,
@@ -56,10 +57,10 @@ export function getItemValueMultiplier(item: ItemInstance): number {
 // on the 2nd+ copy — the first copy is always full value. Doesn't touch
 // trait counting — a stash of different swords still gets full value and
 // full "Sword"/"Weapon" credit, only literal duplicates are discouraged.
-function diminishingMultiplier(copyIndex: number, softened: boolean): number {
+function diminishingMultiplier(copyIndex: number): number {
   if (copyIndex <= 0) return 1;
-  if (copyIndex === 1) return softened ? 0.95 : 0.85;
-  return softened ? 0.85 : 0.7;
+  if (copyIndex === 1) return 0.85;
+  return 0.7;
 }
 
 export function computeScores(
@@ -92,11 +93,11 @@ export function computeScores(
       }
     }
 
-    // Antiquarian/Smuggler: same tier-lookup shape as TRAIT_DEFINITIONS above,
+    // Jeweller/Smuggler: same tier-lookup shape as TRAIT_DEFINITIONS above,
     // but gated to the owner's class instead of being universal.
-    if (player.classId === 'antiquarian') {
+    if (player.classId === 'jeweller') {
       const count = items.filter((i) => getTemplate(i.templateId)?.traits.includes('trinket')).length;
-      const tier = [...ANTIQUARIAN_TRINKET_TIERS].reverse().find((t) => count >= t.count);
+      const tier = [...JEWELLER_TRINKET_TIERS].reverse().find((t) => count >= t.count);
       if (tier) traitBonuses.push({ traitId: 'trinket', count, bonus: tier.bonus });
     }
     if (player.classId === 'smuggler') {
@@ -109,6 +110,7 @@ export function computeScores(
     let hiddenTraitBonus = 0;
     let scoreScalingBonus = 0;
     const solitaireBonus = items.filter((item) => item.solitaire).length === 1 ? 20 : 0;
+    const hoarderBonus = player.classId === 'hoarder' ? items.length * HOARDER_BONUS_PER_ITEM : 0;
     const hasContrabandPermit = items.some((item) => getTemplate(item.templateId)?.effectType === 'weaponMultiplier');
     const armorMultiplier = activeTraitTiers.get('armor')?.strongestMatchingItemMultiplier ?? 1;
     const strongestArmorItemId = armorMultiplier > 1
@@ -144,7 +146,7 @@ export function computeScores(
       const strongestArmorMultiplier = item.id === strongestArmorItemId ? armorMultiplier : 1;
       baseValue +=
         item.trueValue *
-        diminishingMultiplier(copyIndex, player.classId === 'hoarder') *
+        diminishingMultiplier(copyIndex) *
         getRarityValueMultiplier(item.rarity) *
         getMaterialValueMultiplier(item.material) *
         specialMultiplier *
@@ -167,7 +169,7 @@ export function computeScores(
     }
 
     const traitBonusTotal = traitBonuses.reduce((sum, t) => sum + t.bonus, 0);
-    const total = baseValue + hiddenTraitBonus + scoreScalingBonus + solitaireBonus + traitBonusTotal;
+    const total = baseValue + hiddenTraitBonus + scoreScalingBonus + solitaireBonus + hoarderBonus + traitBonusTotal;
 
     return {
       playerId: player.id,
@@ -175,6 +177,7 @@ export function computeScores(
       hiddenTraitBonus,
       scoreScalingBonus: Math.round(scoreScalingBonus),
       solitaireBonus,
+      hoarderBonus,
       traitBonuses,
       total: Math.round(total),
     };

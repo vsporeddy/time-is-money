@@ -1,5 +1,5 @@
 import type { ItemInstance, ItemTemplate, Player, ScoreBreakdown } from 'shared';
-import { getClassDefinition, getHiddenTrait, getMaterialValueMultiplier, getRarityValueMultiplier, getSpecialModifierValueMultiplier, getTemplate, getTraitDefinition, TRAIT_DEFINITIONS } from 'shared';
+import { getHiddenTrait, getMaterialValueMultiplier, getRarityValueMultiplier, getSpecialModifierValueMultiplier, getTemplate, getTraitDefinition, TRAIT_DEFINITIONS } from 'shared';
 import { SpriteIcon } from './SpriteIcon';
 import { getGlowFilter, getGlowIntensity, getItemGlowCategory, getTraitLabelColor } from './itemVisuals';
 
@@ -133,7 +133,6 @@ function modifiedItemValue(item: ItemInstance): number {
 export function Inventory({ player, items, score, side, showValue = true, onClose, onUseItem, roundPhase = null }: InventoryProps) {
   const ownedItems = player.stash.map((id) => items[id]).filter((item): item is ItemInstance => Boolean(item));
   const stash = ownedItems.slice(0, INVENTORY_SIZE);
-  const classDef = getClassDefinition(player.classId);
   const cursedSetActive = score?.traitBonuses.some((trait) => trait.traitId === 'cursed' && trait.multiplier === 1.25) ?? false;
   const traitProgress: TraitProgress[] = TRAIT_DEFINITIONS.map<TraitProgress | null>((trait) => {
     const count = trait.materialMatch
@@ -157,6 +156,7 @@ export function Inventory({ player, items, score, side, showValue = true, onClos
         score.hiddenTraitBonus !== 0 && { text: `Finds: ${score.hiddenTraitBonus >= 0 ? '+' : ''}$${score.hiddenTraitBonus}` },
         score.scoreScalingBonus !== 0 && { text: `Item effects: +$${score.scoreScalingBonus}`, className: 'item-effect-label' },
         score.solitaireBonus !== 0 && { text: `Solitaire bonuses: +$${score.solitaireBonus}` },
+        score.hoarderBonus !== 0 && { text: `Hoarder bonus: +$${score.hoarderBonus}`, className: 'item-effect-label' },
         ...score.traitBonuses.map((trait) => {
           const definition = getTraitDefinition(trait.traitId);
           const reachedTierIndex = definition?.tiers.reduce((highest, tier, index) => (trait.count >= tier.count ? index : highest), -1) ?? -1;
@@ -171,19 +171,7 @@ export function Inventory({ player, items, score, side, showValue = true, onClos
   return (
     <aside className={`inventory-panel inventory-panel-${side}`} aria-label={`${player.name}'s inventory`}>
       <div className="inventory-heading">
-        <div>
-          <h2>{side === 'left' ? 'YOUR INVENTORY' : `${player.name.toUpperCase()}'S INVENTORY`}</h2>
-          {classDef && (
-            <div className="class-badge" tabIndex={0}>
-              {classDef.name}
-              {classDef.id === 'gambler' && player.winStreak > 0 ? ` (streak ${player.winStreak})` : ''}
-              <div className="inventory-tooltip class-badge-tooltip">
-                <b>{classDef.name.toUpperCase()}</b>
-                <span>{classDef.description}</span>
-              </div>
-            </div>
-          )}
-        </div>
+        <h2>{side === 'left' ? 'YOUR INVENTORY' : `${player.name.toUpperCase()}'S INVENTORY`}</h2>
         <div className="inventory-heading-actions">
           {showValue && (
             <div className="inventory-total" tabIndex={0}>

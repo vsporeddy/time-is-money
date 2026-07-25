@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import type { ChatMessage, ItemInstance, MaskedRoundItem, Player, Round, RoomState, ScoreBreakdown } from 'shared';
-import { MAX_BOTS, computeScores, getTemplate, getTraitDefinition } from 'shared';
+import { MAX_BOTS, computeScores, getClassDefinition, getTemplate, getTraitDefinition } from 'shared';
 import { socket } from './socket';
 import { Logo } from './Logo';
 import { Game } from './Game';
@@ -386,6 +386,7 @@ export default function App() {
         const isCurrentlyHolding = liveBids[p.id] !== undefined;
         const dropped = (isMe || hasSpyglass) && droppedThisRound[p.id] !== undefined;
         const time = liveTimes[p.id] ?? p.timeRemainingMs;
+        const classDef = getClassDefinition(p.classId);
         const classes = ['player-card', isMe && 'me', holding && 'holding', dropped && 'dropped']
           .filter(Boolean)
           .join(' ');
@@ -403,6 +404,16 @@ export default function App() {
             >
               <PortraitIcon index={p.portraitIndex} />
             </button>
+            {classDef && (
+              <div className="player-class-badge" style={{ color: classDef.color, borderColor: classDef.color }} tabIndex={0}>
+                {classDef.name}
+                {classDef.id === 'gambler' && p.winStreak > 0 ? ` (${p.winStreak})` : ''}
+                <div className="inventory-tooltip player-class-tooltip">
+                  <b style={{ color: classDef.color }}>{classDef.name.toUpperCase()}</b>
+                  <span>{classDef.description}</span>
+                </div>
+              </div>
+            )}
             <div className="name">
               {p.name}
               {isMe ? ' (you)' : p.isBot ? ' (bot)' : ''}
@@ -466,6 +477,7 @@ export default function App() {
             if (s.hiddenTraitBonus !== 0) extras.push(`hidden ${s.hiddenTraitBonus >= 0 ? '+' : ''}${s.hiddenTraitBonus}`);
             if (s.scoreScalingBonus !== 0) extras.push(`scaling +${s.scoreScalingBonus}`);
             if (s.solitaireBonus !== 0) extras.push(`solitaire +${s.solitaireBonus}`);
+            if (s.hoarderBonus !== 0) extras.push(`hoarder +${s.hoarderBonus}`);
             for (const t of s.traitBonuses) {
               extras.push(
                 `${getTraitDefinition(t.traitId)?.name ?? t.traitId} x${t.count} ${t.multiplier ? `×${t.multiplier}` : `+${t.bonus}`}`

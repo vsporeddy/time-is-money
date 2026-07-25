@@ -185,6 +185,7 @@ export interface ScoreBreakdown {
   hiddenTraitBonus: number;
   scoreScalingBonus: number; // investment/bargain, from price paid
   solitaireBonus: number;
+  hoarderBonus: number; // Hoarder: flat bonus per item owned
   traitBonuses: { traitId: string; count: number; bonus: number; multiplier?: number }[];
   total: number;
 }
