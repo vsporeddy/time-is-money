@@ -29,6 +29,7 @@ export const TRAIT_DEFINITIONS: TraitDefinition[] = [
   { id: 'food', name: 'Food', iconSpriteId: '224', tiers: [{ count: 2, bonus: 0, bonusPerMatchingItem: 10 }, { count: 3, bonus: 0, bonusPerMatchingItem: 15 }, { count: 4, bonus: 0, bonusPerMatchingItem: 20 }] },
   { id: 'aquatic', name: 'Aquatic', iconSpriteId: '262', tiers: [{ count: 2, bonus: 0, matchingItemMultiplier: 1.5 }, { count: 4, bonus: 0, matchingItemMultiplier: 2 }] },
   { id: 'cursed', name: 'Cursed', iconSpriteId: '0', tiers: [{ count: 3, bonus: 0, multiplier: 1.25 }], materialMatch: 'Cursed' },
+  { id: 'magic', name: 'Magic', iconSpriteId: '103', tiers: [{ count: 3, bonus: 20 }, { count: 5, bonus: 40 }, { count: 7, bonus: 75 }] },
 ];
 
 export function getTraitDefinition(id: string): TraitDefinition | undefined {

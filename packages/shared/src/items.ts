@@ -24,47 +24,47 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   { id: 'flail', name: 'Flail', baseSpriteId: '92', baseValue: 10, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'destroyLot', weapon: { phase: 'preBid', target: 'none' }, traits: ['weapon'] },
   { id: 'scimitar', name: 'Scimitar', baseSpriteId: '85', baseValue: 10, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'forceWithdraw', weapon: { phase: 'bidding', target: 'all' }, traits: ['weapon'] },
   { id: 'crossbow', name: 'Crossbow', baseSpriteId: '100', baseValue: 10, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'destroyItem', weapon: { phase: 'anytime', target: 'one' }, traits: ['weapon'] },
-  { id: 'arcane-staff', name: 'Arcane Staff', baseSpriteId: '103', baseValue: 10, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'transformLot', weapon: { phase: 'bidding', target: 'none' }, traits: ['weapon'] },
+  { id: 'arcane-staff', name: 'Arcane Staff', baseSpriteId: '103', baseValue: 10, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'transformLot', weapon: { phase: 'bidding', target: 'none' }, traits: ['weapon', 'magic'] },
   { id: 'wooden-shield', name: 'Wooden Shield', baseSpriteId: '97', baseValue: 10, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'weaponImmunity', traits: ['weapon'] },
   // --- Armor (broad trait: armor) ---
-  { id: 'horned-helm', name: 'Horned Helm', baseSpriteId: '115', baseValue: 29, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['armor'] },
+  { id: 'iron-helm', name: 'Iron Helm', baseSpriteId: '115', baseValue: 29, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['armor'] },
   { id: 'leather-vest', name: 'Leather Vest', baseSpriteId: '118', baseValue: 21, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['armor'] },
   { id: 'plate-armor', name: 'Plate Armor', baseSpriteId: '119', baseValue: 35, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['armor'] },
-  { id: 'travelers-cuirass', name: "Traveler's Cuirass", baseSpriteId: '117', baseValue: 11, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['armor'] },
+  { id: 'apprentices-cloak', name: "Apprentice's Cloak", baseSpriteId: '126', baseValue: 11, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['armor', 'magic'] },
   { id: 'worn-boots', name: 'Worn Boots', baseSpriteId: '130', baseValue: 9, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['armor'] },
-  { id: 'reinforced-gauntlet', name: 'Reinforced Gauntlet', baseSpriteId: '129', baseValue: 15, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['armor'] },
+  { id: 'steel-gauntlets', name: 'Steel Gauntlets', baseSpriteId: '129', baseValue: 15, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['armor'] },
 
   // --- Trinkets (broad trait: trinket) ---
   { id: 'gold-pendant', name: 'Gold Pendant', baseSpriteId: '134', baseValue: 23, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['trinket'] },
   { id: 'diamond-ring', name: 'Diamond Ring', baseSpriteId: '133', baseValue: 48, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['trinket'] },
-  { id: 'bonetooth-necklace', name: 'Bonetooth Necklace', baseSpriteId: '136', baseValue: 39, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['trinket'] },
-  { id: 'one-ring', name: 'The One Ring', baseSpriteId: '132', baseValue: 57, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['trinket'] },
+  { id: 'necklace-of-fangs', name: 'Necklace of Fangs', baseSpriteId: '136', baseValue: 39, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['trinket'] },
+  { id: 'one-ring', name: 'The One Ring', baseSpriteId: '132', baseValue: 57, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['trinket', 'magic'] },
   { id: 'royal-crown', name: 'Championship Belt', baseSpriteId: '127', baseValue: 42, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['trinket'] },
   { id: 'pearl-earring', name: 'Pearl Earring', baseSpriteId: '135', baseValue: 31, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['trinket'] },
 
   // --- Text ---
   { id: 'ancient-tome', name: 'Ancient Tome', baseSpriteId: '213', baseValue: 31, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['text'] },
   { id: 'leather-journal', name: 'Journal of Power', baseSpriteId: '210', baseValue: 36, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['text'] },
-  { id: 'sealed-scroll', name: 'Sealed Scroll', baseSpriteId: '220', baseValue: 31, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['text'] },
+  { id: 'sealed-scroll', name: 'Sealed Scroll', baseSpriteId: '220', baseValue: 31, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['text', 'magic'] },
   { id: 'love-letter', name: 'Secret Recipe', baseSpriteId: '218', baseValue: 10, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['text', 'food'] },
   { id: 'sapphire-grimoire', name: "Mariner's Log", baseSpriteId: '208', baseValue: 16, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['aquatic', 'text'] },
   { id: 'crimson-codex', name: 'Crimson Codex', baseSpriteId: '209', baseValue: 26, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['text'] },
 
   // --- Food ---
-  { id: 'fresh-apple', name: 'Fresh Apple', baseSpriteId: '224', baseValue: 6, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['food'] },
-  { id: 'stale-bread', name: 'Stale Bread', baseSpriteId: '237', baseValue: 6, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['food'] },
+  { id: 'apple', name: 'Apple', baseSpriteId: '224', baseValue: 6, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['food'] },
+  { id: 'bread', name: 'Bread', baseSpriteId: '237', baseValue: 6, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['food'] },
   { id: 'aged-cheese', name: 'Aged Cheese', baseSpriteId: '247', baseValue: 11, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['food'] },
   { id: 'chocolate-cake', name: 'Chocolate Cake', baseSpriteId: '253', baseValue: 16, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['food'] },
-  { id: 'candy', name: 'Candy', baseSpriteId: '252', baseValue: 9, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['food'] },
+  { id: 'smelling-salts', name: 'Smelling Salts', baseSpriteId: '250', baseValue: 9, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['food', 'magic'] },
   { id: 'floor-chicken', name: 'Floor Chicken', baseSpriteId: '239', baseValue: 12, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['food'] },
 
   // --- Aquatic (broad trait: aquatic) ---
   { id: 'rainbow-trout', name: 'Rainbow Trout', baseSpriteId: '259', baseValue: 12, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['aquatic'] },
   { id: 'pickled-jellyfish', name: 'Pickled Jellyfish', baseSpriteId: '264', baseValue: 16, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['food', 'aquatic'] },
   { id: 'dried-octopus', name: 'Dried Octopus', baseSpriteId: '265', baseValue: 18, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['aquatic'] },
-  { id: 'drowned-greave', name: 'Drowned Greave', baseSpriteId: '268', baseValue: 11, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['armor', 'aquatic'] },
+  { id: 'drowned-greaves', name: 'Drowned Greaves', baseSpriteId: '268', baseValue: 11, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['armor', 'aquatic'] },
   { id: 'fish-skeleton', name: 'Fish Skeleton', baseSpriteId: '267', baseValue: 5, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['aquatic'] },
-  { id: 'ancient-fossil', name: 'Ancient Fossil', baseSpriteId: '269', baseValue: 28, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['aquatic'] },
+  { id: 'ancient-fossil', name: 'Ancient Fossil', baseSpriteId: '269', baseValue: 28, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['aquatic', 'magic'] },
 
   // --- Curios (flat value, no modifiers/traits, unique standalone effects) ---
   { id: 'magnifying-glass', name: 'Magnifying Glass', baseSpriteId: '168', baseValue: 5, materials: ['Ordinary'], rarities: ['Common'], effectType: 'revealValue', flatValue: true, traits: [] },
@@ -72,7 +72,7 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   { id: 'treasure-chest', name: 'Treasure Chest', baseSpriteId: '187', baseValue: 0, materials: ['Ordinary'], rarities: ['Common'], effectType: 'chest', flatValue: true, traits: [], chest: { keyTemplateId: 'rusty-key', grantsTraitId: 'trinket', grantsCountRange: [1, 3] } },
   { id: 'sunken-treasure-chest', name: 'Sunken Treasure Chest', baseSpriteId: '270', baseValue: 0, materials: ['Ordinary'], rarities: ['Common'], effectType: 'chest', flatValue: true, traits: [], chest: { keyTemplateId: 'rusty-key', grantsTraitId: 'aquatic', grantsCountRange: [3, 5] } },
   { id: 'rusty-key', name: 'Rusty Key', baseSpriteId: '185', baseValue: 1, materials: ['Ordinary'], rarities: ['Common'], effectType: 'key', flatValue: true, traits: [] },
-  { id: 'chronomancers-hourglass', name: "Chronomancer's Hourglass", baseSpriteId: '352', baseValue: 0, materials: ['Ordinary'], rarities: ['Common'], effectType: 'refundOnLoss', flatValue: true, traits: [] },
+  { id: 'chronomancers-hourglass', name: "Chronomancer's Hourglass", baseSpriteId: '352', baseValue: 0, materials: ['Ordinary'], rarities: ['Common'], effectType: 'refundOnLoss', flatValue: true, traits: ['magic'] },
   { id: 'mirror-of-desire', name: 'Mirror of Desire', baseSpriteId: '177', baseValue: 5, materials: ['Ordinary'], rarities: ['Common'], effectType: 'copyItem', flatValue: true, traits: [] },
   { id: 'contraband-permit', name: 'Contraband Permit', baseSpriteId: '219', baseValue: 5, materials: ['Ordinary'], rarities: ['Common'], effectType: 'weaponMultiplier', flatValue: true, traits: [] },
 ];
