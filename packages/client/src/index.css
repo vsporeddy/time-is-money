@@ -39,6 +39,17 @@ body {
   color: var(--text);
   font-family: var(--font-pixel);
   -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* keep selectable: form fields + chat log so text can be copied */
+input,
+textarea,
+[contenteditable],
+.chat-messages {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 #root {
