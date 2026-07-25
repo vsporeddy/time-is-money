@@ -582,6 +582,13 @@ input[type='text']:focus {
 
 /* --- Lot pool: the whole game's fixed item list, visible up front --- */
 
+.lot-pool-panel {
+  width: 30rem;
+  max-width: calc(100vw - 2rem);
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
 .lot-pool-grid {
   grid-template-columns: repeat(6, 1fr);
 }
@@ -1563,6 +1570,11 @@ input[type='text']:focus {
 
   .inventory-panel-left:has(+ .inventory-panel-right) {
     display: none;
+  }
+
+  .lot-pool-panel {
+    width: min(24rem, calc(100vw - 1.2rem));
+    max-height: calc(100vh - var(--dock-height) - var(--chat-height) - 1.5rem);
   }
 
   .bid-button {

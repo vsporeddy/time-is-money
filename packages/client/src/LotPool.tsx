@@ -47,58 +47,56 @@ export function LotPool({ pool, onClose }: LotPoolProps) {
     : pool;
 
   return (
-    <div className="mirror-picker-overlay" role="dialog" aria-label="Lot Pool">
-      <div className="panel mirror-picker-panel">
-        <div className="inventory-heading">
-          <h2 className="panel-title">LOT POOL</h2>
-          <button type="button" className="inventory-close" aria-label="Close" onClick={onClose}>×</button>
-        </div>
-        <p className="status-line">
-          {fullyRevealed
-            ? 'Magnifying Glass: the full sale order is revealed below. Unnumbered items are reserves and stay out of the auction unless swapped in.'
-            : 'Every item that could come up this game. Not all of them will be sold, the sale order is a surprise, and a few are still a mystery.'}
-        </p>
-        <div className="inventory-grid lot-pool-grid">
-          {sorted.map((entry) => {
-            const template = getTemplate(entry.templateId);
-            const hidden = entry.status === 'hidden';
-            const slotClasses = [
-              'inventory-slot',
-              'lot-pool-slot',
-              hidden && 'lot-pool-slot-hidden',
-              entry.status === 'auctioned' && 'lot-pool-slot-auctioned',
-            ]
-              .filter(Boolean)
-              .join(' ');
-            const label = hidden
-              ? 'Mystery item'
-              : entry.saleRound !== undefined
-              ? `${template?.name} — Round ${entry.saleRound}`
-              : fullyRevealed
-              ? `${template?.name} — reserve, not scheduled`
-              : template?.name;
-            return (
-              <div key={entry.id} className={slotClasses} title={label}>
-                {entry.saleRound !== undefined && <span className="lot-pool-round-badge">{entry.saleRound}</span>}
-                {hidden ? <span className="lot-pool-mystery-mark">?</span> : <SpriteIcon index={Number(template?.baseSpriteId ?? 0)} scale={2} />}
-                {!hidden && template && (
-                  <div className="inventory-tooltip inventory-item-tooltip lot-pool-item-tooltip">
-                    <b>{template.name}</b>
-                    <span>Attributes:</span>
-                    <ul className="inventory-detail-list">
-                      {itemAttributes(template).map((attribute) => (
-                        <li key={attribute.label}>
-                          <span className={attribute.trait ? 'attribute-set-label' : attribute.effect ? 'item-effect-label' : undefined}>{attribute.label}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+    <aside className="inventory-panel inventory-panel-right lot-pool-panel" aria-label="Lot Pool">
+      <div className="inventory-heading">
+        <h2>LOT POOL</h2>
+        <button type="button" className="inventory-close" aria-label="Close" onClick={onClose}>×</button>
       </div>
-    </div>
+      <p className="status-line">
+        {fullyRevealed
+          ? 'Magnifying Glass: the full sale order is revealed below. Unnumbered items are reserves and stay out of the auction unless swapped in.'
+          : 'Every item that could come up this game. Not all of them will be sold, the sale order is a surprise, and a few are still a mystery.'}
+      </p>
+      <div className="inventory-grid lot-pool-grid">
+        {sorted.map((entry) => {
+          const template = getTemplate(entry.templateId);
+          const hidden = entry.status === 'hidden';
+          const slotClasses = [
+            'inventory-slot',
+            'lot-pool-slot',
+            hidden && 'lot-pool-slot-hidden',
+            entry.status === 'auctioned' && 'lot-pool-slot-auctioned',
+          ]
+            .filter(Boolean)
+            .join(' ');
+          const label = hidden
+            ? 'Mystery item'
+            : entry.saleRound !== undefined
+            ? `${template?.name} — Round ${entry.saleRound}`
+            : fullyRevealed
+            ? `${template?.name} — reserve, not scheduled`
+            : template?.name;
+          return (
+            <div key={entry.id} className={slotClasses} title={label}>
+              {entry.saleRound !== undefined && <span className="lot-pool-round-badge">{entry.saleRound}</span>}
+              {hidden ? <span className="lot-pool-mystery-mark">?</span> : <SpriteIcon index={Number(template?.baseSpriteId ?? 0)} scale={2} />}
+              {!hidden && template && (
+                <div className="inventory-tooltip inventory-item-tooltip lot-pool-item-tooltip">
+                  <b>{template.name}</b>
+                  <span>Attributes:</span>
+                  <ul className="inventory-detail-list">
+                    {itemAttributes(template).map((attribute) => (
+                      <li key={attribute.label}>
+                        <span className={attribute.trait ? 'attribute-set-label' : attribute.effect ? 'item-effect-label' : undefined}>{attribute.label}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </aside>
   );
 }
