@@ -104,7 +104,7 @@ export function BackgroundMusic({ ducked, muffled }: BackgroundMusicProps) {
           <b>HOW TO PLAY</b>
           <span className="how-to-play-row">
             <img src={`${HELP_MEDIA_SRC}help-tooltip-playertime.png`} alt="Player time display" />
-            <span>Your remaining time is both your budget and your bid.</span>
+            <span>Your time is your money. Spend it by bidding on items..</span>
           </span>
           <span className="how-to-play-row">
             <img src={`${HELP_MEDIA_SRC}bid.gif`} alt="Joining a bid" />
@@ -112,19 +112,19 @@ export function BackgroundMusic({ ducked, muffled }: BackgroundMusicProps) {
           </span>
           <span className="how-to-play-row">
             <img src={`${HELP_MEDIA_SRC}bid-underway.gif`} alt="Bidding underway" />
-            <span>When bidding starts, your remaining time will start ticking down. Press withdraw to stop spending time. Regardless of whether you win the bid, the time spent will be lost.</span>
+            <span>When bidding starts, your remaining time will start ticking down. Press withdraw to stop spending time. Regardless of whether you win, the time spent will be lost.</span>
           </span>
           <span className="how-to-play-row">
             <img src={`${HELP_MEDIA_SRC}bid-finish.gif`} alt="Auction finish" />
-            <span>The last bidder remaining wins the item. A sole winner will automatically win the item with a 5s bid.</span>
+            <span>The last bidder remaining wins the item. A sole bidder will automatically win  with a 5s bid.</span>
           </span>
           <span className="how-to-play-row">
             <img src={`${HELP_MEDIA_SRC}hover.gif`} alt="Hovering item details" />
-            <span>Hover over attributes/modifiers/set bonus bubbles for details.</span>
+            <span>Hover over attributes/modifiers/set bonus for details.</span>
           </span>
           <span className="how-to-play-row">
             <img className="how-to-play-items-media" src={`${HELP_MEDIA_SRC}items.gif`} alt="Item inventory" />
-            <span>Collect valuable items and complete sets. A combination of your base item values, item effects, and set bonuses will determine your final value. The highest total value wins after all rounds have finished.</span>
+            <span>Collect valuable items and complete sets. Your base item values, item effects, and set bonuses will determine your collection's final value. The player with the most valuable collection is the winner!</span>
           </span>
         </span>
       </button>
