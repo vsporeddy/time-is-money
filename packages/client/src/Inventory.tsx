@@ -65,7 +65,7 @@ function setBonusColor(tierCount: number, reachedTierIndex: number): SetBonusCol
 
 function setBonusText(traitId: string, tier: SetBonusTier): string {
   if (traitId === 'cursed' && tier.multiplier) return 'Change modifier to 1.25x';
-  if (tier.bonusPerMatchingItem) return `ALL ${traitId === 'food' ? 'Food' : traitId} +$${tier.bonusPerMatchingItem}`;
+  if (tier.bonusPerMatchingItem) return `ALL ${traitId === 'musical' ? 'Musical' : traitId} +$${tier.bonusPerMatchingItem}`;
   if (tier.matchingItemMultiplier) return `${traitId === 'aquatic' ? 'Aquatic items' : traitId} ×${tier.matchingItemMultiplier}`;
   if (tier.strongestMatchingItemMultiplier) return `Most Valuable Armor ×${tier.strongestMatchingItemMultiplier}`;
   return tier.multiplier ? `×${tier.multiplier}` : `+$${tier.bonus}`;
@@ -73,7 +73,7 @@ function setBonusText(traitId: string, tier: SetBonusTier): string {
 
 function breakdownTraitText(traitId: string, count: number, bonus: number, multiplier?: number): string {
   const name = getTraitDefinition(traitId)?.name ?? traitId;
-  if (traitId === 'food') return `${name} ${count}: +$${bonus}`;
+  if (traitId === 'musical') return `${name} ${count}: +$${bonus}`;
   if (traitId === 'aquatic') return `${name} ${count}: Aquatic items ×${multiplier}`;
   if (traitId === 'armor') return `${name} ${count}: Most Valuable Armor ×${multiplier}`;
   return `${name} ${count}: ${multiplier ? `×${multiplier}` : `+$${bonus}`}`;
@@ -92,7 +92,7 @@ function itemAttributes(item: ItemInstance): DisplayAttribute[] {
   if (template?.scoreScaling === 'bargain') attributes.push({ label: 'Bargain' });
   if (item.fairTrade) attributes.push({ label: 'Fair Trade', effect: true });
   if (template?.effectType === 'timeRefund') attributes.push({ label: 'Time Refund' });
-  if (item.loner) attributes.push({ label: 'Loner', effect: true });
+  if (item.solitaire) attributes.push({ label: 'Solitaire', effect: true });
   if (template?.effectType === 'revealValue') attributes.push({ label: 'Reveals Modifiers & Pool', effect: true });
   if (template?.effectType === 'revealBidding') attributes.push({ label: 'Scouts Bidders', effect: true });
   if (template?.effectType === 'chest') attributes.push({ label: 'Needs Key', effect: true });
@@ -155,7 +155,7 @@ export function Inventory({ player, items, score, side, showValue = true, onClos
         { text: `Value: $${score.baseValue}` },
         score.hiddenTraitBonus !== 0 && { text: `Finds: ${score.hiddenTraitBonus >= 0 ? '+' : ''}$${score.hiddenTraitBonus}` },
         score.scoreScalingBonus !== 0 && { text: `Item effects: +$${score.scoreScalingBonus}`, className: 'item-effect-label' },
-        score.lonerBonus !== 0 && { text: `Loner bonuses: +$${score.lonerBonus}` },
+        score.solitaireBonus !== 0 && { text: `Solitaire bonuses: +$${score.solitaireBonus}` },
         ...score.traitBonuses.map((trait) => {
           const definition = getTraitDefinition(trait.traitId);
           const reachedTierIndex = definition?.tiers.reduce((highest, tier, index) => (trait.count >= tier.count ? index : highest), -1) ?? -1;
@@ -208,16 +208,22 @@ export function Inventory({ player, items, score, side, showValue = true, onClos
                   <div className="inventory-tooltip inventory-item-tooltip">
                     <b>{template?.name ?? item.templateId}</b>
                     {showValue && <span>True Value: ${modifiedItemValue(item)}</span>}
-                    <span>Modifiers:</span>
-                    <ul className="inventory-detail-list">
-                      <li className={`modifier ${modifierClass(item.material)}`}>{item.material} ×{getMaterialValueMultiplier(item.material).toFixed(1)}</li>
-                      <li className={`modifier ${modifierClass(item.rarity)}`}>{item.rarity} ×{getRarityValueMultiplier(item.rarity).toFixed(1)}</li>
-                      {item.specialModifier && (
-                        <li className={`modifier ${modifierClass(item.specialModifier)}`}>
-                          {item.specialModifier === 'Cursed' ? (cursedSetActive ? 'Cursed x1.25' : 'Cursed ×0.75') : specialModifierLabel(item.specialModifier)}
-                        </li>
-                      )}
-                    </ul>
+                    {!template?.flatValue && (
+                      <>
+                        <span>Modifiers:</span>
+                        <ul className="inventory-detail-list">
+                          {item.material !== 'Ordinary' && (
+                            <li className={`modifier ${modifierClass(item.material)}`}>{item.material} ×{getMaterialValueMultiplier(item.material).toFixed(1)}</li>
+                          )}
+                          <li className={`modifier ${modifierClass(item.rarity)}`}>{item.rarity} ×{getRarityValueMultiplier(item.rarity).toFixed(1)}</li>
+                          {item.specialModifier && (
+                            <li className={`modifier ${modifierClass(item.specialModifier)}`}>
+                              {item.specialModifier === 'Cursed' ? (cursedSetActive ? 'Cursed x1.25' : 'Cursed ×0.75') : specialModifierLabel(item.specialModifier)}
+                            </li>
+                          )}
+                        </ul>
+                      </>
+                    )}
                     <span>Attributes:</span>
                     <ul className="inventory-detail-list">
                       {itemAttributes(item).map((attribute) => (
@@ -227,7 +233,7 @@ export function Inventory({ player, items, score, side, showValue = true, onClos
                       ))}
                     </ul>
                     {hiddenTrait && (
-                      <span className={`inventory-find ${hiddenTrait.id === 'cursed-find' ? 'find-cursed' : hiddenTrait.id === 'blessed-find' ? 'find-blessed' : ''}`}>
+                      <span className={`inventory-find ${hiddenTrait.id === 'flawed' ? 'find-flawed' : hiddenTrait.id === 'windfall' ? 'find-windfall' : ''}`}>
                         {hiddenTrait.name} {hiddenTrait.scoreBonus >= 0 ? '+$' : '-$'}{Math.abs(hiddenTrait.scoreBonus)}
                       </span>
                     )}

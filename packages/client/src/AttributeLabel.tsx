@@ -13,7 +13,7 @@ function setBonusColor(tierCount: number, tierIndex: number): 'bronze' | 'silver
 
 function setBonusText(traitId: string, tier: { bonus: number; multiplier?: number; bonusPerMatchingItem?: number; matchingItemMultiplier?: number; strongestMatchingItemMultiplier?: number }): string {
   if (traitId === 'cursed' && tier.multiplier) return 'Change modifier to 1.25x';
-  if (tier.bonusPerMatchingItem) return `ALL Food +$${tier.bonusPerMatchingItem}`;
+  if (tier.bonusPerMatchingItem) return `ALL Musical +$${tier.bonusPerMatchingItem}`;
   if (tier.matchingItemMultiplier) return `Aquatic items ×${tier.matchingItemMultiplier}`;
   if (tier.strongestMatchingItemMultiplier) return `Most Valuable Armor ×${tier.strongestMatchingItemMultiplier}`;
   return tier.multiplier ? `×${tier.multiplier}` : `+$${tier.bonus}`;

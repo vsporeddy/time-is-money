@@ -13,8 +13,8 @@ A browser-based multiplayer party game built for a game jam (theme: **COUNT DOWN
   - **Bargain** — scores higher the *cheaper* you win it (rewards sniping uncontested lots).
   - **Fair Trade** (second-price rebate) — you only pay the runner-up's price, not your full hold time.
   - **Time Refund** — winning it gives some time back (flat, or scaled up the lower your time is, as a catch-up mechanic).
-  - **Loner** — bonus if it's the only copy of that item in your stash.
-- Items also carry category traits (Weapon, Armor, Food, etc., some nested — a Sword counts for both "Sword" and "Weapon") that pay out a bonus once you own enough of a kind, TFT-trait style. A couple of hidden traits (Blessed/Cursed/Lucky) can roll on any item and are only revealed once it sells.
+  - **Solitaire** — bonus if it's the only copy of that item in your stash.
+- Items also carry category traits (Weapon, Armor, Musical, etc., some nested — a Sword counts for both "Sword" and "Weapon") that pay out a bonus once you own enough of a kind, TFT-trait style. A couple of hidden traits (Windfall/Flawed/Sleeper) can roll on any item and are only revealed once it sells.
 - Owning multiple exact copies of the same item has diminishing returns, so trait-hunting across different items beats hoarding one thing.
 - Game ends once every player is out of time; final ranking is base item value + all bonuses, shown with a full breakdown.
 - By default, the game also ends after 10 resolved lots. Set `ROUND_LIMIT_ENABLED` to `false` in `packages/server/src/rooms.ts` for unlimited rounds.

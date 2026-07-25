@@ -16,8 +16,8 @@ const RARITY_MULTIPLIERS: Record<string, number> = {
 
 const MATERIAL_MULTIPLIERS: Record<string, number> = {
   Ordinary: 1,
-  Weathered: 0.8,
-  Pristine: 1.2,
+  Damaged: 0.8,
+  Mint: 1.2,
 };
 
 const SPECIAL_MODIFIER_MULTIPLIERS: Record<NonNullable<ItemInstance['specialModifier']>, number> = {
@@ -88,7 +88,7 @@ export function computeScores(
     let baseValue = 0;
     let hiddenTraitBonus = 0;
     let scoreScalingBonus = 0;
-    const lonerBonus = items.filter((item) => item.loner).length === 1 ? 20 : 0;
+    const solitaireBonus = items.filter((item) => item.solitaire).length === 1 ? 20 : 0;
     const hasContrabandPermit = items.some((item) => getTemplate(item.templateId)?.effectType === 'weaponMultiplier');
     const armorMultiplier = activeTraitTiers.get('armor')?.strongestMatchingItemMultiplier ?? 1;
     const strongestArmorItemId = armorMultiplier > 1
@@ -144,14 +144,14 @@ export function computeScores(
     }
 
     const traitBonusTotal = traitBonuses.reduce((sum, t) => sum + t.bonus, 0);
-    const total = baseValue + hiddenTraitBonus + scoreScalingBonus + lonerBonus + traitBonusTotal;
+    const total = baseValue + hiddenTraitBonus + scoreScalingBonus + solitaireBonus + traitBonusTotal;
 
     return {
       playerId: player.id,
       baseValue: Math.round(baseValue),
       hiddenTraitBonus,
       scoreScalingBonus: Math.round(scoreScalingBonus),
-      lonerBonus,
+      solitaireBonus,
       traitBonuses,
       total: Math.round(total),
     };

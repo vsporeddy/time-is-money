@@ -11,7 +11,7 @@ let roundCounter = 0;
 const SOLE_BIDDER_PRICE_MS = 5_000;
 const MODIFIER_REVEAL_INTERVAL_MS = 7_000;
 const EARLY_UTILITY_TEMPLATE_IDS = new Set(['magnifying-glass', 'spyglass', 'chronomancers-hourglass']);
-const MAIN_TRAIT_IDS = ['armor', 'trinket', 'text', 'food', 'aquatic'] as const;
+const MAIN_TRAIT_IDS = ['armor', 'trinket', 'text', 'musical', 'aquatic'] as const;
 type MainTraitId = (typeof MAIN_TRAIT_IDS)[number];
 
 function takeRandom<T>(items: T[]): T | undefined {

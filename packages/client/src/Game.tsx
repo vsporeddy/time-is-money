@@ -17,13 +17,13 @@ function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-function templateAttributes(template: ItemTemplate | undefined, item?: Pick<ItemInstance, 'investment' | 'fairTrade' | 'loner'>): DisplayAttribute[] {
+function templateAttributes(template: ItemTemplate | undefined, item?: Pick<ItemInstance, 'investment' | 'fairTrade' | 'solitaire'>): DisplayAttribute[] {
   if (!template) return [];
   const attributes: DisplayAttribute[] = template.traits.map((id) => ({ label: getTraitDefinition(id)?.name ?? capitalize(id), traitId: id }));
   if (item?.investment) attributes.push({ label: 'Investment', effect: true, tooltip: { title: '+1$ for each second used to bid for this item', text: '' } });
   if (template.scoreScaling === 'bargain') attributes.push({ label: 'Bargain' });
   if (item?.fairTrade) attributes.push({ label: 'Fair Trade', effect: true, tooltip: { title: 'FAIR TRADE', text: "Only costs the runner-up's time spent" } });
-  if (item?.loner) attributes.push({ label: 'Loner', effect: true, tooltip: { title: 'If you own only one Loner item: +$20', text: '' } });
+  if (item?.solitaire) attributes.push({ label: 'Solitaire', effect: true, tooltip: { title: 'If you own only one Solitaire item: +$20', text: '' } });
   if (template.effectType === 'revealValue') attributes.push({ label: 'Reveals Modifiers', effect: true, tooltip: { title: 'MAGNIFYING GLASS', text: "Every lot's modifiers are revealed to you instantly, and the Lot Pool shows you the full sale order and every mystery item, while you own one" } });
   if (template.effectType === 'revealBidding') attributes.push({ label: 'Scouts Bidders', effect: true, tooltip: { title: 'SPYGLASS', text: "Other players' time left and bids are always revealed to you while you own one" } });
   if (template.effectType === 'chest' && template.chest) {
@@ -296,17 +296,26 @@ export function Game({
             <div className="item-card">
               <h3 className="sold-title">{lastResult.round.winnerId ? 'SOLD' : 'PASSED'}</h3>
               <p className="item-meta">
-                {getTemplate(lastResult.item.templateId)?.name} (
-                <span className={`modifier ${modifierClass(lastResult.item.material)}`}>{lastResult.item.material}</span>
-                {', '}
-                <span className={`modifier ${modifierClass(lastResult.item.rarity)}`}>{lastResult.item.rarity}</span>
-                {lastResult.item.specialModifier && (
+                {getTemplate(lastResult.item.templateId)?.name}
+                {!getTemplate(lastResult.item.templateId)?.flatValue && (
                   <>
-                    {', '}
-                    <span className={`modifier ${modifierClass(lastResult.item.specialModifier)}`}>{lastResult.item.specialModifier}</span>
+                    {' ('}
+                    {lastResult.item.material !== 'Ordinary' && (
+                      <>
+                        <span className={`modifier ${modifierClass(lastResult.item.material)}`}>{lastResult.item.material}</span>
+                        {', '}
+                      </>
+                    )}
+                    <span className={`modifier ${modifierClass(lastResult.item.rarity)}`}>{lastResult.item.rarity}</span>
+                    {lastResult.item.specialModifier && (
+                      <>
+                        {', '}
+                        <span className={`modifier ${modifierClass(lastResult.item.specialModifier)}`}>{lastResult.item.specialModifier}</span>
+                      </>
+                    )}
+                    {')'}
                   </>
                 )}
-                {')'}
               </p>
               {hidden && (
                 <p className={`hidden-trait ${hidden.scoreBonus >= 0 ? 'positive' : 'negative'}`}>
@@ -356,31 +365,33 @@ export function Game({
           </div>
           <h3 className="item-name">{getTemplate(currentRound.item.templateId)?.name}</h3>
           <div className="auction-details">
-            <div>
-              <p>Modifiers</p>
-              <ul>
-                {currentRound.item.material && (
-                  <li className={`modifier ${modifierRevealClass} ${modifierClass(currentRound.item.material)}`} onAnimationEnd={() => finishModifierReveal('material')}>
-                    {currentRound.item.material} ×{getMaterialValueMultiplier(currentRound.item.material).toFixed(1)}
-                  </li>
-                )}
-                {currentRound.item.rarity && (
-                  <li className={`modifier ${modifierRevealClass} ${modifierClass(currentRound.item.rarity)}`} onAnimationEnd={() => finishModifierReveal('rarity')}>
-                    {currentRound.item.rarity} ×{getRarityValueMultiplier(currentRound.item.rarity).toFixed(1)}
-                  </li>
-                )}
-                {currentRound.item.specialModifier && (
-                  <li className={`modifier ${modifierRevealClass} ${modifierClass(currentRound.item.specialModifier)}`} onAnimationEnd={() => finishModifierReveal('specialModifier')}>
-                    {currentRound.item.specialModifier === 'Cursed' ? (
-                      <span className="special-modifier-trigger">
-                        {cursedSetActive ? 'Cursed x1.25' : 'Cursed ×0.75'}
-                        <span className="special-modifier-tooltip"><b>CURSED SET BONUS</b><span className="set-bonus-tier silver">3: Change modifier to 1.25x</span></span>
-                      </span>
-                    ) : specialModifierLabel(currentRound.item.specialModifier)}
-                  </li>
-                )}
-              </ul>
-            </div>
+            {!getTemplate(currentRound.item.templateId)?.flatValue && (
+              <div>
+                <p>Modifiers</p>
+                <ul>
+                  {currentRound.item.material && currentRound.item.material !== 'Ordinary' && (
+                    <li className={`modifier ${modifierRevealClass} ${modifierClass(currentRound.item.material)}`} onAnimationEnd={() => finishModifierReveal('material')}>
+                      {currentRound.item.material} ×{getMaterialValueMultiplier(currentRound.item.material).toFixed(1)}
+                    </li>
+                  )}
+                  {currentRound.item.rarity && (
+                    <li className={`modifier ${modifierRevealClass} ${modifierClass(currentRound.item.rarity)}`} onAnimationEnd={() => finishModifierReveal('rarity')}>
+                      {currentRound.item.rarity} ×{getRarityValueMultiplier(currentRound.item.rarity).toFixed(1)}
+                    </li>
+                  )}
+                  {currentRound.item.specialModifier && (
+                    <li className={`modifier ${modifierRevealClass} ${modifierClass(currentRound.item.specialModifier)}`} onAnimationEnd={() => finishModifierReveal('specialModifier')}>
+                      {currentRound.item.specialModifier === 'Cursed' ? (
+                        <span className="special-modifier-trigger">
+                          {cursedSetActive ? 'Cursed x1.25' : 'Cursed ×0.75'}
+                          <span className="special-modifier-tooltip"><b>CURSED SET BONUS</b><span className="set-bonus-tier silver">3: Change modifier to 1.25x</span></span>
+                        </span>
+                      ) : specialModifierLabel(currentRound.item.specialModifier)}
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
             <div>
               <p>Attributes</p>
               <ul>

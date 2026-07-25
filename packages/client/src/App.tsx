@@ -465,7 +465,7 @@ export default function App() {
             const extras: string[] = [];
             if (s.hiddenTraitBonus !== 0) extras.push(`hidden ${s.hiddenTraitBonus >= 0 ? '+' : ''}${s.hiddenTraitBonus}`);
             if (s.scoreScalingBonus !== 0) extras.push(`scaling +${s.scoreScalingBonus}`);
-            if (s.lonerBonus !== 0) extras.push(`loner +${s.lonerBonus}`);
+            if (s.solitaireBonus !== 0) extras.push(`solitaire +${s.solitaireBonus}`);
             for (const t of s.traitBonuses) {
               extras.push(
                 `${getTraitDefinition(t.traitId)?.name ?? t.traitId} x${t.count} ${t.multiplier ? `×${t.multiplier}` : `+${t.bonus}`}`

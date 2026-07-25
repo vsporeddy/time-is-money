@@ -782,8 +782,7 @@ input[type='text']:focus {
   margin-bottom: 0.2rem;
 }
 
-.modifier-common,
-.modifier-ordinary {
+.modifier-common {
   color: #fff;
 }
 
@@ -795,11 +794,11 @@ input[type='text']:focus {
   color: #ffe05d;
 }
 
-.modifier-weathered {
+.modifier-damaged {
   color: #9d9d9d;
 }
 
-.modifier-pristine {
+.modifier-mint {
   color: #b7ecff;
 }
 
@@ -827,11 +826,11 @@ input[type='text']:focus {
   color: #8fbf5a;
 }
 
-.find-cursed {
+.find-flawed {
   color: var(--red-bright);
 }
 
-.find-blessed {
+.find-windfall {
   color: #8fbf5a;
 }
 

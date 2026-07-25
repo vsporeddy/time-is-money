@@ -26,7 +26,7 @@ export const TRAIT_DEFINITIONS: TraitDefinition[] = [
   { id: 'armor', name: 'Armor', iconSpriteId: '97', tiers: [{ count: 3, bonus: 0, strongestMatchingItemMultiplier: 1.5 }] },
   { id: 'trinket', name: 'Trinket', iconSpriteId: '133', tiers: [], noSetBonus: true },
   { id: 'text', name: 'Text', iconSpriteId: '217', tiers: [{ count: 2, bonus: 10 }, { count: 4, bonus: 25 }] },
-  { id: 'food', name: 'Food', iconSpriteId: '224', tiers: [{ count: 2, bonus: 0, bonusPerMatchingItem: 10 }, { count: 3, bonus: 0, bonusPerMatchingItem: 15 }, { count: 4, bonus: 0, bonusPerMatchingItem: 20 }] },
+  { id: 'musical', name: 'Musical', iconSpriteId: '179', tiers: [{ count: 2, bonus: 0, bonusPerMatchingItem: 10 }, { count: 3, bonus: 0, bonusPerMatchingItem: 15 }, { count: 4, bonus: 0, bonusPerMatchingItem: 20 }] },
   { id: 'aquatic', name: 'Aquatic', iconSpriteId: '262', tiers: [{ count: 2, bonus: 0, matchingItemMultiplier: 1.5 }, { count: 4, bonus: 0, matchingItemMultiplier: 2 }] },
   { id: 'cursed', name: 'Cursed', iconSpriteId: '0', tiers: [{ count: 3, bonus: 0, multiplier: 1.25 }], materialMatch: 'Cursed' },
   { id: 'magic', name: 'Magic', iconSpriteId: '103', tiers: [{ count: 3, bonus: 20 }, { count: 5, bonus: 40 }, { count: 7, bonus: 75 }] },
@@ -37,7 +37,7 @@ export function getTraitDefinition(id: string): TraitDefinition | undefined {
 }
 
 // Base material rolls are independent from the optional Blessed/Cursed overlay.
-export const MATERIAL_POOL = ['Ordinary', 'Weathered', 'Pristine'];
+export const MATERIAL_POOL = ['Ordinary', 'Damaged', 'Mint'];
 
 // Hidden traits: a per-instance secret, like trueValue — not shown during
 // bidding, revealed only at round_end. Flat bonus/penalty, not a collection set.
@@ -49,9 +49,9 @@ export interface HiddenTraitDefinition {
 }
 
 export const HIDDEN_TRAITS: HiddenTraitDefinition[] = [
-  { id: 'blessed-find', name: 'Blessed Find', iconSpriteId: '5', scoreBonus: 25 },
-  { id: 'cursed-find', name: 'Cursed Find', iconSpriteId: '0', scoreBonus: -20 },
-  { id: 'lucky-find', name: 'Lucky Find', iconSpriteId: '6', scoreBonus: 15 },
+  { id: 'windfall', name: 'Windfall', iconSpriteId: '5', scoreBonus: 25 },
+  { id: 'flawed', name: 'Flawed', iconSpriteId: '0', scoreBonus: -20 },
+  { id: 'sleeper', name: 'Sleeper', iconSpriteId: '6', scoreBonus: 15 },
 ];
 
 export const HIDDEN_TRAIT_CHANCE = 0.12;

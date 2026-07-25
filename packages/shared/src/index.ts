@@ -64,7 +64,7 @@ export interface ItemTemplate {
   timeRefund?: TimeRefundConfig; // present when effectType === 'timeRefund'
   chest?: ChestConfig; // present when effectType === 'chest'
   weapon?: WeaponEffectConfig; // present for the active-use weapon effect types above
-  flatValue?: boolean; // skips material/rarity/specialModifier/loner/investment/fairTrade/hiddenTrait rolls (baseValue is always fixed regardless)
+  flatValue?: boolean; // skips material/rarity/specialModifier/solitaire/investment/fairTrade/hiddenTrait rolls (baseValue is always fixed regardless)
   traits: string[]; // TraitDefinition ids this template's items count toward (category traits, may nest)
   scoreScaling?: 'bargain'; // template-specific score effect
 }
@@ -74,7 +74,7 @@ export interface ItemInstance {
   templateId: string;
   material: string;
   specialModifier?: 'Cursed' | 'Blessed'; // rolls independently of the base material
-  loner?: boolean; // 5% independent roll; scores only when it is the sole Loner owned
+  solitaire?: boolean; // 5% independent roll; scores only when it is the sole Solitaire owned
   investment?: boolean; // 5% independent roll; scores from time spent bidding
   fairTrade?: boolean; // 5% independent roll; winner pays runner-up time on contested lots
   rarity: string;
@@ -182,7 +182,7 @@ export interface ScoreBreakdown {
   baseValue: number; // sum of trueValue after diminishing-returns-on-duplicates
   hiddenTraitBonus: number;
   scoreScalingBonus: number; // investment/bargain, from price paid
-  lonerBonus: number;
+  solitaireBonus: number;
   traitBonuses: { traitId: string; count: number; bonus: number; multiplier?: number }[];
   total: number;
 }
