@@ -1,5 +1,5 @@
 import type { Server } from 'socket.io';
-import type { ClientToServerEvents, MaskedRoundItem, Player, Round, ServerToClientEvents, TimeRefundConfig } from 'shared';
+import type { ClientToServerEvents, ItemTemplate, MaskedRoundItem, Player, Round, ServerToClientEvents, TimeRefundConfig } from 'shared';
 import { cloneItemInstance, computeScores, getTemplate, ITEM_TEMPLATES, rollItemInstanceForTemplate, shuffle } from 'shared';
 import { emitRoomState, ownsItemTemplate } from './rooms.js';
 import type { ActiveRound, Room } from './rooms.js';
@@ -11,23 +11,103 @@ let roundCounter = 0;
 const SOLE_BIDDER_PRICE_MS = 5_000;
 const MODIFIER_REVEAL_INTERVAL_MS = 7_000;
 const EARLY_UTILITY_TEMPLATE_IDS = new Set(['magnifying-glass', 'spyglass', 'chronomancers-hourglass']);
+const MAIN_TRAIT_IDS = ['armor', 'trinket', 'text', 'food', 'aquatic'] as const;
+type MainTraitId = (typeof MAIN_TRAIT_IDS)[number];
 
-// Rolls the whole game's fixed item pool at once: size = rounds + 3 (3 always
-// go unlisted), auctioned in a shuffled order, with 3 random slots blurred
-// client-side until their round comes up. Unlimited-round games (maxRounds
-// null) fall back to the old behavior — the entire template list, no leftovers.
+function takeRandom<T>(items: T[]): T | undefined {
+  if (items.length === 0) return undefined;
+  return items.splice(Math.floor(Math.random() * items.length), 1)[0];
+}
+
+function pickWeighted<T>(entries: readonly { value: T; weight: number }[]): T {
+  const totalWeight = entries.reduce((total, entry) => total + entry.weight, 0);
+  let roll = Math.random() * totalWeight;
+  for (const entry of entries) {
+    roll -= entry.weight;
+    if (roll < 0) return entry.value;
+  }
+  return entries[entries.length - 1].value;
+}
+
+function itemClass(template: ItemTemplate): 'weapon' | 'curio' | 'main' {
+  if (template.weapon || template.effectType === 'weaponImmunity') return 'weapon';
+  return template.traits.some((trait) => MAIN_TRAIT_IDS.includes(trait as MainTraitId)) ? 'main' : 'curio';
+}
+
+function selectMainTraits(mainTemplates: ItemTemplate[]): MainTraitId[] {
+  const choices = MAIN_TRAIT_IDS
+    .map((trait) => ({ value: trait, weight: mainTemplates.filter((template) => template.traits.includes(trait)).length }))
+    .filter((entry) => entry.weight > 0);
+  const selected: MainTraitId[] = [];
+  while (selected.length < 3 && choices.length > 0) {
+    const trait = pickWeighted(choices);
+    selected.push(trait);
+    choices.splice(choices.findIndex((entry) => entry.value === trait), 1);
+  }
+  return selected;
+}
+
+function drawMainTemplate(available: ItemTemplate[], selectedTraits: MainTraitId[]): ItemTemplate | undefined {
+  const eligibleTraits = selectedTraits.filter((trait) => available.some((template) => template.traits.includes(trait)));
+  if (eligibleTraits.length === 0) return undefined;
+  const trait = pickWeighted(eligibleTraits.map((value) => ({ value, weight: available.filter((template) => template.traits.includes(value)).length })));
+  const candidates = available.filter((template) => template.traits.includes(trait));
+  const template = candidates[Math.floor(Math.random() * candidates.length)];
+  available.splice(available.indexOf(template), 1);
+  return template;
+}
+
+// A limited game first rolls Weapon/Curio/Main slot classes using the full item
+// pool's proportions. Three weighted main attributes are then chosen and every
+// Main slot draws only from those pools. Three extra templates stay in reserve
+// for Arcane Staff transforms without affecting the auction's class mix.
 function buildLotPool(room: Room) {
   const maxRounds = room.settings.maxRounds;
-  const poolSize = maxRounds !== null ? Math.min(maxRounds + 3, ITEM_TEMPLATES.length) : ITEM_TEMPLATES.length;
-  const roundsToPlay = maxRounds !== null ? Math.min(maxRounds, poolSize) : poolSize;
+  const roundsToPlay = maxRounds !== null ? Math.min(maxRounds, ITEM_TEMPLATES.length) : ITEM_TEMPLATES.length;
+  const weaponTemplates = ITEM_TEMPLATES.filter((template) => itemClass(template) === 'weapon');
+  const curioTemplates = ITEM_TEMPLATES.filter((template) => itemClass(template) === 'curio');
+  const mainTemplates = ITEM_TEMPLATES.filter((template) => itemClass(template) === 'main');
+  const classWeights = [
+    { value: 'weapon' as const, weight: weaponTemplates.length },
+    { value: 'curio' as const, weight: curioTemplates.length },
+    { value: 'main' as const, weight: mainTemplates.length },
+  ];
+  const available = {
+    weapon: [...weaponTemplates],
+    curio: [...curioTemplates],
+    main: [...mainTemplates],
+  };
+  const selectedMainTraits = maxRounds === null ? [...MAIN_TRAIT_IDS] : selectMainTraits(mainTemplates);
+  const auctionTemplates: ItemTemplate[] = [];
 
-  const selectedTemplates = shuffle(ITEM_TEMPLATES).slice(0, poolSize);
-  room.lotPool = selectedTemplates.map((template) => rollItemInstanceForTemplate(template.id, maxRounds));
+  for (let slot = 0; slot < roundsToPlay; slot += 1) {
+    const availableClasses = classWeights.filter((entry) => entry.value === 'main'
+      ? selectedMainTraits.some((trait) => available.main.some((template) => template.traits.includes(trait)))
+      : available[entry.value].length > 0);
+    const itemType = pickWeighted(availableClasses.length > 0 ? availableClasses : classWeights);
+    const template = itemType === 'main'
+      ? drawMainTemplate(available.main, selectedMainTraits)
+      : takeRandom(available[itemType]);
+    if (!template) break;
+    auctionTemplates.push(template);
+  }
+
+  const selectedIds = new Set(auctionTemplates.map((template) => template.id));
+  const remainingTemplates = ITEM_TEMPLATES.filter((template) =>
+    !selectedIds.has(template.id) &&
+    (itemClass(template) !== 'main' || selectedMainTraits.some((trait) => template.traits.includes(trait)))
+  );
+  // Keep promoted utility curios out of reserve-only slots: if one is rolled,
+  // it is guaranteed to be one of the first auction lots.
+  const reserveCandidates = remainingTemplates.filter((template) => !EARLY_UTILITY_TEMPLATE_IDS.has(template.id));
+  const reserveTemplates = shuffle(reserveCandidates.length >= 3 ? reserveCandidates : remainingTemplates).slice(0, 3);
+  room.lotPool = [...auctionTemplates, ...reserveTemplates].map((template) => rollItemInstanceForTemplate(template.id, maxRounds));
   // Information and recovery curios should arrive early whenever they made it
-  // into this game's pool, rather than being relegated to an unseen reserve.
-  const earlyUtilityIds = shuffle(room.lotPool.filter((item) => EARLY_UTILITY_TEMPLATE_IDS.has(item.templateId)).map((item) => item.id));
-  const remainingIds = shuffle(room.lotPool.filter((item) => !EARLY_UTILITY_TEMPLATE_IDS.has(item.templateId)).map((item) => item.id));
-  room.auctionOrder = [...earlyUtilityIds, ...remainingIds].slice(0, roundsToPlay);
+  // into the auction pool, rather than being relegated to a later lot.
+  const auctionItems = room.lotPool.slice(0, auctionTemplates.length);
+  const earlyUtilityIds = shuffle(auctionItems.filter((item) => EARLY_UTILITY_TEMPLATE_IDS.has(item.templateId)).map((item) => item.id));
+  const remainingIds = shuffle(auctionItems.filter((item) => !EARLY_UTILITY_TEMPLATE_IDS.has(item.templateId)).map((item) => item.id));
+  room.auctionOrder = [...earlyUtilityIds, ...remainingIds];
   room.roundsToPlay = roundsToPlay;
   room.hiddenPoolItemIds = new Set(shuffle(room.lotPool.map((item) => item.id)).slice(0, Math.min(3, room.lotPool.length)));
   room.revealedPoolItemIds = new Set();

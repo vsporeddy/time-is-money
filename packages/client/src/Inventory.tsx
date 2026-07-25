@@ -134,7 +134,7 @@ export function Inventory({ player, items, score, side, showValue = true, onClos
   const ownedItems = player.stash.map((id) => items[id]).filter((item): item is ItemInstance => Boolean(item));
   const stash = ownedItems.slice(0, INVENTORY_SIZE);
   const cursedSetActive = score?.traitBonuses.some((trait) => trait.traitId === 'cursed' && trait.multiplier === 1.25) ?? false;
-  const traitProgress = TRAIT_DEFINITIONS.map((trait) => {
+  const traitProgress: TraitProgress[] = TRAIT_DEFINITIONS.map<TraitProgress | null>((trait) => {
     const count = trait.materialMatch
       ? ownedItems.filter((item) => item.specialModifier === trait.materialMatch).length
       : ownedItems.filter((item) => getTemplate(item.templateId)?.traits.includes(trait.id)).length;
@@ -149,7 +149,7 @@ export function Inventory({ player, items, score, side, showValue = true, onClos
     const color = setBonusColor(trait.tiers.length, reachedTierIndex);
 
     return { id: trait.id, name: trait.name, count, target, color, tiers: trait.tiers };
-  }).filter((progress): progress is TraitProgress => Boolean(progress));
+  }).filter((progress): progress is TraitProgress => progress !== null);
   const breakdown: BreakdownLine[] = score
     ? [
         { text: `Value: $${score.baseValue}` },

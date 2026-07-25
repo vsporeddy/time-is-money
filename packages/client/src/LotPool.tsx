@@ -1,10 +1,40 @@
-import type { LotPoolItem } from 'shared';
-import { getTemplate } from 'shared';
+import type { ItemTemplate, LotPoolItem } from 'shared';
+import { getTemplate, getTraitDefinition } from 'shared';
 import { SpriteIcon } from './SpriteIcon';
 
 interface LotPoolProps {
   pool: LotPoolItem[];
   onClose: () => void;
+}
+
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+interface DisplayAttribute {
+  label: string;
+  effect?: boolean;
+  trait?: boolean;
+}
+
+function itemAttributes(template: ItemTemplate | undefined): DisplayAttribute[] {
+  if (!template) return [];
+  const attributes: DisplayAttribute[] = template.traits.map((trait) => ({ label: getTraitDefinition(trait)?.name ?? capitalize(trait), trait: true }));
+  const addEffect = (label: string) => attributes.push({ label, effect: true });
+  if (template.effectType === 'revealValue') addEffect('Reveals Modifiers & Pool');
+  if (template.effectType === 'revealBidding') addEffect('Scouts Bidders');
+  if (template.effectType === 'chest') addEffect('Needs Key');
+  if (template.effectType === 'key') addEffect('Opens Chests');
+  if (template.effectType === 'refundOnLoss') addEffect('Refunds Losses');
+  if (template.effectType === 'copyItem') addEffect('Copies an Item');
+  if (template.effectType === 'destroyLot') addEffect('Destroys the Lot');
+  if (template.effectType === 'forceEnter') addEffect(template.weapon?.exclusive ? 'Forces a Duel' : 'Forces All to Bid');
+  if (template.effectType === 'forceWithdraw') addEffect(template.weapon?.target === 'all' ? 'Clears the Field' : 'Forces a Withdrawal');
+  if (template.effectType === 'destroyItem') addEffect('Destroys an Item');
+  if (template.effectType === 'transformLot') addEffect('Transforms the Lot');
+  if (template.effectType === 'weaponImmunity') addEffect('Weapon Immunity');
+  if (template.effectType === 'weaponMultiplier') addEffect('Weapon Value ×2');
+  return attributes;
 }
 
 export function LotPool({ pool, onClose }: LotPoolProps) {
@@ -51,6 +81,19 @@ export function LotPool({ pool, onClose }: LotPoolProps) {
               <div key={entry.id} className={slotClasses} title={label}>
                 {entry.saleRound !== undefined && <span className="lot-pool-round-badge">{entry.saleRound}</span>}
                 {hidden ? <span className="lot-pool-mystery-mark">?</span> : <SpriteIcon index={Number(template?.baseSpriteId ?? 0)} scale={2} />}
+                {!hidden && template && (
+                  <div className="inventory-tooltip inventory-item-tooltip lot-pool-item-tooltip">
+                    <b>{template.name}</b>
+                    <span>Attributes:</span>
+                    <ul className="inventory-detail-list">
+                      {itemAttributes(template).map((attribute) => (
+                        <li key={attribute.label}>
+                          <span className={attribute.trait ? 'attribute-set-label' : attribute.effect ? 'item-effect-label' : undefined}>{attribute.label}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             );
           })}

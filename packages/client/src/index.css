@@ -586,6 +586,26 @@ input[type='text']:focus {
   grid-template-columns: repeat(6, 1fr);
 }
 
+.lot-pool-item-tooltip {
+  z-index: 70;
+  max-width: min(15rem, calc(100vw - 2.5rem));
+  overflow-wrap: anywhere;
+}
+
+/* Keep six-column lot-pool hover cards inside the viewport. */
+.lot-pool-slot:nth-child(6n + 1) .lot-pool-item-tooltip,
+.lot-pool-slot:nth-child(6n + 2) .lot-pool-item-tooltip {
+  left: 0;
+  transform: none;
+}
+
+.lot-pool-slot:nth-child(6n) .lot-pool-item-tooltip,
+.lot-pool-slot:nth-child(6n + 5) .lot-pool-item-tooltip {
+  right: 0;
+  left: auto;
+  transform: none;
+}
+
 .lot-pool-slot-hidden {
   border-style: dashed;
   border-color: var(--gold);
