@@ -1,6 +1,12 @@
 const SFX_BASE = `${import.meta.env.BASE_URL}sounds/interface/`;
+let sfxEnabled = true;
+
+export function setSfxEnabled(enabled: boolean) {
+  sfxEnabled = enabled;
+}
 
 function playSfx(file: string, volume = 0.5) {
+  if (!sfxEnabled) return;
   const audio = new Audio(`${SFX_BASE}${file}`);
   audio.volume = volume;
   audio.play().catch(() => {}); // ignored — e.g. no user gesture yet

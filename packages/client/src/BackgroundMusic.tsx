@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import { setSfxEnabled } from './sound';
 
 const MUSIC_SRC = `${import.meta.env.BASE_URL}sounds/music/menu.mp3`;
+const HELP_MEDIA_SRC = `${import.meta.env.BASE_URL}`;
 const NORMAL_VOLUME = 0.15;
 const DUCKED_VOLUME = 0.04;
 const CLEAR_FILTER_HZ = 20000;
@@ -18,6 +20,7 @@ export function BackgroundMusic({ ducked, muffled }: BackgroundMusicProps) {
   const gainRef = useRef<GainNode | null>(null);
   const filterRef = useRef<BiquadFilterNode | null>(null);
   const [muted, setMuted] = useState(false);
+  const [sfxEnabled, setSfxEnabledState] = useState(true);
 
   useEffect(() => {
     const audio = new Audio(MUSIC_SRC);
@@ -85,21 +88,51 @@ export function BackgroundMusic({ ducked, muffled }: BackgroundMusicProps) {
     setMuted(audio.muted);
   };
 
+  const toggleSfx = () => {
+    setSfxEnabledState((enabled) => {
+      const nextEnabled = !enabled;
+      setSfxEnabled(nextEnabled);
+      return nextEnabled;
+    });
+  };
+
   return (
     <div className="top-controls">
       <button type="button" className="how-to-play-trigger" aria-label="How to play">
         ?
         <span className="how-to-play-tooltip" role="tooltip">
           <b>HOW TO PLAY</b>
-          <span>Your remaining time is both your budget and your bid.</span>
-          <span>During the opening window, click BID to opt in or CANCEL BID to leave.</span>
-          <span>When bidding starts, your remaining time will start ticking down. Press withdraw to stop spending time. Regardless of whether you win the bid, the time spent will be lost. The last bidder remaining wins the item. A sole winner will automatically win the item with a 5s bid.</span>
-          <span>Collect valuable items and complete sets. A combination of your base item values, item effects, and set bonuses will determine your final value. The highest total value wins after all rounds have finished.</span>
-          <span>Hover over attributes/modifiers/set bonus bubbles for details.</span>
+          <span className="how-to-play-row">
+            <img src={`${HELP_MEDIA_SRC}help-tooltip-playertime.png`} alt="Player time display" />
+            <span>Your remaining time is both your budget and your bid.</span>
+          </span>
+          <span className="how-to-play-row">
+            <img src={`${HELP_MEDIA_SRC}bid.gif`} alt="Joining a bid" />
+            <span>During the opening window, click BID to opt in or CANCEL BID to leave.</span>
+          </span>
+          <span className="how-to-play-row">
+            <img src={`${HELP_MEDIA_SRC}bid-underway.gif`} alt="Bidding underway" />
+            <span>When bidding starts, your remaining time will start ticking down. Press withdraw to stop spending time. Regardless of whether you win the bid, the time spent will be lost.</span>
+          </span>
+          <span className="how-to-play-row">
+            <img src={`${HELP_MEDIA_SRC}bid-finish.gif`} alt="Auction finish" />
+            <span>The last bidder remaining wins the item. A sole winner will automatically win the item with a 5s bid.</span>
+          </span>
+          <span className="how-to-play-row">
+            <img src={`${HELP_MEDIA_SRC}hover.gif`} alt="Hovering item details" />
+            <span>Hover over attributes/modifiers/set bonus bubbles for details.</span>
+          </span>
+          <span className="how-to-play-row">
+            <img className="how-to-play-items-media" src={`${HELP_MEDIA_SRC}items.gif`} alt="Item inventory" />
+            <span>Collect valuable items and complete sets. A combination of your base item values, item effects, and set bonuses will determine your final value. The highest total value wins after all rounds have finished.</span>
+          </span>
         </span>
       </button>
       <button type="button" className="music-toggle" onClick={toggleMute}>
         {muted ? 'Music: Off' : 'Music: On'}
+      </button>
+      <button type="button" className="sfx-toggle" onClick={toggleSfx}>
+        {sfxEnabled ? 'SFX: On' : 'SFX: Off'}
       </button>
     </div>
   );
