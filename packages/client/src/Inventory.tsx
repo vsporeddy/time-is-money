@@ -1,5 +1,5 @@
 import type { ItemInstance, ItemTemplate, Player, ScoreBreakdown } from 'shared';
-import { getHiddenTrait, getMaterialValueMultiplier, getRarityValueMultiplier, getTemplate, getTraitDefinition, TRAIT_DEFINITIONS } from 'shared';
+import { getHiddenTrait, getMaterialValueMultiplier, getRarityValueMultiplier, getSpecialModifierValueMultiplier, getTemplate, getTraitDefinition, TRAIT_DEFINITIONS } from 'shared';
 import { SpriteIcon } from './SpriteIcon';
 
 interface InventoryProps {
@@ -35,15 +35,19 @@ interface SetBonusTier {
   count: number;
   bonus: number;
   multiplier?: number;
+  bonusPerMatchingItem?: number;
+  matchingItemMultiplier?: number;
+  strongestMatchingItemMultiplier?: number;
 }
 
 interface TraitProgress {
   id: string;
   name: string;
   count: number;
-  target: number;
+  target?: number;
   color: SetBonusColor;
   tiers: SetBonusTier[];
+  noSetBonus?: boolean;
 }
 
 interface BreakdownLine {
@@ -61,7 +65,18 @@ function setBonusColor(tierCount: number, reachedTierIndex: number): SetBonusCol
 
 function setBonusText(traitId: string, tier: SetBonusTier): string {
   if (traitId === 'cursed' && tier.multiplier) return 'Change modifier to 1.25x';
+  if (tier.bonusPerMatchingItem) return `ALL ${traitId === 'food' ? 'Food' : traitId} +$${tier.bonusPerMatchingItem}`;
+  if (tier.matchingItemMultiplier) return `${traitId === 'aquatic' ? 'Aquatic items' : traitId} ×${tier.matchingItemMultiplier}`;
+  if (tier.strongestMatchingItemMultiplier) return `Most Valuable Armor ×${tier.strongestMatchingItemMultiplier}`;
   return tier.multiplier ? `×${tier.multiplier}` : `+$${tier.bonus}`;
+}
+
+function breakdownTraitText(traitId: string, count: number, bonus: number, multiplier?: number): string {
+  const name = getTraitDefinition(traitId)?.name ?? traitId;
+  if (traitId === 'food') return `${name} ${count}: +$${bonus}`;
+  if (traitId === 'aquatic') return `${name} ${count}: Aquatic items ×${multiplier}`;
+  if (traitId === 'armor') return `${name} ${count}: Most Valuable Armor ×${multiplier}`;
+  return `${name} ${count}: ${multiplier ? `×${multiplier}` : `+$${bonus}`}`;
 }
 
 function capitalize(text: string): string {
@@ -90,7 +105,7 @@ function itemAttributes(item: ItemInstance): DisplayAttribute[] {
   if (template?.effectType === 'destroyItem') attributes.push({ label: 'Destroys an Item', effect: true });
   if (template?.effectType === 'transformLot') attributes.push({ label: 'Transforms the Lot', effect: true });
   if (template?.effectType === 'weaponImmunity') attributes.push({ label: 'Weapon Immunity', effect: true });
-  if (template?.effectType === 'weaponMultiplier') attributes.push({ label: 'Weapon Value x3', effect: true });
+  if (template?.effectType === 'weaponMultiplier') attributes.push({ label: 'Weapon Value x2', effect: true });
   if (item.usedActiveEffect) attributes.push({ label: 'Effect Used' });
 
   return attributes;
@@ -106,6 +121,15 @@ function specialModifierLabel(specialModifier: ItemInstance['specialModifier']):
   return '';
 }
 
+function modifiedItemValue(item: ItemInstance): number {
+  return Math.round(
+    item.trueValue *
+    getMaterialValueMultiplier(item.material) *
+    getRarityValueMultiplier(item.rarity) *
+    getSpecialModifierValueMultiplier(item.specialModifier)
+  );
+}
+
 export function Inventory({ player, items, score, side, showValue = true, onClose, onUseItem, roundPhase = null }: InventoryProps) {
   const ownedItems = player.stash.map((id) => items[id]).filter((item): item is ItemInstance => Boolean(item));
   const stash = ownedItems.slice(0, INVENTORY_SIZE);
@@ -116,6 +140,10 @@ export function Inventory({ player, items, score, side, showValue = true, onClos
       : ownedItems.filter((item) => getTemplate(item.templateId)?.traits.includes(trait.id)).length;
     if (count === 0) return null;
 
+    if (trait.noSetBonus) {
+      return { id: trait.id, name: trait.name, count, color: 'gold', tiers: [], noSetBonus: true };
+    }
+
     const reachedTierIndex = trait.tiers.reduce((highest, tier, index) => (count >= tier.count ? index : highest), -1);
     const target = trait.tiers.find((tier) => count < tier.count)?.count ?? trait.tiers[trait.tiers.length - 1].count;
     const color = setBonusColor(trait.tiers.length, reachedTierIndex);
@@ -124,7 +152,7 @@ export function Inventory({ player, items, score, side, showValue = true, onClos
   }).filter((progress): progress is TraitProgress => Boolean(progress));
   const breakdown: BreakdownLine[] = score
     ? [
-        { text: `Base Value: $${score.baseValue}` },
+        { text: `Value: $${score.baseValue}` },
         score.hiddenTraitBonus !== 0 && { text: `Finds: ${score.hiddenTraitBonus >= 0 ? '+' : ''}$${score.hiddenTraitBonus}` },
         score.scoreScalingBonus !== 0 && { text: `Item effects: +$${score.scoreScalingBonus}`, className: 'item-effect-label' },
         score.lonerBonus !== 0 && { text: `Loner bonuses: +$${score.lonerBonus}` },
@@ -132,7 +160,7 @@ export function Inventory({ player, items, score, side, showValue = true, onClos
           const definition = getTraitDefinition(trait.traitId);
           const reachedTierIndex = definition?.tiers.reduce((highest, tier, index) => (trait.count >= tier.count ? index : highest), -1) ?? -1;
           return {
-            text: `${definition?.name ?? trait.traitId} ${trait.count}: ${trait.multiplier ? `×${trait.multiplier}` : `+$${trait.bonus}`}`,
+            text: breakdownTraitText(trait.traitId, trait.count, trait.bonus, trait.multiplier),
             color: setBonusColor(definition?.tiers.length ?? 1, reachedTierIndex),
           };
         }),
@@ -179,7 +207,7 @@ export function Inventory({ player, items, score, side, showValue = true, onClos
                   )}
                   <div className="inventory-tooltip inventory-item-tooltip">
                     <b>{template?.name ?? item.templateId}</b>
-                    {showValue && <span>Value: ${item.trueValue}</span>}
+                    {showValue && <span>True Value: ${modifiedItemValue(item)}</span>}
                     <span>Modifiers:</span>
                     <ul className="inventory-detail-list">
                       <li className={`modifier ${modifierClass(item.material)}`}>{item.material} ×{getMaterialValueMultiplier(item.material).toFixed(1)}</li>
@@ -214,14 +242,16 @@ export function Inventory({ player, items, score, side, showValue = true, onClos
         <div className="trait-progress" aria-label="Set bonus progress">
           {traitProgress.map((progress) => (
             <span key={progress.id} className={`trait-progress-bubble ${progress.color}`} tabIndex={0}>
-              {progress.name}: {progress.count}/{progress.target}
+              {progress.noSetBonus ? `Trinket ${progress.count}` : `${progress.name}: ${progress.count}/${progress.target}`}
               <span className="trait-progress-tooltip">
-                <b>{progress.name} SET BONUS</b>
-                {progress.tiers.map((tier, index) => (
-                  <span key={tier.count} className={`set-bonus-tier ${setBonusColor(progress.tiers.length, index)}`}>
-                    {tier.count}: {setBonusText(progress.id, tier)}
-                  </span>
-                ))}
+                <b>{progress.noSetBonus ? 'TRINKETS' : `${progress.name} SET BONUS`}</b>
+                {progress.noSetBonus
+                  ? <><span>Trinkets are valuable on their own.</span><span>They have no SET bonus.</span></>
+                  : progress.tiers.map((tier, index) => (
+                    <span key={tier.count} className={`set-bonus-tier ${setBonusColor(progress.tiers.length, index)}`}>
+                      {tier.count}: {setBonusText(progress.id, tier)}
+                    </span>
+                  ))}
               </span>
             </span>
           ))}

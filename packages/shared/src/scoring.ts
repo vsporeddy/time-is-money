@@ -1,11 +1,12 @@
 import type { ItemInstance, Player, ScoreBreakdown } from './index.js';
 import { getTemplate } from './items.js';
 import { getHiddenTrait, TRAIT_DEFINITIONS } from './traits.js';
+import type { TraitTier } from './traits.js';
 
 const INVESTMENT_RATE_PER_SEC = 1;
 const BARGAIN_CAP_SECONDS = 5;
 const BARGAIN_RATE_PER_SEC = 8;
-const CONTRABAND_WEAPON_MULTIPLIER = 3;
+const CONTRABAND_WEAPON_MULTIPLIER = 2;
 
 const RARITY_MULTIPLIERS: Record<string, number> = {
   Common: 1,
@@ -65,7 +66,7 @@ export function computeScores(
       .filter((item): item is ItemInstance => Boolean(item));
 
     const traitBonuses: ScoreBreakdown['traitBonuses'] = [];
-    const activeTraitTiers = new Map<string, { bonus: number; multiplier?: number }>();
+    const activeTraitTiers = new Map<string, TraitTier>();
     for (const def of TRAIT_DEFINITIONS) {
       const count = def.materialMatch
         ? items.filter((i) => i.specialModifier === def.materialMatch).length
@@ -74,7 +75,13 @@ export function computeScores(
       const tier = [...def.tiers].reverse().find((t) => count >= t.count);
       if (tier) {
         activeTraitTiers.set(def.id, tier);
-        traitBonuses.push({ traitId: def.id, count, bonus: tier.bonus, multiplier: tier.multiplier });
+        const appliedBonus = tier.bonus + (tier.bonusPerMatchingItem ?? 0) * count;
+        traitBonuses.push({
+          traitId: def.id,
+          count,
+          bonus: appliedBonus,
+          multiplier: tier.multiplier ?? tier.matchingItemMultiplier ?? tier.strongestMatchingItemMultiplier,
+        });
       }
     }
 
@@ -83,6 +90,19 @@ export function computeScores(
     let scoreScalingBonus = 0;
     const lonerBonus = items.filter((item) => item.loner).length === 1 ? 20 : 0;
     const hasContrabandPermit = items.some((item) => getTemplate(item.templateId)?.effectType === 'weaponMultiplier');
+    const armorMultiplier = activeTraitTiers.get('armor')?.strongestMatchingItemMultiplier ?? 1;
+    const strongestArmorItemId = armorMultiplier > 1
+      ? items
+        .filter((item) => getTemplate(item.templateId)?.traits.includes('armor'))
+        .reduce<{ id: string; value: number } | undefined>((strongest, item) => {
+          const candidateValue =
+            item.trueValue *
+            getRarityValueMultiplier(item.rarity) *
+            getMaterialValueMultiplier(item.material) *
+            (activeTraitTiers.get(item.specialModifier?.toLowerCase() ?? '')?.multiplier ?? getSpecialModifierValueMultiplier(item.specialModifier));
+          return !strongest || candidateValue > strongest.value ? { id: item.id, value: candidateValue } : strongest;
+        }, undefined)?.id
+      : undefined;
 
     const seenSoFarByTemplate = new Map<string, number>();
     for (const item of items) {
@@ -94,14 +114,20 @@ export function computeScores(
         ? activeTraitTiers.get(item.specialModifier.toLowerCase())?.multiplier
         : undefined;
       const specialMultiplier = specialSetMultiplier ?? getSpecialModifierValueMultiplier(item.specialModifier);
-      const weaponMultiplier = hasContrabandPermit && template?.traits.includes('weapon') ? CONTRABAND_WEAPON_MULTIPLIER : 1;
+      const weaponMultiplier = hasContrabandPermit && (template?.weapon || template?.effectType === 'weaponImmunity') ? CONTRABAND_WEAPON_MULTIPLIER : 1;
+      const aquaticMultiplier = template?.traits.includes('aquatic')
+        ? activeTraitTiers.get('aquatic')?.matchingItemMultiplier ?? 1
+        : 1;
+      const strongestArmorMultiplier = item.id === strongestArmorItemId ? armorMultiplier : 1;
       baseValue +=
         item.trueValue *
         diminishingMultiplier(copyIndex) *
         getRarityValueMultiplier(item.rarity) *
         getMaterialValueMultiplier(item.material) *
         specialMultiplier *
-        weaponMultiplier;
+        weaponMultiplier *
+        aquaticMultiplier *
+        strongestArmorMultiplier;
 
       const hidden = getHiddenTrait(item.hiddenTraitId);
       if (hidden) hiddenTraitBonus += hidden.scoreBonus;

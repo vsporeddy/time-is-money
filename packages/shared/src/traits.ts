@@ -8,6 +8,9 @@ export interface TraitTier {
   count: number;
   bonus: number;
   multiplier?: number;
+  bonusPerMatchingItem?: number;
+  matchingItemMultiplier?: number;
+  strongestMatchingItemMultiplier?: number;
 }
 
 export interface TraitDefinition {
@@ -16,26 +19,15 @@ export interface TraitDefinition {
   iconSpriteId: string;
   tiers: TraitTier[]; // ascending by count
   materialMatch?: string; // if set, counts instances with this rolled material instead of template.traits
+  noSetBonus?: boolean;
 }
 
 export const TRAIT_DEFINITIONS: TraitDefinition[] = [
-  // --- Broad categories (nested: a Sword counts for both "sword" and "weapon") ---
-  // Weapon has no set bonus — each weapon instead carries its own unique active effect.
-  { id: 'armor', name: 'Armor', iconSpriteId: '97', tiers: [{ count: 3, bonus: 25 }, { count: 5, bonus: 50 }] },
-  { id: 'trinket', name: 'Trinket', iconSpriteId: '133', tiers: [{ count: 2, bonus: 25 }, { count: 3, bonus: 50 }] },
-  { id: 'tool', name: 'Tool', iconSpriteId: '162', tiers: [{ count: 2, bonus: 20 }, { count: 3, bonus: 30 }, { count: 4, bonus: 40 }] },
-  { id: 'musical', name: 'Musical', iconSpriteId: '179', tiers: [{ count: 2, bonus: 30 }] },
-  { id: 'text', name: 'Text', iconSpriteId: '217', tiers: [{ count: 2, bonus: 20 }, { count: 3, bonus: 30 }, { count: 4, bonus: 40 }] },
-  { id: 'food', name: 'Food', iconSpriteId: '224', tiers: [{ count: 3, bonus: 25 }, { count: 5, bonus: 50 }] },
-  { id: 'aquatic', name: 'Aquatic', iconSpriteId: '262', tiers: [{ count: 2, bonus: 25 }, { count: 3, bonus: 50 }] },
-
-  // --- Narrow sub-traits (nested inside a broad category above) ---
-  { id: 'sword', name: 'Sword', iconSpriteId: '84', tiers: [{ count: 2, bonus: 25 }, { count: 3, bonus: 50 }] },
-  { id: 'bow', name: 'Bow', iconSpriteId: '99', tiers: [{ count: 2, bonus: 30 }] },
-  { id: 'book', name: 'Book', iconSpriteId: '213', tiers: [{ count: 2, bonus: 30 }] },
-  { id: 'dessert', name: 'Dessert', iconSpriteId: '253', tiers: [{ count: 2, bonus: 30 }] },
-
-  // --- Modifier-driven (matches rolled material, cuts across every category) ---
+  { id: 'armor', name: 'Armor', iconSpriteId: '97', tiers: [{ count: 3, bonus: 0, strongestMatchingItemMultiplier: 1.5 }] },
+  { id: 'trinket', name: 'Trinket', iconSpriteId: '133', tiers: [], noSetBonus: true },
+  { id: 'text', name: 'Text', iconSpriteId: '217', tiers: [{ count: 2, bonus: 10 }, { count: 4, bonus: 25 }] },
+  { id: 'food', name: 'Food', iconSpriteId: '224', tiers: [{ count: 2, bonus: 0, bonusPerMatchingItem: 10 }, { count: 3, bonus: 0, bonusPerMatchingItem: 15 }, { count: 4, bonus: 0, bonusPerMatchingItem: 20 }] },
+  { id: 'aquatic', name: 'Aquatic', iconSpriteId: '262', tiers: [{ count: 2, bonus: 0, matchingItemMultiplier: 1.5 }, { count: 4, bonus: 0, matchingItemMultiplier: 2 }] },
   { id: 'cursed', name: 'Cursed', iconSpriteId: '0', tiers: [{ count: 3, bonus: 0, multiplier: 1.25 }], materialMatch: 'Cursed' },
 ];
 

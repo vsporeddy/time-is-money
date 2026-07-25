@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ItemInstance, ItemTemplate, MaskedRoundItem, Player, Round, ScoreBreakdown } from 'shared';
-import { getHiddenTrait, getMaterialValueMultiplier, getRarityValueMultiplier, getTemplate, getTraitDefinition } from 'shared';
+import { getHiddenTrait, getMaterialValueMultiplier, getRarityValueMultiplier, getSpecialModifierValueMultiplier, getTemplate, getTraitDefinition } from 'shared';
 import { SpriteIcon } from './SpriteIcon';
 import { PortraitIcon } from './PortraitIcon';
 import { AttributeLabel } from './AttributeLabel';
@@ -52,7 +52,7 @@ function templateAttributes(template: ItemTemplate | undefined, item?: Pick<Item
   if (template.effectType === 'destroyItem') attributes.push({ label: 'Destroys an Item', effect: true, tooltip: { title: 'CROSSBOW', text: "Anytime: destroy an item from another player's inventory. One-time use." } });
   if (template.effectType === 'transformLot') attributes.push({ label: 'Transforms the Lot', effect: true, tooltip: { title: 'ARCANE STAFF', text: 'During bidding: randomly replace the current lot with a new item. One-time use.' } });
   if (template.effectType === 'weaponImmunity') attributes.push({ label: 'Weapon Immunity', effect: true, tooltip: { title: 'WOODEN SHIELD', text: "Passive: immune to every other player's weapon effects while held." } });
-  if (template.effectType === 'weaponMultiplier') attributes.push({ label: 'Weapon Value x3', effect: true, tooltip: { title: 'CONTRABAND PERMIT', text: 'Passive: multiplies the value of every weapon you own by 3x while held.' } });
+  if (template.effectType === 'weaponMultiplier') attributes.push({ label: 'Weapon Value x2', effect: true, tooltip: { title: 'CONTRABAND PERMIT', text: 'Passive: multiplies the value of every weapon you own by 2x while held.' } });
   return attributes;
 }
 
@@ -97,6 +97,22 @@ function specialModifierLabel(specialModifier: ItemInstance['specialModifier']):
   return '';
 }
 
+type ModifierField = 'material' | 'rarity' | 'specialModifier';
+
+const ALL_MODIFIER_FIELDS = new Set<ModifierField>(['material', 'rarity', 'specialModifier']);
+
+function displayedItemValue(
+  item: Pick<ItemInstance, 'trueValue'> & Partial<Pick<ItemInstance, 'material' | 'rarity' | 'specialModifier'>>,
+  revealedFields: ReadonlySet<ModifierField>,
+): number {
+  return Math.round(
+    item.trueValue *
+    (item.material && revealedFields.has('material') ? getMaterialValueMultiplier(item.material) : 1) *
+    (item.rarity && revealedFields.has('rarity') ? getRarityValueMultiplier(item.rarity) : 1) *
+    (item.specialModifier && revealedFields.has('specialModifier') ? getSpecialModifierValueMultiplier(item.specialModifier) : 1)
+  );
+}
+
 function lerpColor(from: [number, number, number], to: [number, number, number], t: number): string {
   const r = Math.round(from[0] + (to[0] - from[0]) * t);
   const g = Math.round(from[1] + (to[1] - from[1]) * t);
@@ -126,6 +142,10 @@ export function Game({
   onOpenLotPool,
 }: GameProps) {
   const [now, setNow] = useState(Date.now());
+  const [completedModifierReveals, setCompletedModifierReveals] = useState<{
+    roundId: string | null;
+    fields: Set<ModifierField>;
+  }>({ roundId: null, fields: new Set() });
   const isHolding = (id: string) => liveBids[id] !== undefined;
   const cursedSetActive = myScore?.traitBonuses.some((trait) => trait.traitId === 'cursed' && trait.multiplier === 1.25) ?? false;
   const isDropped = (id: string) => droppedThisRound[id] !== undefined;
@@ -156,6 +176,29 @@ export function Game({
   useEffect(() => {
     setOptimisticBidding(false);
   }, [currentRound?.round.id]);
+
+  useEffect(() => {
+    const roundId = currentRound?.round.id ?? null;
+    setCompletedModifierReveals({
+      roundId,
+      fields: currentRound?.item.modifiersRevealedInstantly
+        ? new Set(ALL_MODIFIER_FIELDS)
+        : new Set(),
+    });
+  }, [currentRound?.round.id, currentRound?.item.modifiersRevealedInstantly]);
+
+  const finishModifierReveal = (field: ModifierField) => {
+    const roundId = currentRound?.round.id;
+    if (!roundId) return;
+    setCompletedModifierReveals((current) => {
+      if (current.roundId !== roundId || current.fields.has(field)) return current;
+      return { roundId, fields: new Set([...current.fields, field]) };
+    });
+  };
+
+  const revealedModifierFields = completedModifierReveals.roundId === currentRound?.round.id
+    ? completedModifierReveals.fields
+    : new Set<ModifierField>();
 
   const iAmHolding = !iHaveDropped && (optimisticBidding || isHolding(myId));
   // During the opt-in window, holding is free — time (and spending) only
@@ -287,7 +330,7 @@ export function Game({
                   </div>
                   <div className="sold-detail">
                     <span>True Value</span>
-                    <strong>${lastResult.item.trueValue}</strong>
+                    <strong>${displayedItemValue(lastResult.item, ALL_MODIFIER_FIELDS)}</strong>
                   </div>
                 </div>
               ) : (
@@ -296,7 +339,7 @@ export function Game({
                   <div className="sold-details passed-details">
                     <div className="sold-detail">
                       <span>True Value</span>
-                      <strong>${lastResult.item.trueValue}</strong>
+                      <strong>${displayedItemValue(lastResult.item, ALL_MODIFIER_FIELDS)}</strong>
                     </div>
                   </div>
                 </>
@@ -317,17 +360,17 @@ export function Game({
               <p>Modifiers</p>
               <ul>
                 {currentRound.item.material && (
-                  <li className={`modifier ${modifierRevealClass} ${modifierClass(currentRound.item.material)}`}>
+                  <li className={`modifier ${modifierRevealClass} ${modifierClass(currentRound.item.material)}`} onAnimationEnd={() => finishModifierReveal('material')}>
                     {currentRound.item.material} ×{getMaterialValueMultiplier(currentRound.item.material).toFixed(1)}
                   </li>
                 )}
                 {currentRound.item.rarity && (
-                  <li className={`modifier ${modifierRevealClass} ${modifierClass(currentRound.item.rarity)}`}>
+                  <li className={`modifier ${modifierRevealClass} ${modifierClass(currentRound.item.rarity)}`} onAnimationEnd={() => finishModifierReveal('rarity')}>
                     {currentRound.item.rarity} ×{getRarityValueMultiplier(currentRound.item.rarity).toFixed(1)}
                   </li>
                 )}
                 {currentRound.item.specialModifier && (
-                  <li className={`modifier ${modifierRevealClass} ${modifierClass(currentRound.item.specialModifier)}`}>
+                  <li className={`modifier ${modifierRevealClass} ${modifierClass(currentRound.item.specialModifier)}`} onAnimationEnd={() => finishModifierReveal('specialModifier')}>
                     {currentRound.item.specialModifier === 'Cursed' ? (
                       <span className="special-modifier-trigger">
                         {cursedSetActive ? 'Cursed x1.25' : 'Cursed ×0.75'}
@@ -358,7 +401,7 @@ export function Game({
             getTemplate(currentRound.item.templateId)?.timeRefund?.mode === 'catchup' && (
               <div className="item-effect-callout">Emergency Refund: Refunds time based on remaining time</div>
             )}
-          <p className="item-meta">Value: ${currentRound.item.trueValue}</p>
+          <p className="item-meta">Value: ${displayedItemValue(currentRound.item, revealedModifierFields)}</p>
 
           {currentRound.round.status === 'pending' && <p className="status-line">Get ready…</p>}
 

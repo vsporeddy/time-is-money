@@ -724,6 +724,17 @@ input[type='text']:focus {
   display: block;
 }
 
+.inventory-panel-left .trait-progress-tooltip {
+  left: 0;
+  transform: none;
+}
+
+.inventory-panel-right .trait-progress-tooltip {
+  right: 0;
+  left: auto;
+  transform: none;
+}
+
 .inventory-tooltip {
   position: absolute;
   z-index: 50;
@@ -777,7 +788,7 @@ input[type='text']:focus {
 }
 
 .modifier-reveal {
-  animation: modifier-unblur 8s steps(6, end) forwards;
+  animation: modifier-unblur 7s steps(6, end) forwards;
 }
 
 @keyframes modifier-unblur {

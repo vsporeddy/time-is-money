@@ -9,7 +9,8 @@ type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 
 let roundCounter = 0;
 const SOLE_BIDDER_PRICE_MS = 5_000;
-const MODIFIER_REVEAL_INTERVAL_MS = 8_000;
+const MODIFIER_REVEAL_INTERVAL_MS = 7_000;
+const EARLY_UTILITY_TEMPLATE_IDS = new Set(['magnifying-glass', 'spyglass', 'chronomancers-hourglass']);
 
 // Rolls the whole game's fixed item pool at once: size = rounds + 3 (3 always
 // go unlisted), auctioned in a shuffled order, with 3 random slots blurred
@@ -22,7 +23,11 @@ function buildLotPool(room: Room) {
 
   const selectedTemplates = shuffle(ITEM_TEMPLATES).slice(0, poolSize);
   room.lotPool = selectedTemplates.map((template) => rollItemInstanceForTemplate(template.id, maxRounds));
-  room.auctionOrder = shuffle(room.lotPool.map((item) => item.id)).slice(0, roundsToPlay);
+  // Information and recovery curios should arrive early whenever they made it
+  // into this game's pool, rather than being relegated to an unseen reserve.
+  const earlyUtilityIds = shuffle(room.lotPool.filter((item) => EARLY_UTILITY_TEMPLATE_IDS.has(item.templateId)).map((item) => item.id));
+  const remainingIds = shuffle(room.lotPool.filter((item) => !EARLY_UTILITY_TEMPLATE_IDS.has(item.templateId)).map((item) => item.id));
+  room.auctionOrder = [...earlyUtilityIds, ...remainingIds].slice(0, roundsToPlay);
   room.roundsToPlay = roundsToPlay;
   room.hiddenPoolItemIds = new Set(shuffle(room.lotPool.map((item) => item.id)).slice(0, Math.min(3, room.lotPool.length)));
   room.revealedPoolItemIds = new Set();
