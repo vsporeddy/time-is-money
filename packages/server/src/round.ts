@@ -1,13 +1,9 @@
-import type { Server } from 'socket.io';
-import type { ClientToServerEvents, ItemTemplate, MaskedRoundItem, Player, Round, ServerToClientEvents, TimeRefundConfig } from 'shared';
+import type { ItemTemplate, MaskedRoundItem, Player, Round, TimeRefundConfig } from 'shared';
 import { cloneItemInstance, computeScores, getTemplate, ITEM_TEMPLATES, rollItemInstanceForTemplate, shuffle } from 'shared';
-import { emitRoomState, ownsItemTemplate, playerHasClass } from './rooms.js';
-import type { ActiveRound, Room } from './rooms.js';
+import { emitRoomState, humanPlayerIds, ownsItemTemplate, playerHasClass } from './rooms.js';
+import type { ActiveRound, IO, Room } from './rooms.js';
 import { scheduleBotEntries, scheduleBotReleases } from './bots.js';
 
-type IO = Server<ClientToServerEvents, ServerToClientEvents>;
-
-let roundCounter = 0;
 const SOLE_BIDDER_PRICE_MS = 5_000;
 const MODIFIER_REVEAL_INTERVAL_MS = 7_000;
 const INVESTOR_INTEREST_RATE = 0.03; // Investor: % of unspent time added at the end of every round
@@ -151,9 +147,9 @@ export function startRound(room: Room, io: IO) {
     bidders[p.id] = { isHolding: false, committedMs: 0, droppedAt: null };
   }
 
-  roundCounter += 1;
+  room.roundCounter += 1;
   const round: Round = {
-    id: `round-${roundCounter}`,
+    id: `round-${room.roundCounter}`,
     itemInstanceId: item.id,
     status: 'pending',
     initialBidDeadlineAt: null,
@@ -245,7 +241,7 @@ function closeBidWindow(room: Room, io: IO) {
     resolveRound(room, io, winnerId);
   }, room.settings.maxRoundDurationMs);
 
-  io.emit('bid_window_closed', { roundId: ar.round.id, spendingStartedAt });
+  io.to(room.code).emit('bid_window_closed', { roundId: ar.round.id, spendingStartedAt });
   emitRoomState(room, io);
 }
 
@@ -459,7 +455,7 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
     player.timeRemainingMs += Math.round(player.timeRemainingMs * INVESTOR_INTEREST_RATE);
   }
 
-  io.emit('round_end', { round: publicRoundResult(ar.round), item: ar.item });
+  io.to(room.code).emit('round_end', { round: publicRoundResult(ar.round), item: ar.item });
   emitRoomState(room, io);
 
   ar.interRoundTimer = setTimeout(() => {
@@ -478,7 +474,7 @@ function finishGame(room: Room, io: IO) {
 
   const players = [...room.players.values()].filter((p) => !p.isObserver);
   const scores = computeScores(players, room.wonItems, room.itemPricePaidMs);
-  io.emit('game_over', { players, scores });
+  io.to(room.code).emit('game_over', { players, scores });
 }
 
 // Clears round/round-timers/status back to a fresh lobby. Also promotes any
@@ -530,9 +526,9 @@ export function forceResetGame(room: Room, io: IO) {
 // Sends the winner's amount to whoever is entitled to see it: the withdrawer
 // themself, plus anyone currently holding a Spyglass.
 function emitBidderDropped(room: Room, io: IO, payload: { roundId: string; playerId: string; committedMs: number }) {
-  for (const socketId of io.sockets.sockets.keys()) {
-    if (socketId === payload.playerId || ownsItemTemplate(room, socketId, 'spyglass')) {
-      io.to(socketId).emit('bidder_dropped', payload);
+  for (const viewerId of humanPlayerIds(room)) {
+    if (viewerId === payload.playerId || ownsItemTemplate(room, viewerId, 'spyglass')) {
+      io.to(viewerId).emit('bidder_dropped', payload);
     }
   }
 }
@@ -670,7 +666,7 @@ export function useWeapon(
             b.droppedAt = null;
             io.to(pid).emit('bidder_cancelled', { roundId: ar!.round.id, playerId: pid });
           }
-          io.emit('bid_restricted', { roundId: ar!.round.id, allowedPlayerIds: [...allowed] });
+          io.to(room.code).emit('bid_restricted', { roundId: ar!.round.id, allowedPlayerIds: [...allowed] });
         }
       }
       break;
@@ -734,8 +730,8 @@ function maskedItemForSocket(room: Room, ar: ActiveRound, socketId: string): Mas
 function emitRoundStart(room: Room, io: IO) {
   const ar = room.activeRound;
   if (!ar) return;
-  for (const socketId of io.sockets.sockets.keys()) {
-    io.to(socketId).emit('round_start', { round: ar.round, item: maskedItemForSocket(room, ar, socketId) });
+  for (const viewerId of humanPlayerIds(room)) {
+    io.to(viewerId).emit('round_start', { round: ar.round, item: maskedItemForSocket(room, ar, viewerId) });
   }
 }
 
@@ -760,8 +756,8 @@ function transformLot(room: Room, io: IO, ar: ActiveRound): boolean {
   for (const timer of ar.modifierRevealTimers) clearTimeout(timer);
   ar.modifierRevealTimers = [];
 
-  for (const socketId of io.sockets.sockets.keys()) {
-    io.to(socketId).emit('lot_transformed', { roundId: ar.round.id, item: maskedItemForSocket(room, ar, socketId) });
+  for (const viewerId of humanPlayerIds(room)) {
+    io.to(viewerId).emit('lot_transformed', { roundId: ar.round.id, item: maskedItemForSocket(room, ar, viewerId) });
   }
   scheduleModifierReveals(room, io);
   return true;
@@ -782,7 +778,7 @@ function scheduleModifierReveals(room: Room, io: IO) {
     const reveal = () => {
       if (room.activeRound !== ar) return;
       ar.round.revealedFields.push(field);
-      io.emit('reveal', { roundId: ar.round.id, field, value });
+      io.to(room.code).emit('reveal', { roundId: ar.round.id, field, value });
     };
 
     if (index === 0) reveal();
@@ -838,13 +834,13 @@ export function tickRoom(room: Room, io: IO) {
 
   // A player sees only their own live clock and spend, unless they hold a
   // Spyglass — that reveals everyone's.
-  for (const socketId of io.sockets.sockets.keys()) {
-    const hasSpyglass = ownsItemTemplate(room, socketId, 'spyglass');
-    const ownTime = players[socketId];
-    const ownBid = bidders[socketId];
-    io.to(socketId).emit('round_tick', {
-      players: hasSpyglass ? players : ownTime === undefined ? {} : { [socketId]: ownTime },
-      bidders: hasSpyglass ? bidders : ownBid === undefined ? {} : { [socketId]: ownBid },
+  for (const viewerId of humanPlayerIds(room)) {
+    const hasSpyglass = ownsItemTemplate(room, viewerId, 'spyglass');
+    const ownTime = players[viewerId];
+    const ownBid = bidders[viewerId];
+    io.to(viewerId).emit('round_tick', {
+      players: hasSpyglass ? players : ownTime === undefined ? {} : { [viewerId]: ownTime },
+      bidders: hasSpyglass ? bidders : ownBid === undefined ? {} : { [viewerId]: ownBid },
       holding,
     });
   }

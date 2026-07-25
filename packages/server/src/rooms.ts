@@ -1,5 +1,16 @@
-import type { Server } from 'socket.io';
-import type { ClientToServerEvents, GameSettings, ItemInstance, Player, Round, RoomState, RoomStatus, ServerToClientEvents } from 'shared';
+import type { DefaultEventsMap, Server, Socket } from 'socket.io';
+import type { ChatMessage, ClientToServerEvents, GameSettings, ItemInstance, Player, Round, RoomState, RoomStatus, ServerToClientEvents } from 'shared';
+
+// Which room a socket belongs to. Set once by join_room; every other handler
+// resolves its room from here rather than taking a code in the payload.
+export interface SocketData {
+  roomCode?: string;
+}
+
+// Declared here (a leaf module) so index/round/bots all share one shape — a
+// mismatched generic list makes `io` silently unassignable across files.
+export type IO = Server<ClientToServerEvents, ServerToClientEvents, DefaultEventsMap, SocketData>;
+export type AppSocket = Socket<ClientToServerEvents, ServerToClientEvents, DefaultEventsMap, SocketData>;
 
 // Game-jam tuning flag: set to false to restore the original unlimited game.
 const ROUND_LIMIT_ENABLED = true;
@@ -19,6 +30,15 @@ export interface ActiveRound {
 }
 
 export interface Room {
+  code: string; // the share code; also the socket.io room name every member joins
+  hostId: string | null; // the only player allowed to start/configure the game; null while empty
+  createdAt: number;
+  emptySince: number | null; // set when the last human leaves; the reaper deletes the room once this ages out
+  // Counters that used to be module-level globals — one game per room now.
+  roundCounter: number;
+  botCounter: number;
+  chat: ChatMessage[];
+  chatCounter: number;
   status: RoomStatus;
   players: Map<string, Player>;
   settings: GameSettings;
@@ -43,24 +63,47 @@ const DEFAULT_SETTINGS: GameSettings = {
   maxRounds: ROUND_LIMIT_ENABLED ? ROUND_LIMIT : null,
 };
 
-// Single global room — everyone who connects plays in the same game.
-const room: Room = {
-  status: 'lobby',
-  players: new Map(),
-  settings: { ...DEFAULT_SETTINGS },
-  currentRoundIndex: -1,
-  activeRound: null,
-  lotPool: [],
-  auctionOrder: [],
-  roundsToPlay: 0,
-  hiddenPoolItemIds: new Set(),
-  revealedPoolItemIds: new Set(),
-  wonItems: new Map(),
-  itemPricePaidMs: new Map(),
-};
+// Every room owns its own settings object — sharing one would make any host's
+// round-limit change apply to every lobby on the server.
+export function createRoomObject(code: string): Room {
+  return {
+    code,
+    hostId: null,
+    createdAt: Date.now(),
+    emptySince: Date.now(),
+    roundCounter: 0,
+    botCounter: 0,
+    chat: [],
+    chatCounter: 0,
+    status: 'lobby',
+    players: new Map(),
+    settings: { ...DEFAULT_SETTINGS },
+    currentRoundIndex: -1,
+    activeRound: null,
+    lotPool: [],
+    auctionOrder: [],
+    roundsToPlay: 0,
+    hiddenPoolItemIds: new Set(),
+    revealedPoolItemIds: new Set(),
+    wonItems: new Map(),
+    itemPricePaidMs: new Map(),
+  };
+}
 
-export function getRoom(): Room {
-  return room;
+export function isHost(r: Room, playerId: string | undefined): boolean {
+  return r.hostId !== null && r.hostId === playerId;
+}
+
+// Human player ids are socket ids, so this doubles as the list of sockets to
+// fan personalized state out to. Bots have ids like `bot-1` and no socket.
+export function humanPlayerIds(r: Room): string[] {
+  return [...r.players.values()].filter((p) => !p.isBot).map((p) => p.id);
+}
+
+export function humanCount(r: Room): number {
+  let count = 0;
+  for (const player of r.players.values()) if (!player.isBot) count += 1;
+  return count;
 }
 
 // True if the given player currently holds an item of the given template —
@@ -84,6 +127,8 @@ export function toRoomState(r: Room, viewerId?: string): RoomState {
   const isMerchant = playerHasClass(r, viewerId, 'merchant');
 
   return {
+    code: r.code,
+    hostId: r.hostId,
     status: r.status,
     players: [...r.players.values()].map((player) =>
       player.id === viewerId || ownsItemTemplate(r, viewerId, 'spyglass') ? player : { ...player, timeRemainingMs: 0 }
@@ -107,8 +152,9 @@ export function toRoomState(r: Room, viewerId?: string): RoomState {
   };
 }
 
-export function emitRoomState(room: Room, io: Server<ClientToServerEvents, ServerToClientEvents>) {
-  for (const socketId of io.sockets.sockets.keys()) {
-    io.to(socketId).emit('room_state', toRoomState(room, socketId));
+// Personalized per viewer, so this cannot be a single io.to(room.code) broadcast.
+export function emitRoomState(room: Room, io: IO) {
+  for (const viewerId of humanPlayerIds(room)) {
+    io.to(viewerId).emit('room_state', toRoomState(room, viewerId));
   }
 }

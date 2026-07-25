@@ -1,0 +1,144 @@
+import { useEffect, useRef, useState } from 'react';
+import { MAX_BOTS } from 'shared';
+import { copyText } from './lobbyLink';
+import { playClick } from './sound';
+
+interface LobbyProps {
+  lobbyCode: string;
+  inviteLink: string | null; // null when there's no shareable URL (e.g. the itch.io embed) — share the code instead
+  isHost: boolean;
+  hostName: string | null;
+  playerCount: number;
+  maxPlayers: number;
+  botCount: number;
+  roundLimit: number;
+  onRoundLimitChange: (maxRounds: number) => void;
+  onStartGame: () => void;
+  onAddBot: () => void;
+  onRemoveBot: () => void;
+}
+
+export function Lobby({
+  lobbyCode,
+  inviteLink,
+  isHost,
+  hostName,
+  playerCount,
+  maxPlayers,
+  botCount,
+  roundLimit,
+  onRoundLimitChange,
+  onStartGame,
+  onAddBot,
+  onRemoveBot,
+}: LobbyProps) {
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  // A real, visible input rather than an offscreen node: it doubles as the
+  // execCommand fallback target and as manual select-and-copy if both fail.
+  const linkRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (copyState === 'idle') return;
+    const timer = window.setTimeout(() => setCopyState('idle'), 2000);
+    return () => window.clearTimeout(timer);
+  }, [copyState]);
+
+  const shareValue = inviteLink ?? lobbyCode;
+
+  const handleCopy = async () => {
+    playClick();
+    setCopyState((await copyText(shareValue, linkRef.current)) ? 'copied' : 'failed');
+  };
+
+  return (
+    <div className="panel">
+      <h2 className="panel-title">
+        LOBBY <span className="lobby-code">{lobbyCode}</span>
+      </h2>
+
+      <div className="invite-row">
+        <input
+          ref={linkRef}
+          type="text"
+          className="invite-link-input"
+          value={shareValue}
+          readOnly
+          aria-label={inviteLink ? 'Invite link' : 'Lobby code'}
+          onFocus={(event) => event.currentTarget.select()}
+        />
+        <button
+          type="button"
+          className={`btn invite-copy-btn${copyState === 'copied' ? ' copied' : ''}`}
+          onClick={handleCopy}
+        >
+          {copyState === 'copied' ? 'COPIED!' : inviteLink ? 'COPY INVITE LINK' : 'COPY CODE'}
+        </button>
+      </div>
+      <p className="invite-hint" aria-live="polite">
+        {copyState === 'failed'
+          ? 'Copy failed — select the box above and copy it manually.'
+          : inviteLink
+            ? 'Send this link to a friend to bring them into this lobby.'
+            : 'Share this code — your friends enter it on the join screen.'}
+      </p>
+
+      <p className="status-line">
+        {playerCount} of {maxPlayers} players — waiting for players…
+      </p>
+
+      {isHost ? (
+        <>
+          <div className="round-limit-control">
+            <label htmlFor="round-limit">Rounds: {roundLimit}</label>
+            <input
+              id="round-limit"
+              type="range"
+              min="10"
+              max="25"
+              step="1"
+              value={roundLimit}
+              onChange={(event) => onRoundLimitChange(Number(event.target.value))}
+            />
+            <div className="round-limit-labels"><span>10</span><span>25</span></div>
+          </div>
+          <button
+            className="btn btn-block"
+            onClick={() => {
+              playClick();
+              onStartGame();
+            }}
+          >
+            START GAME
+          </button>
+          <button
+            className="btn btn-block"
+            style={{ marginTop: '0.75rem' }}
+            disabled={botCount >= MAX_BOTS}
+            onClick={() => {
+              playClick();
+              onAddBot();
+            }}
+          >
+            Add Bot ({botCount}/{MAX_BOTS})
+          </button>
+          <button
+            className="btn btn-block"
+            style={{ marginTop: '0.75rem' }}
+            disabled={botCount === 0}
+            onClick={() => {
+              playClick();
+              onRemoveBot();
+            }}
+          >
+            Remove Bot
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="status-line">Waiting for {hostName ?? 'the host'} to start…</p>
+          <p className="status-line">Rounds: {roundLimit}</p>
+        </>
+      )}
+    </div>
+  );
+}
