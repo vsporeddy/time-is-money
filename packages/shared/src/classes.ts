@@ -26,6 +26,9 @@ export const CLASS_DEFINITIONS: ClassDefinition[] = [
   { id: 'gambler', name: 'Gambler', description: 'Each lot won in a row grows a time rebate on the next win. Any lot someone else wins resets the streak.', color: '#e6529c', portraitIndex: 147 },
 ];
 
+// Classes are unique per room, so the class list is also the hard player cap.
+export const MAX_PLAYERS_PER_ROOM = CLASS_DEFINITIONS.length;
+
 // Classes are unique per room — picks randomly among whichever classes aren't
 // already taken, or undefined if every one of them (all CLASS_DEFINITIONS.length) is in use.
 export function pickAvailableClassId(takenClassIds: Iterable<string>): string | undefined {
