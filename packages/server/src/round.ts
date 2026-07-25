@@ -16,12 +16,33 @@ const INSURER_REFUND_RATE = 0.25; // Insurer: % of committed time recovered on a
 const GAMBLER_STREAK_REBATE_RATE_PER_WIN = 0.05; // Gambler: % of price rebated per consecutive win, additive
 const GAMBLER_MAX_STREAK_WINS = 4; // caps the rebate scaling at a 4-win streak (20%)
 const EARLY_UTILITY_TEMPLATE_IDS = new Set(['spyglass', 'chronomancers-hourglass']);
+const TREASURE_CHEST_TEMPLATE_ID = 'treasure-chest';
+const TREASURE_CHEST_KEY_TEMPLATE_ID = 'rusty-key';
 const MAIN_TRAIT_IDS = ['armor', 'trinket', 'text', 'musical', 'aquatic'] as const;
 type MainTraitId = (typeof MAIN_TRAIT_IDS)[number];
 
 function takeRandom<T>(items: T[]): T | undefined {
   if (items.length === 0) return undefined;
   return items.splice(Math.floor(Math.random() * items.length), 1)[0];
+}
+
+function ensureTreasureChestAndKey(templates: ItemTemplate[]) {
+  const hasChest = templates.some((template) => template.id === TREASURE_CHEST_TEMPLATE_ID);
+  const hasKey = templates.some((template) => template.id === TREASURE_CHEST_KEY_TEMPLATE_ID);
+  if (hasChest === hasKey) return;
+
+  const presentTemplateId = hasChest ? TREASURE_CHEST_TEMPLATE_ID : TREASURE_CHEST_KEY_TEMPLATE_ID;
+  const missingTemplateId = hasChest ? TREASURE_CHEST_KEY_TEMPLATE_ID : TREASURE_CHEST_TEMPLATE_ID;
+  const missingTemplate = ITEM_TEMPLATES.find((template) => template.id === missingTemplateId);
+  if (!missingTemplate) return;
+
+  const eligibleIndexes = templates
+    .map((template, index) => ({ template, index }))
+    .filter(({ template }) => template.id !== presentTemplateId);
+  const curioIndexes = eligibleIndexes.filter(({ template }) => itemClass(template) === 'curio');
+  const replacementOptions = curioIndexes.length > 0 ? curioIndexes : eligibleIndexes;
+  const replacement = replacementOptions[Math.floor(Math.random() * replacementOptions.length)];
+  if (replacement) templates[replacement.index] = missingTemplate;
 }
 
 function pickWeighted<T>(entries: readonly { value: T; weight: number }[]): T {
@@ -97,6 +118,11 @@ function buildLotPool(room: Room) {
     auctionTemplates.push(template);
   }
 
+  // The Treasure Chest and Rusty Key always enter limited pools together.
+  // Prefer replacing another random curio to preserve the rolled class mix;
+  // if there is no other curio, replace any other item at random.
+  ensureTreasureChestAndKey(auctionTemplates);
+
   const selectedIds = new Set(auctionTemplates.map((template) => template.id));
   const remainingTemplates = ITEM_TEMPLATES.filter((template) =>
     !selectedIds.has(template.id) &&
@@ -106,6 +132,9 @@ function buildLotPool(room: Room) {
   // it is guaranteed to be one of the first auction lots.
   const reserveCandidates = remainingTemplates.filter((template) => !EARLY_UTILITY_TEMPLATE_IDS.has(template.id));
   const reserveTemplates = shuffle(reserveCandidates.length >= 3 ? reserveCandidates : remainingTemplates).slice(0, 3);
+  if (!auctionTemplates.some((template) =>
+    template.id === TREASURE_CHEST_TEMPLATE_ID || template.id === TREASURE_CHEST_KEY_TEMPLATE_ID
+  )) ensureTreasureChestAndKey(reserveTemplates);
   room.lotPool = [...auctionTemplates, ...reserveTemplates].map((template) => rollItemInstanceForTemplate(template.id, maxRounds));
   // Information and recovery curios should arrive early whenever they made it
   // into the auction pool, rather than being relegated to a later lot.
