@@ -2,7 +2,7 @@ import express from 'express';
 import { createServer } from 'node:http';
 import { Server } from 'socket.io';
 import type { ClientToServerEvents, Player, ServerToClientEvents } from 'shared';
-import { randomPortraitIndex } from 'shared';
+import { getClassDefinition, pickAvailableClassId } from 'shared';
 import { emitRoomState, getRoom, toRoomState } from './rooms.js';
 import { addBot, removeBot } from './bots.js';
 import {
@@ -47,6 +47,13 @@ io.on('connection', (socket) => {
     }
 
     const room = getRoom();
+
+    const classId = pickAvailableClassId([...room.players.values()].map((p) => p.classId));
+    if (!classId) {
+      ack({ ok: false, error: 'The game is full — every class is already taken.' });
+      return;
+    }
+
     const isObserver = room.status !== 'lobby';
 
     const player: Player = {
@@ -56,7 +63,9 @@ io.on('connection', (socket) => {
       status: 'active',
       stash: [],
       connected: true,
-      portraitIndex: randomPortraitIndex(),
+      portraitIndex: getClassDefinition(classId)!.portraitIndex,
+      classId,
+      winStreak: 0,
       isObserver,
       isBot: false,
     };

@@ -1,7 +1,7 @@
 import type { Server } from 'socket.io';
 import type { ClientToServerEvents, ItemTemplate, MaskedRoundItem, Player, Round, ServerToClientEvents, TimeRefundConfig } from 'shared';
 import { cloneItemInstance, computeScores, getTemplate, ITEM_TEMPLATES, rollItemInstanceForTemplate, shuffle } from 'shared';
-import { emitRoomState, ownsItemTemplate } from './rooms.js';
+import { emitRoomState, ownsItemTemplate, playerHasClass } from './rooms.js';
 import type { ActiveRound, Room } from './rooms.js';
 import { scheduleBotEntries, scheduleBotReleases } from './bots.js';
 
@@ -10,7 +10,12 @@ type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 let roundCounter = 0;
 const SOLE_BIDDER_PRICE_MS = 5_000;
 const MODIFIER_REVEAL_INTERVAL_MS = 7_000;
-const EARLY_UTILITY_TEMPLATE_IDS = new Set(['magnifying-glass', 'spyglass', 'chronomancers-hourglass']);
+const INVESTOR_INTEREST_RATE = 0.03; // Investor: % of unspent time added at the end of every round
+const AUCTIONEER_REBATE_RATE = 0.1; // Auctioneer: % of the price paid rebated back on every win
+const INSURER_REFUND_RATE = 0.25; // Insurer: % of committed time recovered on a lost bid
+const GAMBLER_STREAK_REBATE_RATE_PER_WIN = 0.05; // Gambler: % of price rebated per consecutive win, additive
+const GAMBLER_MAX_STREAK_WINS = 4; // caps the rebate scaling at a 4-win streak (20%)
+const EARLY_UTILITY_TEMPLATE_IDS = new Set(['spyglass', 'chronomancers-hourglass']);
 const MAIN_TRAIT_IDS = ['armor', 'trinket', 'text', 'musical', 'aquatic'] as const;
 type MainTraitId = (typeof MAIN_TRAIT_IDS)[number];
 
@@ -369,6 +374,15 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
   ar.round.soleBidder = winnerId !== null && bidderCount === 1;
 
   if (winnerId) {
+    // Win streaks (Gambler): a sold lot extends the winner's streak and
+    // resets everyone else who was eligible this round. A passed lot (no
+    // winner) leaves every streak untouched — nothing was won away from anyone.
+    for (const playerId of Object.keys(ar.round.bidders)) {
+      const player = room.players.get(playerId);
+      if (!player) continue;
+      player.winStreak = playerId === winnerId ? player.winStreak + 1 : 0;
+    }
+
     const winner = room.players.get(winnerId);
     if (winner) {
       const winnerBidder = ar.round.bidders[winnerId];
@@ -400,20 +414,49 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
         }
       }
 
+      // Auctioneer: takes a commission rebate of time back on every lot won.
+      if (winner.classId === 'auctioneer' && paidPrice > 0) {
+        winner.timeRemainingMs += Math.round(paidPrice * AUCTIONEER_REBATE_RATE);
+        if (winner.status === 'out_of_time') winner.status = 'active';
+      }
+
+      // Gambler: rebate grows with the just-updated streak (already includes this win).
+      if (winner.classId === 'gambler' && paidPrice > 0) {
+        const streakLevel = Math.min(winner.winStreak, GAMBLER_MAX_STREAK_WINS);
+        const rebate = Math.round(paidPrice * GAMBLER_STREAK_REBATE_RATE_PER_WIN * streakLevel);
+        if (rebate > 0) {
+          winner.timeRemainingMs += rebate;
+          if (winner.status === 'out_of_time') winner.status = 'active';
+        }
+      }
+
       tryOpenChests(room, winner);
     }
   }
 
   // Chronomancer's Hourglass: anyone who spent time on this lot and didn't
-  // win it gets that time back.
+  // win it gets that time back in full. Insurer is the same idea as a
+  // passive class ability, but only a partial refund — the two don't stack.
   for (const [playerId, bidder] of Object.entries(ar.round.bidders)) {
     if (playerId === winnerId || bidder.droppedAt === null || bidder.committedMs <= 0) continue;
-    if (!ownsItemTemplate(room, playerId, 'chronomancers-hourglass')) continue;
 
     const loser = room.players.get(playerId);
     if (!loser) continue;
-    loser.timeRemainingMs += bidder.committedMs;
+
+    if (ownsItemTemplate(room, playerId, 'chronomancers-hourglass')) {
+      loser.timeRemainingMs += bidder.committedMs;
+    } else if (loser.classId === 'insurer') {
+      loser.timeRemainingMs += Math.round(bidder.committedMs * INSURER_REFUND_RATE);
+    } else {
+      continue;
+    }
     if (loser.status === 'out_of_time' && loser.timeRemainingMs > 0) loser.status = 'active';
+  }
+
+  // Investor: unspent time quietly earns interest at the end of every round.
+  for (const player of room.players.values()) {
+    if (player.classId !== 'investor' || player.status !== 'active' || player.timeRemainingMs <= 0) continue;
+    player.timeRemainingMs += Math.round(player.timeRemainingMs * INVESTOR_INTEREST_RATE);
   }
 
   io.emit('round_end', { round: publicRoundResult(ar.round), item: ar.item });
@@ -464,6 +507,7 @@ export function resetRoomToLobby(room: Room) {
     player.timeRemainingMs = room.settings.startingTimeMs;
     player.status = 'active';
     player.stash = [];
+    player.winStreak = 0;
     player.isObserver = false;
   }
 }
@@ -496,13 +540,16 @@ function emitBidderDropped(room: Room, io: IO, payload: { roundId: string; playe
 // Combining a chest with its matching key consumes both and grants a handful
 // of random items from the chest's reward trait. Checked right after a win
 // changes the winner's stash, since that's the only way stash contents change.
+// A Locksmith skips the key requirement entirely — the chest alone opens.
 function tryOpenChests(room: Room, player: Player) {
+  const isLocksmith = player.classId === 'locksmith';
+
   for (const chestTemplate of ITEM_TEMPLATES) {
     if (!chestTemplate.chest) continue;
 
     const chestItemId = player.stash.find((id) => room.wonItems.get(id)?.templateId === chestTemplate.id);
     const keyItemId = player.stash.find((id) => room.wonItems.get(id)?.templateId === chestTemplate.chest!.keyTemplateId);
-    if (!chestItemId || !keyItemId) continue;
+    if (!chestItemId || (!keyItemId && !isLocksmith)) continue;
 
     player.stash = player.stash.filter((id) => id !== chestItemId && id !== keyItemId);
 
@@ -671,15 +718,17 @@ export function useWeapon(
   return { ok: true };
 }
 
-// The Magnifying Glass skips the staggered reveal entirely, showing rarity/
-// material/specialModifier up front — a persistent effect re-checked every
-// time the lot is (re-)announced, including after an Arcane Staff transform.
-// trueValue is always public now (base value is fixed), so it needs no masking.
+// Prospector skips the staggered reveal entirely, showing rarity/material/
+// specialModifier up front — a persistent effect re-checked every time the
+// lot is (re-)announced, including after an Arcane Staff transform. Appraiser
+// additionally sees the hidden trait before bidding even opens. trueValue is
+// always public now (base value is fixed), so it needs no masking.
 function maskedItemForSocket(room: Room, ar: ActiveRound, socketId: string): MaskedRoundItem {
-  const { hiddenTraitId: _hiddenTraitId, material, rarity, specialModifier, ...publicItem } = ar.item;
-  return ownsItemTemplate(room, socketId, 'magnifying-glass')
+  const { hiddenTraitId, material, rarity, specialModifier, ...publicItem } = ar.item;
+  const revealed: MaskedRoundItem = playerHasClass(room, socketId, 'prospector')
     ? { ...publicItem, material, rarity, specialModifier, modifiersRevealedInstantly: true }
     : publicItem;
+  return playerHasClass(room, socketId, 'appraiser') ? { ...revealed, hiddenTraitId } : revealed;
 }
 
 function emitRoundStart(room: Room, io: IO) {

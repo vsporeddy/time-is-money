@@ -25,7 +25,6 @@ function templateAttributes(template: ItemTemplate | undefined, item?: Pick<Item
   if (template.scoreScaling === 'bargain') attributes.push({ label: 'Bargain' });
   if (item?.fairTrade) attributes.push({ label: 'Fair Trade', effect: true, tooltip: { title: 'FAIR TRADE', text: "Only costs the runner-up's time spent" } });
   if (item?.solitaire) attributes.push({ label: 'Solitaire', effect: true, tooltip: { title: 'If you own only one Solitaire item: +$20', text: '' } });
-  if (template.effectType === 'revealValue') attributes.push({ label: 'Reveals Modifiers', effect: true, tooltip: { title: 'MAGNIFYING GLASS', text: "Every lot's modifiers are revealed to you instantly, and the Lot Pool shows you the full sale order and every mystery item, while you own one" } });
   if (template.effectType === 'revealBidding') attributes.push({ label: 'Scouts Bidders', effect: true, tooltip: { title: 'SPYGLASS', text: "Other players' time left and bids are always revealed to you while you own one" } });
   if (template.effectType === 'chest' && template.chest) {
     const traitName = getTraitDefinition(template.chest.grantsTraitId)?.name ?? template.chest.grantsTraitId;
@@ -267,7 +266,7 @@ export function Game({
     }
   };
 
-  // Magnifying Glass holders get modifiers up front — see revealValue effect — so skip the blur reveal for them.
+  // Prospectors get modifiers up front — so skip the blur reveal for them.
   const modifierRevealClass = currentRound?.item.modifiersRevealedInstantly ? '' : 'modifier-reveal';
 
   return (
@@ -372,6 +371,16 @@ export function Game({
             />
           </div>
           <h3 className="item-name">{getTemplate(currentRound.item.templateId)?.name}</h3>
+          {(() => {
+            // Only populated for an Appraiser — everyone else's hiddenTraitId is stripped server-side until round_end.
+            const hidden = getHiddenTrait(currentRound.item.hiddenTraitId);
+            return hidden ? (
+              <p className={`hidden-trait ${hidden.scoreBonus >= 0 ? 'positive' : 'negative'}`}>
+                {hidden.name} ({hidden.scoreBonus >= 0 ? '+$' : '-$'}
+                {Math.abs(hidden.scoreBonus)})
+              </p>
+            ) : null;
+          })()}
           <div className="auction-details">
             {!getTemplate(currentRound.item.templateId)?.flatValue && (
               <div>

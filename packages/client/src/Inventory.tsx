@@ -94,7 +94,6 @@ function itemAttributes(item: ItemInstance): DisplayAttribute[] {
   if (item.fairTrade) attributes.push({ label: 'Fair Trade', effect: true });
   if (template?.effectType === 'timeRefund') attributes.push({ label: 'Time Refund' });
   if (item.solitaire) attributes.push({ label: 'Solitaire', effect: true });
-  if (template?.effectType === 'revealValue') attributes.push({ label: 'Reveals Modifiers & Pool', effect: true });
   if (template?.effectType === 'revealBidding') attributes.push({ label: 'Scouts Bidders', effect: true });
   if (template?.effectType === 'chest') attributes.push({ label: 'Needs Key', effect: true });
   if (template?.effectType === 'key') attributes.push({ label: 'Opens Chests', effect: true });
@@ -157,6 +156,7 @@ export function Inventory({ player, items, score, side, showValue = true, onClos
         score.hiddenTraitBonus !== 0 && { text: `Finds: ${score.hiddenTraitBonus >= 0 ? '+' : ''}$${score.hiddenTraitBonus}` },
         score.scoreScalingBonus !== 0 && { text: `Item effects: +$${score.scoreScalingBonus}`, className: 'item-effect-label' },
         score.solitaireBonus !== 0 && { text: `Solitaire bonuses: +$${score.solitaireBonus}` },
+        score.hoarderBonus !== 0 && { text: `Hoarder bonus: +$${score.hoarderBonus}`, className: 'item-effect-label' },
         ...score.traitBonuses.map((trait) => {
           const definition = getTraitDefinition(trait.traitId);
           const reachedTierIndex = definition?.tiers.reduce((highest, tier, index) => (trait.count >= tier.count ? index : highest), -1) ?? -1;
