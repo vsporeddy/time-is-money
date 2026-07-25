@@ -2,7 +2,7 @@ import express from 'express';
 import { createServer } from 'node:http';
 import { Server } from 'socket.io';
 import type { ClientToServerEvents, Player, ServerToClientEvents } from 'shared';
-import { randomClassId, randomPortraitIndex } from 'shared';
+import { getClassDefinition, randomClassId } from 'shared';
 import { emitRoomState, getRoom, toRoomState } from './rooms.js';
 import { addBot, removeBot } from './bots.js';
 import {
@@ -49,6 +49,8 @@ io.on('connection', (socket) => {
     const room = getRoom();
     const isObserver = room.status !== 'lobby';
 
+    const classId = randomClassId();
+
     const player: Player = {
       id: socket.id,
       name,
@@ -56,8 +58,8 @@ io.on('connection', (socket) => {
       status: 'active',
       stash: [],
       connected: true,
-      portraitIndex: randomPortraitIndex(),
-      classId: randomClassId(),
+      portraitIndex: getClassDefinition(classId)!.portraitIndex,
+      classId,
       winStreak: 0,
       isObserver,
       isBot: false,

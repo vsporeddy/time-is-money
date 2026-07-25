@@ -1,6 +1,6 @@
 import type { Server } from 'socket.io';
 import type { ClientToServerEvents, Player, ServerToClientEvents } from 'shared';
-import { MAX_BOTS, randomClassId, randomPortraitIndex } from 'shared';
+import { getClassDefinition, MAX_BOTS, randomClassId } from 'shared';
 import type { Room } from './rooms.js';
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
@@ -30,6 +30,7 @@ export function addBot(room: Room): Player | null {
 
   botCounter += 1;
   const id = `bot-${botCounter}`;
+  const classId = randomClassId();
   const bot: Player = {
     id,
     name: pickBotName(room),
@@ -37,8 +38,8 @@ export function addBot(room: Room): Player | null {
     status: 'active',
     stash: [],
     connected: true,
-    portraitIndex: randomPortraitIndex(),
-    classId: randomClassId(),
+    portraitIndex: getClassDefinition(classId)!.portraitIndex,
+    classId,
     winStreak: 0,
     isObserver: false,
     isBot: true,
