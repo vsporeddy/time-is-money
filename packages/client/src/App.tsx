@@ -53,7 +53,7 @@ export default function App() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [selectedOpponentId, setSelectedOpponentId] = useState<string | null>(null);
   const [myInventoryOpen, setMyInventoryOpen] = useState(true);
-  const [roundLimit, setRoundLimit] = useState(10);
+  const [roundLimit, setRoundLimit] = useState(15);
   // Mirror of Desire (copy) and Crossbow (destroy) both target an item in
   // someone else's inventory — one picker overlay serves both.
   const [itemPickerItemId, setItemPickerItemId] = useState<string | null>(null);
@@ -521,8 +521,8 @@ export default function App() {
           <input
             id="round-limit"
             type="range"
-            min="5"
-            max="20"
+            min="10"
+            max="25"
             step="1"
             value={roundLimit}
             onChange={(event) => {
@@ -531,7 +531,7 @@ export default function App() {
               socket.emit('set_round_limit', { maxRounds });
             }}
           />
-          <div className="round-limit-labels"><span>5</span><span>20</span></div>
+          <div className="round-limit-labels"><span>10</span><span>25</span></div>
         </div>
         <button
           className="btn btn-block"

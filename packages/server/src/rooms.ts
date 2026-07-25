@@ -3,7 +3,7 @@ import type { ClientToServerEvents, GameSettings, ItemInstance, Player, Round, R
 
 // Game-jam tuning flag: set to false to restore the original unlimited game.
 const ROUND_LIMIT_ENABLED = true;
-const ROUND_LIMIT = 10;
+const ROUND_LIMIT = 15;
 
 export interface ActiveRound {
   round: Round;

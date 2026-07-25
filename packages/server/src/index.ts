@@ -93,7 +93,7 @@ io.on('connection', (socket) => {
     if (room.status !== 'lobby') return;
 
     const rounded = Math.round(maxRounds);
-    if (!Number.isFinite(rounded) || rounded < 5 || rounded > 20) return;
+    if (!Number.isFinite(rounded) || rounded < 10 || rounded > 25) return;
     room.settings.maxRounds = rounded;
     emitRoomState(room, io);
   });
