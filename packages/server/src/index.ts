@@ -88,6 +88,15 @@ io.on('connection', (socket: AppSocket) => {
       }
     }
 
+    const normalizedName = name.toLowerCase();
+    const isNameTaken = [...room.players.values()].some(
+      (player) => player.name.toLowerCase() === normalizedName
+    );
+    if (isNameTaken) {
+      ack({ ok: false, error: 'That name is already taken!' });
+      return;
+    }
+
     const classId = pickAvailableClassId([...room.players.values()].map((p) => p.classId));
     if (!classId) {
       ack({ ok: false, reason: 'room_full', error: `This lobby is full — ${MAX_PLAYERS_PER_ROOM} players max.` });

@@ -110,6 +110,9 @@ export interface Round {
   revealedFields: string[];
   winnerId: string | null;
   soleBidder: boolean;
+  // Non-empty only when the lot hit the max-duration cutoff with players still
+  // holding: nobody wins, and everyone listed here got their held time back.
+  stalematePlayerIds: string[];
   restrictedBidderIds: string[] | null; // set by Dual Daggers — only these players may bid this round
 }
 
@@ -204,6 +207,7 @@ export interface ScoreBreakdown {
   hoarderBonus: number; // Hoarder: flat bonus per item owned
   traitBonuses: { traitId: string; count: number; bonus: number; multiplier?: number }[];
   total: number;
+  itemCount: number; // stash size — the first tiebreak on equal totals (fewer items wins)
 }
 
 // What every client sees of the active lot. trueValue is always shown (base

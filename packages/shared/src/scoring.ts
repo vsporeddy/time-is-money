@@ -180,6 +180,48 @@ export function computeScores(
       hoarderBonus,
       traitBonuses,
       total: Math.round(total),
+      itemCount: items.length,
     };
   });
+}
+
+// Ranking order: highest total, then the smaller stash (same money from fewer
+// lots is the more efficient collection), then the most time left over. Time is
+// only usable where it isn't masked — see rankScores.
+export function compareScoreBreakdowns(
+  a: ScoreBreakdown,
+  b: ScoreBreakdown,
+  timeByPlayer?: Map<string, number>
+): number {
+  if (a.total !== b.total) return b.total - a.total;
+  if (a.itemCount !== b.itemCount) return a.itemCount - b.itemCount;
+  if (timeByPlayer) {
+    const aTime = timeByPlayer.get(a.playerId) ?? 0;
+    const bTime = timeByPlayer.get(b.playerId) ?? 0;
+    if (aTime !== bTime) return bTime - aTime;
+  }
+  return 0; // genuinely tied — callers share the rank rather than pick one
+}
+
+export interface RankedScore {
+  score: ScoreBreakdown;
+  rank: number;
+  shared: boolean; // true when at least one other player holds this same rank
+}
+
+// Competition ranking (1, 1, 3): players the comparator can't separate share a
+// rank. Pass players only where timeRemainingMs is real — toRoomState masks it
+// to 0 for other players mid-game, so in-game callers must omit it.
+export function rankScores(scores: ScoreBreakdown[], players?: Player[]): RankedScore[] {
+  const timeByPlayer = players ? new Map(players.map((p) => [p.id, p.timeRemainingMs])) : undefined;
+  const sorted = [...scores].sort((a, b) => compareScoreBreakdowns(a, b, timeByPlayer));
+
+  const ranked: RankedScore[] = [];
+  for (let i = 0; i < sorted.length; i += 1) {
+    const tiedWithPrevious = i > 0 && compareScoreBreakdowns(sorted[i - 1], sorted[i], timeByPlayer) === 0;
+    const rank = tiedWithPrevious ? ranked[i - 1].rank : i + 1;
+    if (tiedWithPrevious) ranked[i - 1].shared = true;
+    ranked.push({ score: sorted[i], rank, shared: tiedWithPrevious });
+  }
+  return ranked;
 }

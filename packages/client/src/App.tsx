@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import type { ChatMessage, ItemInstance, JoinFailureReason, MaskedRoundItem, Player, Round, RoomState, ScoreBreakdown } from 'shared';
-import { MAX_PLAYERS_PER_ROOM, computeScores, getClassDefinition, getTemplate, getTraitDefinition } from 'shared';
+import { MAX_PLAYERS_PER_ROOM, computeScores, getClassDefinition, getTemplate, getTraitDefinition, rankScores } from 'shared';
 import { socket } from './socket';
 import { buildInviteLink, clearLobbyCodeFromUrl, readLobbyCodeFromUrl, writeLobbyCodeToUrl } from './lobbyLink';
 import { Logo } from './Logo';
@@ -15,6 +15,7 @@ import { ItemTargetPicker } from './ItemTargetPicker';
 import { PlayerPicker } from './PlayerPicker';
 import { LotPool } from './LotPool';
 import { playChatDing, playClick, playLose, playWin } from './sound';
+import { useViewportTooltips } from './useViewportTooltips';
 
 interface CurrentRound {
   round: Round;
@@ -27,6 +28,8 @@ interface LastResult {
 }
 
 export default function App() {
+  useViewportTooltips();
+
   const [connected, setConnected] = useState(false);
   const [joined, setJoined] = useState(false);
   const [myId, setMyId] = useState<string | null>(null);
@@ -510,13 +513,13 @@ export default function App() {
       </main>
     );
   } else if (gameOverPlayers && scores) {
-    const ranked = [...scores].sort((a, b) => b.total - a.total);
+    const ranked = rankScores(scores, gameOverPlayers);
 
     screen = shellWithHeader(
       <div className="panel">
         <h2 className="panel-title">GAME OVER</h2>
         <ol className="results-list">
-          {ranked.map((s) => {
+          {ranked.map(({ score: s, rank, shared }) => {
             const player = gameOverPlayers.find((p) => p.id === s.playerId);
             const itemNames = (player?.stash ?? [])
               .map((id) => knownItems[id])
@@ -540,8 +543,9 @@ export default function App() {
                   {player && <PortraitIcon index={player.portraitIndex} size={40} />}
                   <div>
                     <div className="rank-total">
-                      {player?.name}
+                      {shared ? `T${rank}` : `#${rank}`} {player?.name}
                       {s.playerId === myId ? ' (you)' : ''}: ${s.total}
+                      {shared && <span className="tied-label"> (tied)</span>}
                     </div>
                     <div className="rank-breakdown">
                       base ${s.baseValue}

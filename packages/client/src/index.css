@@ -808,6 +808,10 @@ input[type='text']:focus {
   left: 50%;
   display: none;
   width: max-content;
+  max-width: calc(100vw - 1rem);
+  max-height: calc(100vh - 1rem);
+  overflow: auto;
+  box-sizing: border-box;
   padding: 0.45rem;
   transform: translateX(-50%);
   background: var(--bg);
@@ -851,7 +855,10 @@ input[type='text']:focus {
   z-index: 50;
   display: none;
   width: max-content;
-  max-width: 15rem;
+  max-width: min(15rem, calc(100vw - 1rem));
+  max-height: calc(100vh - 1rem);
+  overflow: auto;
+  box-sizing: border-box;
   padding: 0.55rem;
   background: var(--bg);
   border: 2px solid var(--gold);
@@ -956,6 +963,10 @@ input[type='text']:focus {
   left: 50%;
   display: none;
   width: max-content;
+  max-width: calc(100vw - 1rem);
+  max-height: calc(100vh - 1rem);
+  overflow: auto;
+  box-sizing: border-box;
   padding: 0.45rem;
   transform: translateX(-50%);
   background: var(--bg);
@@ -1010,7 +1021,10 @@ input[type='text']:focus {
   left: 50%;
   display: none;
   width: max-content;
-  max-width: 13rem;
+  max-width: min(13rem, calc(100vw - 1rem));
+  max-height: calc(100vh - 1rem);
+  overflow: auto;
+  box-sizing: border-box;
   padding: 0.45rem;
   transform: translateX(-50%);
   background: var(--bg);
@@ -1314,6 +1328,11 @@ input[type='text']:focus {
 .results-item .rank-total {
   color: var(--gold-bright);
   font-size: 0.95rem;
+}
+
+.results-item .tied-label {
+  color: var(--text-dim);
+  font-size: 0.65rem;
 }
 
 .results-item .rank-breakdown {
