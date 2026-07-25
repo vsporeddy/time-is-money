@@ -1,6 +1,6 @@
 import type { Server } from 'socket.io';
 import type { ClientToServerEvents, Player, ServerToClientEvents } from 'shared';
-import { getClassDefinition, MAX_BOTS, randomClassId } from 'shared';
+import { getClassDefinition, MAX_BOTS, pickAvailableClassId } from 'shared';
 import type { Room } from './rooms.js';
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
@@ -28,9 +28,11 @@ export function addBot(room: Room): Player | null {
   const botCount = [...room.players.values()].filter((p) => p.isBot).length;
   if (botCount >= MAX_BOTS) return null;
 
+  const classId = pickAvailableClassId([...room.players.values()].map((p) => p.classId));
+  if (!classId) return null;
+
   botCounter += 1;
   const id = `bot-${botCounter}`;
-  const classId = randomClassId();
   const bot: Player = {
     id,
     name: pickBotName(room),

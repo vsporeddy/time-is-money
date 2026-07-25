@@ -26,8 +26,13 @@ export const CLASS_DEFINITIONS: ClassDefinition[] = [
   { id: 'gambler', name: 'Gambler', description: 'Each lot won in a row grows a time rebate on the next win. Any lot someone else wins resets the streak.', color: '#e6529c', portraitIndex: 147 },
 ];
 
-export function randomClassId(): string {
-  return CLASS_DEFINITIONS[Math.floor(Math.random() * CLASS_DEFINITIONS.length)].id;
+// Classes are unique per room — picks randomly among whichever classes aren't
+// already taken, or undefined if every one of them (all CLASS_DEFINITIONS.length) is in use.
+export function pickAvailableClassId(takenClassIds: Iterable<string>): string | undefined {
+  const taken = new Set(takenClassIds);
+  const available = CLASS_DEFINITIONS.filter((c) => !taken.has(c.id));
+  if (available.length === 0) return undefined;
+  return available[Math.floor(Math.random() * available.length)].id;
 }
 
 export function getClassDefinition(id: string | undefined): ClassDefinition | undefined {
