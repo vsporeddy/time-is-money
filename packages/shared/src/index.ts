@@ -4,6 +4,7 @@ export * from './items.js';
 export * from './traits.js';
 export * from './scoring.js';
 export * from './portraits.js';
+export * from './classes.js';
 
 export interface Player {
   id: string;
@@ -13,6 +14,7 @@ export interface Player {
   stash: string[]; // ItemInstance ids won
   connected: boolean;
   portraitIndex: number;
+  classId: string; // ClassDefinition id — random for now, eventually derived from portraitIndex
   isObserver: boolean; // joined while a game was already in progress — watches, never bids
   isBot: boolean;
 }
@@ -48,7 +50,6 @@ export interface ItemTemplate {
   effectType:
     | 'none'
     | 'timeRefund'
-    | 'revealValue'
     | 'revealBidding'
     | 'chest'
     | 'key'
@@ -130,7 +131,7 @@ export interface LotPoolItem {
   id: string;
   templateId: string;
   status: 'hidden' | 'upcoming' | 'auctioned';
-  saleRound?: number; // 1-indexed position in the (otherwise secret) auction order — only sent to a Magnifying Glass owner; absent for pool leftovers
+  saleRound?: number; // 1-indexed position in the (otherwise secret) auction order — only sent to a Merchant; absent for pool leftovers
 }
 
 export interface RoomState {
@@ -190,10 +191,11 @@ export interface ScoreBreakdown {
 // What every client sees of the active lot. trueValue is always shown (base
 // value is fixed and public; only the modifier rolls create variance).
 // rarity/material/specialModifier/hiddenTrait are stripped unless individually
-// revealed — except for a Magnifying Glass owner, who gets them all up front.
+// revealed — except for a Prospector, who gets material/rarity/specialModifier
+// all up front, and an Appraiser, who gets hiddenTraitId up front.
 export type MaskedRoundItem = Omit<ItemInstance, 'hiddenTraitId' | 'material' | 'rarity' | 'specialModifier'> &
-  Partial<Pick<ItemInstance, 'material' | 'rarity' | 'specialModifier'>> & {
-    modifiersRevealedInstantly?: boolean; // true for a Magnifying Glass owner — lets the client skip the blur-in animation
+  Partial<Pick<ItemInstance, 'material' | 'rarity' | 'specialModifier' | 'hiddenTraitId'>> & {
+    modifiersRevealedInstantly?: boolean; // true for a Prospector — lets the client skip the blur-in animation
   };
 
 export interface ServerToClientEvents {

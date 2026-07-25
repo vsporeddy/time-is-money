@@ -8,6 +8,13 @@ const BARGAIN_CAP_SECONDS = 5;
 const BARGAIN_RATE_PER_SEC = 8;
 const CONTRABAND_WEAPON_MULTIPLIER = 2;
 
+// Antiquarian/Smuggler: class-gated set bonuses for trait categories that get
+// no bonus otherwise (trinket is explicitly noSetBonus; weapon isn't even a
+// TraitDefinition) — same shape as TraitTier, just applied outside the
+// TRAIT_DEFINITIONS loop since they're conditional on the owner's class.
+const ANTIQUARIAN_TRINKET_TIERS: TraitTier[] = [{ count: 2, bonus: 10 }, { count: 4, bonus: 25 }, { count: 6, bonus: 45 }];
+const SMUGGLER_WEAPON_TIERS: TraitTier[] = [{ count: 2, bonus: 10 }, { count: 4, bonus: 25 }];
+
 const RARITY_MULTIPLIERS: Record<string, number> = {
   Common: 1,
   Rare: 1.2,
@@ -49,10 +56,10 @@ export function getItemValueMultiplier(item: ItemInstance): number {
 // on the 2nd+ copy — the first copy is always full value. Doesn't touch
 // trait counting — a stash of different swords still gets full value and
 // full "Sword"/"Weapon" credit, only literal duplicates are discouraged.
-function diminishingMultiplier(copyIndex: number): number {
+function diminishingMultiplier(copyIndex: number, softened: boolean): number {
   if (copyIndex <= 0) return 1;
-  if (copyIndex === 1) return 0.85;
-  return 0.7;
+  if (copyIndex === 1) return softened ? 0.95 : 0.85;
+  return softened ? 0.85 : 0.7;
 }
 
 export function computeScores(
@@ -85,6 +92,19 @@ export function computeScores(
       }
     }
 
+    // Antiquarian/Smuggler: same tier-lookup shape as TRAIT_DEFINITIONS above,
+    // but gated to the owner's class instead of being universal.
+    if (player.classId === 'antiquarian') {
+      const count = items.filter((i) => getTemplate(i.templateId)?.traits.includes('trinket')).length;
+      const tier = [...ANTIQUARIAN_TRINKET_TIERS].reverse().find((t) => count >= t.count);
+      if (tier) traitBonuses.push({ traitId: 'trinket', count, bonus: tier.bonus });
+    }
+    if (player.classId === 'smuggler') {
+      const count = items.filter((i) => getTemplate(i.templateId)?.traits.includes('weapon')).length;
+      const tier = [...SMUGGLER_WEAPON_TIERS].reverse().find((t) => count >= t.count);
+      if (tier) traitBonuses.push({ traitId: 'weapon', count, bonus: tier.bonus });
+    }
+
     let baseValue = 0;
     let hiddenTraitBonus = 0;
     let scoreScalingBonus = 0;
@@ -113,7 +133,10 @@ export function computeScores(
       const specialSetMultiplier = item.specialModifier
         ? activeTraitTiers.get(item.specialModifier.toLowerCase())?.multiplier
         : undefined;
-      const specialMultiplier = specialSetMultiplier ?? getSpecialModifierValueMultiplier(item.specialModifier);
+      // Fence: ignores the Cursed value penalty specifically — the Cursed set
+      // bonus (from specialSetMultiplier) still applies on top if earned.
+      const fenceIgnoresCursedPenalty = player.classId === 'fence' && item.specialModifier === 'Cursed';
+      const specialMultiplier = specialSetMultiplier ?? (fenceIgnoresCursedPenalty ? 1 : getSpecialModifierValueMultiplier(item.specialModifier));
       const weaponMultiplier = hasContrabandPermit && (template?.weapon || template?.effectType === 'weaponImmunity') ? CONTRABAND_WEAPON_MULTIPLIER : 1;
       const aquaticMultiplier = template?.traits.includes('aquatic')
         ? activeTraitTiers.get('aquatic')?.matchingItemMultiplier ?? 1
@@ -121,7 +144,7 @@ export function computeScores(
       const strongestArmorMultiplier = item.id === strongestArmorItemId ? armorMultiplier : 1;
       baseValue +=
         item.trueValue *
-        diminishingMultiplier(copyIndex) *
+        diminishingMultiplier(copyIndex, player.classId === 'hoarder') *
         getRarityValueMultiplier(item.rarity) *
         getMaterialValueMultiplier(item.material) *
         specialMultiplier *

@@ -64,7 +64,7 @@ export function getRoom(): Room {
 }
 
 // True if the given player currently holds an item of the given template —
-// used to gate passive item effects (e.g. Spyglass, Magnifying Glass).
+// used to gate passive item effects (e.g. Spyglass).
 export function ownsItemTemplate(r: Room, playerId: string | undefined, templateId: string): boolean {
   if (!playerId) return false;
   const player = r.players.get(playerId);
@@ -72,8 +72,16 @@ export function ownsItemTemplate(r: Room, playerId: string | undefined, template
   return player.stash.some((itemId) => r.wonItems.get(itemId)?.templateId === templateId);
 }
 
+// True if the given player is currently playing the given class — used to
+// gate passive class abilities (e.g. Merchant, Spy).
+export function playerHasClass(r: Room, playerId: string | undefined, classId: string): boolean {
+  if (!playerId) return false;
+  return r.players.get(playerId)?.classId === classId;
+}
+
 export function toRoomState(r: Room, viewerId?: string): RoomState {
-  const hasMagnifyingGlass = ownsItemTemplate(r, viewerId, 'magnifying-glass');
+  const isSpy = playerHasClass(r, viewerId, 'spy');
+  const isMerchant = playerHasClass(r, viewerId, 'merchant');
 
   return {
     status: r.status,
@@ -86,14 +94,14 @@ export function toRoomState(r: Room, viewerId?: string): RoomState {
     currentRoundIndex: r.currentRoundIndex,
     lotPool: r.lotPool.map((item) => {
       const auctioned = r.revealedPoolItemIds.has(item.id);
-      const hidden = !hasMagnifyingGlass && !auctioned && r.hiddenPoolItemIds.has(item.id);
+      const hidden = !isSpy && !auctioned && r.hiddenPoolItemIds.has(item.id);
       const auctionIndex = r.auctionOrder.indexOf(item.id);
       return {
         id: item.id,
         templateId: item.templateId,
         status: auctioned ? 'auctioned' : hidden ? 'hidden' : 'upcoming',
-        // Magnifying Glass: reveal the whole schedule, not just this lot's modifiers.
-        saleRound: hasMagnifyingGlass && auctionIndex !== -1 ? auctionIndex + 1 : undefined,
+        // Merchant: reveal the whole schedule, not just this lot's modifiers.
+        saleRound: isMerchant && auctionIndex !== -1 ? auctionIndex + 1 : undefined,
       };
     }),
   };

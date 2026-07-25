@@ -25,6 +25,7 @@ export interface TraitDefinition {
 export const TRAIT_DEFINITIONS: TraitDefinition[] = [
   { id: 'armor', name: 'Armor', iconSpriteId: '97', tiers: [{ count: 3, bonus: 0, strongestMatchingItemMultiplier: 1.5 }] },
   { id: 'trinket', name: 'Trinket', iconSpriteId: '133', tiers: [], noSetBonus: true },
+  { id: 'weapon', name: 'Weapon', iconSpriteId: '80', tiers: [], noSetBonus: true },
   { id: 'text', name: 'Text', iconSpriteId: '217', tiers: [{ count: 2, bonus: 10 }, { count: 4, bonus: 25 }] },
   { id: 'musical', name: 'Musical', iconSpriteId: '179', tiers: [{ count: 2, bonus: 0, bonusPerMatchingItem: 10 }, { count: 3, bonus: 0, bonusPerMatchingItem: 15 }, { count: 4, bonus: 0, bonusPerMatchingItem: 20 }] },
   { id: 'aquatic', name: 'Aquatic', iconSpriteId: '262', tiers: [{ count: 2, bonus: 0, matchingItemMultiplier: 1.5 }, { count: 4, bonus: 0, matchingItemMultiplier: 2 }] },

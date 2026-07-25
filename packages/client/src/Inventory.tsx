@@ -1,5 +1,5 @@
 import type { ItemInstance, ItemTemplate, Player, ScoreBreakdown } from 'shared';
-import { getHiddenTrait, getMaterialValueMultiplier, getRarityValueMultiplier, getSpecialModifierValueMultiplier, getTemplate, getTraitDefinition, TRAIT_DEFINITIONS } from 'shared';
+import { getClassDefinition, getHiddenTrait, getMaterialValueMultiplier, getRarityValueMultiplier, getSpecialModifierValueMultiplier, getTemplate, getTraitDefinition, TRAIT_DEFINITIONS } from 'shared';
 import { SpriteIcon } from './SpriteIcon';
 import { getGlowFilter, getGlowIntensity, getItemGlowCategory, getTraitLabelColor } from './itemVisuals';
 
@@ -94,7 +94,6 @@ function itemAttributes(item: ItemInstance): DisplayAttribute[] {
   if (item.fairTrade) attributes.push({ label: 'Fair Trade', effect: true });
   if (template?.effectType === 'timeRefund') attributes.push({ label: 'Time Refund' });
   if (item.solitaire) attributes.push({ label: 'Solitaire', effect: true });
-  if (template?.effectType === 'revealValue') attributes.push({ label: 'Reveals Modifiers & Pool', effect: true });
   if (template?.effectType === 'revealBidding') attributes.push({ label: 'Scouts Bidders', effect: true });
   if (template?.effectType === 'chest') attributes.push({ label: 'Needs Key', effect: true });
   if (template?.effectType === 'key') attributes.push({ label: 'Opens Chests', effect: true });
@@ -134,6 +133,7 @@ function modifiedItemValue(item: ItemInstance): number {
 export function Inventory({ player, items, score, side, showValue = true, onClose, onUseItem, roundPhase = null }: InventoryProps) {
   const ownedItems = player.stash.map((id) => items[id]).filter((item): item is ItemInstance => Boolean(item));
   const stash = ownedItems.slice(0, INVENTORY_SIZE);
+  const classDef = getClassDefinition(player.classId);
   const cursedSetActive = score?.traitBonuses.some((trait) => trait.traitId === 'cursed' && trait.multiplier === 1.25) ?? false;
   const traitProgress: TraitProgress[] = TRAIT_DEFINITIONS.map<TraitProgress | null>((trait) => {
     const count = trait.materialMatch
@@ -171,7 +171,18 @@ export function Inventory({ player, items, score, side, showValue = true, onClos
   return (
     <aside className={`inventory-panel inventory-panel-${side}`} aria-label={`${player.name}'s inventory`}>
       <div className="inventory-heading">
-        <h2>{side === 'left' ? 'YOUR INVENTORY' : `${player.name.toUpperCase()}'S INVENTORY`}</h2>
+        <div>
+          <h2>{side === 'left' ? 'YOUR INVENTORY' : `${player.name.toUpperCase()}'S INVENTORY`}</h2>
+          {classDef && (
+            <div className="class-badge" tabIndex={0}>
+              {classDef.name}
+              <div className="inventory-tooltip class-badge-tooltip">
+                <b>{classDef.name.toUpperCase()}</b>
+                <span>{classDef.description}</span>
+              </div>
+            </div>
+          )}
+        </div>
         <div className="inventory-heading-actions">
           {showValue && (
             <div className="inventory-total" tabIndex={0}>

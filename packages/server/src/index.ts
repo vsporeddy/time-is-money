@@ -2,7 +2,7 @@ import express from 'express';
 import { createServer } from 'node:http';
 import { Server } from 'socket.io';
 import type { ClientToServerEvents, Player, ServerToClientEvents } from 'shared';
-import { randomPortraitIndex } from 'shared';
+import { randomClassId, randomPortraitIndex } from 'shared';
 import { emitRoomState, getRoom, toRoomState } from './rooms.js';
 import { addBot, removeBot } from './bots.js';
 import {
@@ -57,6 +57,7 @@ io.on('connection', (socket) => {
       stash: [],
       connected: true,
       portraitIndex: randomPortraitIndex(),
+      classId: randomClassId(),
       isObserver,
       isBot: false,
     };

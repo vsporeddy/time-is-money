@@ -22,7 +22,6 @@ function itemAttributes(template: ItemTemplate | undefined): DisplayAttribute[] 
   if (!template) return [];
   const attributes: DisplayAttribute[] = template.traits.map((trait) => ({ label: getTraitDefinition(trait)?.name ?? capitalize(trait), traitId: trait }));
   const addEffect = (label: string) => attributes.push({ label, effect: true });
-  if (template.effectType === 'revealValue') addEffect('Reveals Modifiers & Pool');
   if (template.effectType === 'revealBidding') addEffect('Scouts Bidders');
   if (template.effectType === 'chest') addEffect('Needs Key');
   if (template.effectType === 'key') addEffect('Opens Chests');
@@ -39,8 +38,9 @@ function itemAttributes(template: ItemTemplate | undefined): DisplayAttribute[] 
 }
 
 export function LotPool({ pool, onClose }: LotPoolProps) {
-  // Only a Magnifying Glass owner ever gets saleRound populated — its presence
-  // anywhere in the pool means the whole schedule (and every mystery item) is revealed.
+  // Only a Merchant ever gets saleRound populated — its presence anywhere in
+  // the pool means the whole schedule is revealed (mystery items are a
+  // separate Spy ability and may still be blurred here).
   const fullyRevealed = pool.some((entry) => entry.saleRound !== undefined);
 
   const sorted = fullyRevealed
@@ -55,7 +55,7 @@ export function LotPool({ pool, onClose }: LotPoolProps) {
       </div>
       <p className="status-line">
         {fullyRevealed
-          ? 'Magnifying Glass: the full sale order is revealed below. Unnumbered items are reserves and stay out of the auction unless swapped in.'
+          ? 'Merchant: the full sale order is revealed below. Unnumbered items are reserves and stay out of the auction unless swapped in.'
           : 'Every item that could come up this game. Not all of them will be sold, the sale order is a surprise, and a few are still a mystery.'}
       </p>
       <div className="inventory-grid lot-pool-grid">

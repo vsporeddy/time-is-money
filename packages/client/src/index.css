@@ -443,6 +443,25 @@ input[type='text']:focus {
   cursor: help;
 }
 
+.class-badge {
+  position: relative;
+  display: inline-block;
+  margin-top: 0.2rem;
+  color: var(--gold-bright);
+  font-size: 0.5rem;
+  cursor: help;
+}
+
+.class-badge:hover .class-badge-tooltip,
+.class-badge:focus .class-badge-tooltip {
+  display: block;
+}
+
+.class-badge-tooltip {
+  top: calc(100% + 0.35rem);
+  left: 0;
+}
+
 .inventory-total span,
 .inventory-total strong {
   display: block;

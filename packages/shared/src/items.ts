@@ -67,7 +67,6 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   { id: 'helix-fossil', name: 'Helix Fossil', baseSpriteId: '269', baseValue: 28, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['aquatic', 'magic'] },
 
   // --- Curios (flat value, no modifiers/traits, unique standalone effects) ---
-  { id: 'magnifying-glass', name: 'Magnifying Glass', baseSpriteId: '168', baseValue: 5, materials: ['Ordinary'], rarities: ['Common'], effectType: 'revealValue', flatValue: true, traits: [] },
   { id: 'spyglass', name: 'Spyglass', baseSpriteId: '167', baseValue: 5, materials: ['Ordinary'], rarities: ['Common'], effectType: 'revealBidding', flatValue: true, traits: [] },
   { id: 'treasure-chest', name: 'Treasure Chest', baseSpriteId: '187', baseValue: 0, materials: ['Ordinary'], rarities: ['Common'], effectType: 'chest', flatValue: true, traits: [], chest: { keyTemplateId: 'rusty-key', grantsTraitId: 'trinket', grantsCountRange: [1, 3] } },
   { id: 'sunken-treasure-chest', name: 'Sunken Treasure Chest', baseSpriteId: '270', baseValue: 0, materials: ['Ordinary'], rarities: ['Common'], effectType: 'chest', flatValue: true, traits: [], chest: { keyTemplateId: 'rusty-key', grantsTraitId: 'aquatic', grantsCountRange: [3, 5] } },
