@@ -176,6 +176,7 @@ export function Inventory({ player, items, score, side, showValue = true, onClos
           {classDef && (
             <div className="class-badge" tabIndex={0}>
               {classDef.name}
+              {classDef.id === 'gambler' && player.winStreak > 0 ? ` (streak ${player.winStreak})` : ''}
               <div className="inventory-tooltip class-badge-tooltip">
                 <b>{classDef.name.toUpperCase()}</b>
                 <span>{classDef.description}</span>

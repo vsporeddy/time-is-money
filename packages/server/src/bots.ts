@@ -39,6 +39,7 @@ export function addBot(room: Room): Player | null {
     connected: true,
     portraitIndex: randomPortraitIndex(),
     classId: randomClassId(),
+    winStreak: 0,
     isObserver: false,
     isBot: true,
   };

@@ -21,6 +21,7 @@ export const CLASS_DEFINITIONS: ClassDefinition[] = [
   { id: 'insurer', name: 'Insurer', description: 'Recovers part of the time spent on lots bid on and lost.' },
   { id: 'locksmith', name: 'Locksmith', description: 'Chests you win open immediately — no matching key required.' },
   { id: 'hoarder', name: 'Hoarder', description: 'Owning duplicates of the same item is penalized less harshly.' },
+  { id: 'gambler', name: 'Gambler', description: 'Each lot won in a row grows a time rebate on the next win — any lot someone else wins resets the streak.' },
 ];
 
 export function randomClassId(): string {

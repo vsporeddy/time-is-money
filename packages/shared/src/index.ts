@@ -15,6 +15,7 @@ export interface Player {
   connected: boolean;
   portraitIndex: number;
   classId: string; // ClassDefinition id — random for now, eventually derived from portraitIndex
+  winStreak: number; // consecutive lots won in a row; any lot someone else wins resets it to 0 — drives the Gambler class
   isObserver: boolean; // joined while a game was already in progress — watches, never bids
   isBot: boolean;
 }

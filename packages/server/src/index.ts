@@ -58,6 +58,7 @@ io.on('connection', (socket) => {
       connected: true,
       portraitIndex: randomPortraitIndex(),
       classId: randomClassId(),
+      winStreak: 0,
       isObserver,
       isBot: false,
     };

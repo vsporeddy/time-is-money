@@ -13,6 +13,8 @@ const MODIFIER_REVEAL_INTERVAL_MS = 7_000;
 const INVESTOR_INTEREST_RATE = 0.02; // Investor: % of unspent time added at the end of every round
 const AUCTIONEER_REBATE_RATE = 0.1; // Auctioneer: % of the price paid rebated back on every win
 const INSURER_REFUND_RATE = 0.5; // Insurer: % of committed time recovered on a lost bid
+const GAMBLER_STREAK_REBATE_RATE_PER_WIN = 0.05; // Gambler: % of price rebated per consecutive win, additive
+const GAMBLER_MAX_STREAK_WINS = 4; // caps the rebate scaling at a 4-win streak (20%)
 const EARLY_UTILITY_TEMPLATE_IDS = new Set(['spyglass', 'chronomancers-hourglass']);
 const MAIN_TRAIT_IDS = ['armor', 'trinket', 'text', 'musical', 'aquatic'] as const;
 type MainTraitId = (typeof MAIN_TRAIT_IDS)[number];
@@ -372,6 +374,15 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
   ar.round.soleBidder = winnerId !== null && bidderCount === 1;
 
   if (winnerId) {
+    // Win streaks (Gambler): a sold lot extends the winner's streak and
+    // resets everyone else who was eligible this round. A passed lot (no
+    // winner) leaves every streak untouched — nothing was won away from anyone.
+    for (const playerId of Object.keys(ar.round.bidders)) {
+      const player = room.players.get(playerId);
+      if (!player) continue;
+      player.winStreak = playerId === winnerId ? player.winStreak + 1 : 0;
+    }
+
     const winner = room.players.get(winnerId);
     if (winner) {
       const winnerBidder = ar.round.bidders[winnerId];
@@ -407,6 +418,16 @@ function resolveRound(room: Room, io: IO, winnerId: string | null) {
       if (winner.classId === 'auctioneer' && paidPrice > 0) {
         winner.timeRemainingMs += Math.round(paidPrice * AUCTIONEER_REBATE_RATE);
         if (winner.status === 'out_of_time') winner.status = 'active';
+      }
+
+      // Gambler: rebate grows with the just-updated streak (already includes this win).
+      if (winner.classId === 'gambler' && paidPrice > 0) {
+        const streakLevel = Math.min(winner.winStreak, GAMBLER_MAX_STREAK_WINS);
+        const rebate = Math.round(paidPrice * GAMBLER_STREAK_REBATE_RATE_PER_WIN * streakLevel);
+        if (rebate > 0) {
+          winner.timeRemainingMs += rebate;
+          if (winner.status === 'out_of_time') winner.status = 'active';
+        }
       }
 
       tryOpenChests(room, winner);
@@ -486,6 +507,7 @@ export function resetRoomToLobby(room: Room) {
     player.timeRemainingMs = room.settings.startingTimeMs;
     player.status = 'active';
     player.stash = [];
+    player.winStreak = 0;
     player.isObserver = false;
   }
 }
