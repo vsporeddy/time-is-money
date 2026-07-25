@@ -156,10 +156,12 @@ export function rollItemInstanceForTemplate(templateId: string, maxRounds: numbe
 }
 
 // Duplicates an existing instance's exact rolled stats under a fresh id —
-// used by the Mirror of Desire to copy another player's item.
+// used by the Mirror of Desire to copy another player's item. The copy is
+// a fresh, unspent item even if the source's one-time weapon effect was
+// already used.
 export function cloneItemInstance(source: ItemInstance): ItemInstance {
   instanceCounter += 1;
-  return { ...source, id: `item-${instanceCounter}` };
+  return { ...source, id: `item-${instanceCounter}`, usedActiveEffect: false };
 }
 
 export function getTemplate(templateId: string): ItemTemplate | undefined {
