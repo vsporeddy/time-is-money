@@ -4,6 +4,7 @@ import { getHiddenTrait, getMaterialValueMultiplier, getRarityValueMultiplier, g
 import { SpriteIcon } from './SpriteIcon';
 import { PortraitIcon } from './PortraitIcon';
 import { AttributeLabel } from './AttributeLabel';
+import { getGlowFilter, getGlowIntensity, getItemGlowCategory } from './itemVisuals';
 import { playClick, playCoin, playCountdownTick } from './sound';
 
 interface DisplayAttribute {
@@ -361,7 +362,14 @@ export function Game({
       {!lastResult && currentRound && (
         <div className="item-card">
           <div className="item-sprite">
-            <SpriteIcon index={Number(currentRound.item.visual.baseSpriteId)} scale={4} />
+            <SpriteIcon
+              index={Number(currentRound.item.visual.baseSpriteId)}
+              scale={4}
+              glowFilter={getGlowFilter(
+                getItemGlowCategory(getTemplate(currentRound.item.templateId)),
+                getGlowIntensity(currentRound.item.material, currentRound.item.rarity)
+              )}
+            />
           </div>
           <h3 className="item-name">{getTemplate(currentRound.item.templateId)?.name}</h3>
           <div className="auction-details">

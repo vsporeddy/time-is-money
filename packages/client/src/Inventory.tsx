@@ -1,6 +1,7 @@
 import type { ItemInstance, ItemTemplate, Player, ScoreBreakdown } from 'shared';
 import { getHiddenTrait, getMaterialValueMultiplier, getRarityValueMultiplier, getSpecialModifierValueMultiplier, getTemplate, getTraitDefinition, TRAIT_DEFINITIONS } from 'shared';
 import { SpriteIcon } from './SpriteIcon';
+import { getGlowFilter, getGlowIntensity, getItemGlowCategory, getTraitLabelColor } from './itemVisuals';
 
 interface InventoryProps {
   player: Player;
@@ -194,16 +195,17 @@ export function Inventory({ player, items, score, side, showValue = true, onClos
           const used = item?.usedActiveEffect === true;
           const usable = Boolean(item && onUseItem && !used && isEffectUsableNow(template, roundPhase));
           const slotClasses = ['inventory-slot', usable && 'inventory-slot-usable', used && 'inventory-slot-used'].filter(Boolean).join(' ');
+          const glowFilter = item ? getGlowFilter(getItemGlowCategory(template), getGlowIntensity(item.material, item.rarity)) : undefined;
           return (
             <div className={slotClasses} key={item?.id ?? `empty-${index}`}>
               {item && (
                 <>
                   {usable ? (
                     <button type="button" className="inventory-slot-use-button" onClick={() => onUseItem!(item.id)} aria-label={`Use ${template?.name ?? item.templateId}`}>
-                      <SpriteIcon index={Number(item.visual.baseSpriteId)} scale={2} />
+                      <SpriteIcon index={Number(item.visual.baseSpriteId)} scale={2} glowFilter={glowFilter} />
                     </button>
                   ) : (
-                    <SpriteIcon index={Number(item.visual.baseSpriteId)} scale={2} />
+                    <SpriteIcon index={Number(item.visual.baseSpriteId)} scale={2} glowFilter={glowFilter} />
                   )}
                   <div className="inventory-tooltip inventory-item-tooltip">
                     <b>{template?.name ?? item.templateId}</b>
@@ -226,11 +228,19 @@ export function Inventory({ player, items, score, side, showValue = true, onClos
                     )}
                     <span>Attributes:</span>
                     <ul className="inventory-detail-list">
-                      {itemAttributes(item).map((attribute) => (
-                        <li key={attribute.label}>
-                          <span className={attribute.traitId ? 'attribute-set-label' : attribute.effect ? 'item-effect-label' : undefined}>{attribute.label}</span>
-                        </li>
-                      ))}
+                      {itemAttributes(item).map((attribute) => {
+                        const traitColor = attribute.traitId ? getTraitLabelColor(attribute.traitId) : undefined;
+                        return (
+                          <li key={attribute.label}>
+                            <span
+                              className={!traitColor && attribute.traitId ? 'attribute-set-label' : attribute.effect ? 'item-effect-label' : undefined}
+                              style={traitColor ? { color: traitColor } : undefined}
+                            >
+                              {attribute.label}
+                            </span>
+                          </li>
+                        );
+                      })}
                     </ul>
                     {hiddenTrait && (
                       <span className={`inventory-find ${hiddenTrait.id === 'flawed' ? 'find-flawed' : hiddenTrait.id === 'windfall' ? 'find-windfall' : ''}`}>

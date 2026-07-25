@@ -1,6 +1,7 @@
 import type { ItemTemplate, LotPoolItem } from 'shared';
 import { getTemplate, getTraitDefinition } from 'shared';
 import { SpriteIcon } from './SpriteIcon';
+import { getGlowFilter, getItemGlowCategory, getTraitLabelColor } from './itemVisuals';
 
 interface LotPoolProps {
   pool: LotPoolItem[];
@@ -14,12 +15,12 @@ function capitalize(value: string): string {
 interface DisplayAttribute {
   label: string;
   effect?: boolean;
-  trait?: boolean;
+  traitId?: string;
 }
 
 function itemAttributes(template: ItemTemplate | undefined): DisplayAttribute[] {
   if (!template) return [];
-  const attributes: DisplayAttribute[] = template.traits.map((trait) => ({ label: getTraitDefinition(trait)?.name ?? capitalize(trait), trait: true }));
+  const attributes: DisplayAttribute[] = template.traits.map((trait) => ({ label: getTraitDefinition(trait)?.name ?? capitalize(trait), traitId: trait }));
   const addEffect = (label: string) => attributes.push({ label, effect: true });
   if (template.effectType === 'revealValue') addEffect('Reveals Modifiers & Pool');
   if (template.effectType === 'revealBidding') addEffect('Scouts Bidders');
@@ -76,20 +77,31 @@ export function LotPool({ pool, onClose }: LotPoolProps) {
             : fullyRevealed
             ? `${template?.name} — reserve, not scheduled`
             : template?.name;
+          // No rolled instance data is exposed for pool lots yet, so the glow
+          // stays at its dull baseline (0 intensity) until an item is actually won.
+          const glowFilter = !hidden && template ? getGlowFilter(getItemGlowCategory(template), 0) : undefined;
           return (
             <div key={entry.id} className={slotClasses} title={label}>
               {entry.saleRound !== undefined && <span className="lot-pool-round-badge">{entry.saleRound}</span>}
-              {hidden ? <span className="lot-pool-mystery-mark">?</span> : <SpriteIcon index={Number(template?.baseSpriteId ?? 0)} scale={2} />}
+              {hidden ? <span className="lot-pool-mystery-mark">?</span> : <SpriteIcon index={Number(template?.baseSpriteId ?? 0)} scale={2} glowFilter={glowFilter} />}
               {!hidden && template && (
                 <div className="inventory-tooltip inventory-item-tooltip lot-pool-item-tooltip">
                   <b>{template.name}</b>
                   <span>Attributes:</span>
                   <ul className="inventory-detail-list">
-                    {itemAttributes(template).map((attribute) => (
-                      <li key={attribute.label}>
-                        <span className={attribute.trait ? 'attribute-set-label' : attribute.effect ? 'item-effect-label' : undefined}>{attribute.label}</span>
-                      </li>
-                    ))}
+                    {itemAttributes(template).map((attribute) => {
+                      const traitColor = attribute.traitId ? getTraitLabelColor(attribute.traitId) : undefined;
+                      return (
+                        <li key={attribute.label}>
+                          <span
+                            className={!traitColor && attribute.traitId ? 'attribute-set-label' : attribute.effect ? 'item-effect-label' : undefined}
+                            style={traitColor ? { color: traitColor } : undefined}
+                          >
+                            {attribute.label}
+                          </span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               )}

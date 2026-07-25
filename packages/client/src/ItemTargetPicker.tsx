@@ -1,6 +1,7 @@
 import type { ItemInstance, Player } from 'shared';
 import { getTemplate } from 'shared';
 import { SpriteIcon } from './SpriteIcon';
+import { getGlowFilter, getGlowIntensity, getItemGlowCategory } from './itemVisuals';
 
 interface ItemTargetPickerProps {
   title: string;
@@ -44,6 +45,7 @@ export function ItemTargetPicker({ title, subtitle, players, myId, items, exclud
               <div className="inventory-grid mirror-picker-grid">
                 {playerItems.map((item) => {
                   const template = getTemplate(item.templateId);
+                  const glowFilter = getGlowFilter(getItemGlowCategory(template), getGlowIntensity(item.material, item.rarity));
                   return (
                     <button
                       type="button"
@@ -53,7 +55,7 @@ export function ItemTargetPicker({ title, subtitle, players, myId, items, exclud
                       aria-label={`${template?.name ?? item.templateId} (${player.name})`}
                       title={template?.name}
                     >
-                      <SpriteIcon index={Number(item.visual.baseSpriteId)} scale={2} />
+                      <SpriteIcon index={Number(item.visual.baseSpriteId)} scale={2} glowFilter={glowFilter} />
                     </button>
                   );
                 })}

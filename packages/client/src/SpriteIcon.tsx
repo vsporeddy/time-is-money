@@ -10,7 +10,7 @@ function getSheet() {
   return sheetImage;
 }
 
-export function SpriteIcon({ index, scale = 2 }: { index: number; scale?: number }) {
+export function SpriteIcon({ index, scale = 2, glowFilter }: { index: number; scale?: number; glowFilter?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -35,7 +35,7 @@ export function SpriteIcon({ index, scale = 2 }: { index: number; scale?: number
       ref={canvasRef}
       width={SPRITE_SIZE * scale}
       height={SPRITE_SIZE * scale}
-      style={{ imageRendering: 'pixelated' }}
+      style={{ imageRendering: 'pixelated', filter: glowFilter, transition: glowFilter ? 'filter 7s ease-out' : undefined }}
     />
   );
 }

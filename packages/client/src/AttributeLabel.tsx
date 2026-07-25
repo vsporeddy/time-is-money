@@ -1,4 +1,5 @@
 import { getTraitDefinition } from 'shared';
+import { getTraitLabelColor } from './itemVisuals';
 
 interface AttributeLabelProps {
   traitId?: string;
@@ -21,10 +22,12 @@ function setBonusText(traitId: string, tier: { bonus: number; multiplier?: numbe
 
 export function AttributeLabel({ traitId, label }: AttributeLabelProps) {
   const trait = traitId ? getTraitDefinition(traitId) : undefined;
-  if (!trait) return <>{label}</>;
+  const color = traitId ? getTraitLabelColor(traitId) : undefined;
+
+  if (!trait) return color ? <span style={{ color }}>{label}</span> : <>{label}</>;
 
   return (
-    <span className="attribute-bonus-trigger" tabIndex={0}>
+    <span className="attribute-bonus-trigger" style={color ? { color } : undefined} tabIndex={0}>
       {label}
       <span className="attribute-bonus-tooltip">
         <b>{trait.noSetBonus ? 'TRINKETS' : `${trait.name} SET BONUS`}</b>
