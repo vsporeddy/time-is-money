@@ -692,7 +692,7 @@ export default function App() {
     screen = shellWithHeader(
       <>
       <div className="panel">
-        <h2 className="panel-title">GAME OVER</h2>
+        <h2 className="panel-title">AUCTION OVER</h2>
         <ol className="results-list">
           {ranked.map(({ score: s, rank, shared }) => {
             const player = gameOverPlayers.find((p) => p.id === s.playerId);
@@ -879,7 +879,7 @@ export default function App() {
       <BackgroundMusic ducked={currentRound !== null} muffled={!joined || room?.status === 'lobby'} />
       {isHost && (
         <button className="dev-reset-button" onClick={handleResetGame}>
-          Reset Game
+          Reset Auction
         </button>
       )}
       <div className="bottom-bar">

@@ -83,7 +83,7 @@ export function Lobby({
       </p>
 
       <p className="status-line">
-        {playerCount} of {maxPlayers} players — waiting for bidders…
+        {playerCount} of {maxPlayers} bidders. Waiting for bidders…
       </p>
 
       {isHost ? (
@@ -109,7 +109,7 @@ export function Lobby({
               onStartGame();
             }}
           >
-            START GAME
+            START AUCTION
           </button>
           <div className="bot-stepper" role="group" aria-label="Bot count">
             <span className="bot-stepper-label">BOTS</span>
@@ -148,7 +148,7 @@ export function Lobby({
       )}
 
       {playerCount < 2 && (
-        <p className="error-text">Not enough bidders to start the game.</p>
+        <p className="error-text">Not enough bidders to start the auction.</p>
       )}
     </div>
   );

@@ -64,7 +64,7 @@ export function LotPool({ pool, onClose }: LotPoolProps) {
       <p className="status-line">
         {fullyRevealed
           ? 'Merchant: the full sale order is revealed below. Unnumbered items are reserves and stay out of the auction unless swapped in.'
-          : 'Every item that could come up this game. Not all of them will be sold, the sale order is a surprise, and a few are still a mystery.'}
+          : 'Every item that could come up this auction. Not all of them will be sold, the sale order is a surprise, and a few are still a mystery.'}
       </p>
       <div className="inventory-grid lot-pool-grid">
         {sorted.map((entry) => {
