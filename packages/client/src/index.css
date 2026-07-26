@@ -341,6 +341,7 @@ input[type='text']:focus {
   font-family: var(--font-pixel);
   font-size: 0.75rem;
   letter-spacing: 0.04em;
+  text-align: center;
   color: var(--bg);
   background: var(--gold);
   border: 3px solid var(--border-gold);
@@ -369,6 +370,13 @@ input[type='text']:focus {
 
 .btn-block {
   width: 100%;
+}
+
+.btn-hint {
+  display: block;
+  font-size: 0.7em;
+  opacity: 0.75;
+  margin-top: 0.35em;
 }
 
 .error-text {
@@ -1561,15 +1569,19 @@ input[type='text']:focus {
   position: fixed;
   top: 1rem;
   right: 1rem;
+  left: 1rem;
   z-index: 40;
   display: flex;
   align-items: flex-start;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 0.45rem;
 }
 
 .music-toggle,
 .sfx-toggle,
 .credits-toggle,
+.main-menu-toggle,
 .how-to-play-trigger {
   font-family: var(--font-pixel);
   font-size: 0.55rem;
@@ -1589,6 +1601,7 @@ input[type='text']:focus {
 .music-toggle:active,
 .sfx-toggle:active,
 .credits-toggle:active,
+.main-menu-toggle:active,
 .how-to-play-trigger:active {
   transform: translate(1px, 1px);
 }

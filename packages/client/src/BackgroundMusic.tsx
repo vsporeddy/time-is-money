@@ -14,9 +14,11 @@ interface BackgroundMusicProps {
   ducked: boolean; // fade down for the whole round — pre-bid countdown through spending
   muffled: boolean; // low-pass filter for the main menu/lobby
   onOpenCredits: () => void;
+  // Omitted entirely on the starting screen — there's nowhere to go back to yet.
+  onMainMenu?: () => void;
 }
 
-export function BackgroundMusic({ ducked, muffled, onOpenCredits }: BackgroundMusicProps) {
+export function BackgroundMusic({ ducked, muffled, onOpenCredits, onMainMenu }: BackgroundMusicProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
   const gainRef = useRef<GainNode | null>(null);
@@ -144,6 +146,11 @@ export function BackgroundMusic({ ducked, muffled, onOpenCredits }: BackgroundMu
       <button type="button" className="credits-toggle" onClick={onOpenCredits}>
         Credits
       </button>
+      {onMainMenu && (
+        <button type="button" className="main-menu-toggle" onClick={onMainMenu}>
+          Main Menu
+        </button>
+      )}
     </div>
   );
 }
