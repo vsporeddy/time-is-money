@@ -20,6 +20,10 @@ import {
   useWeapon,
 } from './round.js';
 import { addChatMessage, getChatHistory } from './chat.js';
+import { initStatsKeys } from './statsKey.js';
+import { attachStatsProfile, emitPlayerStats } from './playerStats.js';
+
+initStatsKeys();
 
 const app = express();
 const httpServer = createServer(app);
@@ -54,7 +58,7 @@ io.on('connection', (socket: AppSocket) => {
     if (message) io.to(room.code).emit('chat_message', message);
   });
 
-  socket.on('join_room', ({ playerName, code }, ack) => {
+  socket.on('join_room', ({ playerName, code, statsToken }, ack) => {
     const name = playerName.trim().slice(0, 20);
 
     if (!name) {
@@ -128,9 +132,14 @@ io.on('connection', (socket: AppSocket) => {
     // a lobby and walking into one the previous host abandoned.
     if (room.hostId === null || !room.players.has(room.hostId)) room.hostId = player.id;
 
+    // A token that fails verification is ignored rather than rejected: the
+    // player joins either way and simply starts a fresh profile.
+    attachStatsProfile(socket, statsToken, name);
+
     ack({ ok: true, code: room.code, playerId: player.id, state: toRoomState(room, player.id) });
     socket.emit('chat_history', getChatHistory(room));
     emitRoomState(room, io);
+    emitPlayerStats(room, io);
   });
 
   socket.on('start_game', () => {

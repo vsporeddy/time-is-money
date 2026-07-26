@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import type { ChatMessage, ItemInstance, JoinFailureReason, MaskedRoundItem, Player, Round, RoomState, ScoreBreakdown } from 'shared';
+import type { ChatMessage, ItemInstance, JoinFailureReason, MaskedRoundItem, Player, PlayerStats, Round, RoomState, ScoreBreakdown, StatsToken } from 'shared';
 import {
   MAX_PLAYERS_PER_ROOM,
   ROOM_CODE_ALPHABET,
@@ -24,6 +24,7 @@ import { Inventory } from './Inventory';
 import { ItemTargetPicker } from './ItemTargetPicker';
 import { PlayerPicker } from './PlayerPicker';
 import { LotPool } from './LotPool';
+import { decodeStatsToken, loadStatsToken, saveStatsToken } from './statsProfile';
 import { playChatDing, playClick, playLose, playWin } from './sound';
 import { useViewportTooltips } from './useViewportTooltips';
 
@@ -104,6 +105,10 @@ export default function App() {
   const [playerPickerError, setPlayerPickerError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [lotPoolOpen, setLotPoolOpen] = useState(false);
+  // Our own signed profile, which we verify because it came back through our
+  // own localStorage; plus everyone else's records as the server reports them.
+  const [myStats, setMyStats] = useState<StatsToken | null>(null);
+  const [roomStats, setRoomStats] = useState<Record<string, PlayerStats>>({});
 
   useEffect(() => {
     if (!actionError) return;
@@ -226,6 +231,16 @@ export default function App() {
       setGameOverPlayers(payload.players);
       setScores(payload.scores);
     };
+    // Our re-signed profile after a finished game, straight from the server.
+    const onStatsToken = ({ token }: { token: string }) => {
+      saveStatsToken(token);
+      setMyStats(decodeStatsToken(token));
+    };
+    // Replaces the map wholesale: the server sends the full roster every time,
+    // so anyone missing from it has left or has no profile yet.
+    const onPlayerStats = ({ entries }: { entries: { playerId: string; stats: PlayerStats }[] }) => {
+      setRoomStats(Object.fromEntries(entries.map((entry) => [entry.playerId, entry.stats])));
+    };
     const onChatHistory = (history: ChatMessage[]) => setChatMessages(history);
     const onChatMessage = (message: ChatMessage) => {
       playChatDing();
@@ -245,6 +260,8 @@ export default function App() {
     socket.on('bidder_dropped', onBidderDropped);
     socket.on('round_end', onRoundEnd);
     socket.on('game_over', onGameOver);
+    socket.on('stats_token', onStatsToken);
+    socket.on('player_stats', onPlayerStats);
     socket.on('chat_history', onChatHistory);
     socket.on('chat_message', onChatMessage);
 
@@ -262,10 +279,20 @@ export default function App() {
       socket.off('bidder_dropped', onBidderDropped);
       socket.off('round_end', onRoundEnd);
       socket.off('game_over', onGameOver);
+      socket.off('stats_token', onStatsToken);
+      socket.off('player_stats', onPlayerStats);
       socket.off('chat_history', onChatHistory);
       socket.off('chat_message', onChatMessage);
       socket.disconnect();
     };
+  }, []);
+
+  // The token is plain JSON under its signature, so the record is readable here
+  // before joining anything. Whether it is still *valid* is the server's call,
+  // made when we present it on join.
+  useEffect(() => {
+    const stored = loadStatsToken();
+    if (stored) setMyStats(decodeStatsToken(stored));
   }, []);
 
   const handleJoin = (e: FormEvent) => {
@@ -274,7 +301,7 @@ export default function App() {
     setError(null);
     setJoinErrorReason(null);
     setJoining(true);
-    socket.emit('join_room', { playerName: name, code: pendingLobbyCode }, (res) => {
+    socket.emit('join_room', { playerName: name, code: pendingLobbyCode, statsToken: loadStatsToken() ?? undefined }, (res) => {
       if (res.ok) {
         setMyId(res.playerId);
         setRoom(res.state);
@@ -569,6 +596,15 @@ export default function App() {
               START A NEW LOBBY INSTEAD
             </button>
           )}
+          {/* The profile is stored locally and signed by the server, so it can
+              be read and shown here without being in a lobby yet. */}
+          {myStats && myStats.stats.gamesFinished > 0 && (
+            <div className="career-summary">
+              <span>
+                {myStats.stats.gamesFinished} games, {myStats.stats.wins} won, best ${myStats.stats.bestScore}
+              </span>
+            </div>
+          )}
         </div>
       </main>
     );
@@ -703,6 +739,7 @@ export default function App() {
           onClose={() => setMyInventoryOpen(false)}
           onUseItem={handleUseItem}
           roundPhase={roundPhase}
+          stats={myStats?.stats ?? null}
         />
       )}
       {joined && itemPickerItemId && room && (
@@ -743,6 +780,7 @@ export default function App() {
               showValue={false}
               panelKey={`inventory-opponent-${opponentId}`}
               cascadeIndex={index}
+              stats={roomStats[opponentId] ?? null}
               onClose={() => setOpenOpponentIds((open) => open.filter((id) => id !== opponentId))}
             />
           );

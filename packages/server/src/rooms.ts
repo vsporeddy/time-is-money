@@ -1,10 +1,14 @@
 import type { DefaultEventsMap, Server, Socket } from 'socket.io';
-import type { ChatMessage, ClientToServerEvents, GameSettings, ItemInstance, Player, Round, RoomState, RoomStatus, ServerToClientEvents } from 'shared';
+import type { ChatMessage, ClientToServerEvents, GameSettings, ItemInstance, Player, Round, RoomState, RoomStatus, ServerToClientEvents, StatsToken } from 'shared';
 
 // Which room a socket belongs to. Set once by join_room; every other handler
 // resolves its room from here rather than taking a code in the payload.
 export interface SocketData {
   roomCode?: string;
+  // The player's lifetime stats, as verified from the token they presented on
+  // join and re-signed after each game. Absent until they finish their first
+  // game, or if the token they brought failed verification.
+  statsProfile?: StatsToken;
 }
 
 // Declared here (a leaf module) so index/round/bots all share one shape — a
