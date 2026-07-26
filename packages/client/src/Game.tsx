@@ -146,6 +146,7 @@ export function Game({
     roundId: string | null;
     fields: Set<ModifierField>;
   }>({ roundId: null, fields: new Set() });
+  const [valueFlash, setValueFlash] = useState<{ direction: 'increase' | 'decrease'; sequence: number } | null>(null);
   const isHolding = (id: string) => liveBids[id] !== undefined;
   const cursedSetActive = myScore?.traitBonuses.some((trait) => trait.traitId === 'cursed' && trait.multiplier === 1.25) ?? false;
   const isDropped = (id: string) => droppedThisRound[id] !== undefined;
@@ -179,6 +180,7 @@ export function Game({
 
   useEffect(() => {
     const roundId = currentRound?.round.id ?? null;
+    setValueFlash(null);
     setCompletedModifierReveals({
       roundId,
       fields: currentRound?.item.modifiersRevealedInstantly
@@ -194,6 +196,21 @@ export function Game({
       if (current.roundId !== roundId || current.fields.has(field)) return current;
       return { roundId, fields: new Set([...current.fields, field]) };
     });
+
+    const item = currentRound.item;
+    const multiplier = field === 'material' && item.material
+      ? getMaterialValueMultiplier(item.material)
+      : field === 'rarity' && item.rarity
+        ? getRarityValueMultiplier(item.rarity)
+        : field === 'specialModifier' && item.specialModifier
+          ? getSpecialModifierValueMultiplier(item.specialModifier)
+          : 1;
+    if (multiplier !== 1) {
+      setValueFlash((current) => ({
+        direction: multiplier > 1 ? 'increase' : 'decrease',
+        sequence: (current?.sequence ?? 0) + 1,
+      }));
+    }
   };
 
   const revealedModifierFields = completedModifierReveals.roundId === currentRound?.round.id
@@ -436,7 +453,15 @@ export function Game({
             getTemplate(currentRound.item.templateId)?.timeRefund?.mode === 'catchup' && (
               <div className="item-effect-callout">Emergency Refund: Refunds time based on remaining time</div>
             )}
-          <p className="item-meta">Value: ${displayedItemValue(currentRound.item, revealedModifierFields)}</p>
+          <p className="item-meta current-item-value">
+            Value:{' '}
+            <span
+              key={`${currentRound.round.id}-${valueFlash?.sequence ?? 0}`}
+              className={valueFlash ? `value-number value-flash-${valueFlash.direction}` : 'value-number'}
+            >
+              ${displayedItemValue(currentRound.item, revealedModifierFields)}
+            </span>
+          </p>
 
           {currentRound.round.status === 'pending' && <p className="status-line">Get ready…</p>}
 
