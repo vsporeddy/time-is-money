@@ -619,7 +619,8 @@ export default function App() {
               {isMe && (
                 <CoinBurst
                   active={
-                    isCurrentlyHolding &&
+                    holding &&
+                    droppedThisRound[p.id] === undefined &&
                     currentRound?.round.status === 'active' &&
                     !currentRound.round.bidWindowOpen
                   }

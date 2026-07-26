@@ -1682,7 +1682,7 @@ input[type='text']:focus {
   border: 2px solid var(--gold-bright);
   box-shadow: 3px 3px 0 #000;
   color: var(--text);
-  font-size: 0.5rem;
+  font-size: 0.7rem;
   line-height: 1.55;
   text-align: left;
 }
@@ -1719,6 +1719,26 @@ input[type='text']:focus {
 
 .how-to-play-row span {
   min-width: 0;
+}
+
+/* Row text is a block; emphasis inside it has to stay inline. */
+.how-to-play-row span b {
+  display: inline;
+  margin: 0;
+  color: var(--gold-bright);
+}
+
+/* Opt-out actions, matching the red the bid button turns when it's active. */
+.how-to-play-row span b.how-to-play-cancel {
+  color: var(--red-bright);
+}
+
+/* Amber heading that opens each row — set apart from the gold inline emphasis. */
+.how-to-play-row .how-to-play-label {
+  display: block;
+  margin-bottom: 0.15rem;
+  color: var(--amber);
+  letter-spacing: 0.04em;
 }
 
 .how-to-play-row:nth-of-type(even) {

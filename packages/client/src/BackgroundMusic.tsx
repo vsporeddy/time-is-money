@@ -113,27 +113,50 @@ export function BackgroundMusic({ ducked, muffled, onOpenCredits, onMainMenu }: 
           <b>HOW TO PLAY</b>
           <span className="how-to-play-row">
             <img src={`${HELP_MEDIA_SRC}help-tooltip-playertime.png`} alt="Player time display" />
-            <span>Your time is your money. Spend it by bidding on items..</span>
+            <span>
+              <b className="how-to-play-label">TIME IS MONEY</b>
+              Your time is your money. Spend it by <b>bidding</b> on items.
+            </span>
           </span>
           <span className="how-to-play-row">
             <img src={`${HELP_MEDIA_SRC}bid.gif`} alt="Joining a bid" />
-            <span>During the opening window, click BID to opt in or CANCEL BID to leave.</span>
+            <span>
+              <b className="how-to-play-label">JOINING</b>
+              During the opening window, click <b>BID</b> to join or{' '}
+              <b className="how-to-play-cancel">CANCEL BID</b> to leave.
+            </span>
           </span>
           <span className="how-to-play-row">
             <img src={`${HELP_MEDIA_SRC}bid-underway.gif`} alt="Bidding underway" />
-            <span>When bidding starts, your remaining time will start ticking down. Press withdraw to stop spending time. Regardless of whether you win, the time spent will be lost.</span>
+            <span>
+              <b className="how-to-play-label">WHILE BIDDING</b>
+              Once bidding starts, your time ticks down. Press <b>WITHDRAW</b> to stop. The time you spend is{' '}
+              <b>lost whether you win or not</b>.
+            </span>
           </span>
           <span className="how-to-play-row">
             <img src={`${HELP_MEDIA_SRC}bid-finish.gif`} alt="Auction finish" />
-            <span>The last bidder remaining wins the item. A sole bidder will automatically win  with a 5s bid. If everyone holds until time runs out, it's a stalemate — nobody wins and the time spent is refunded.</span>
+            <span>
+              <b className="how-to-play-label">WINNING THE ITEM</b>
+              The <b>last bidder remaining</b> wins the item. A sole bidder wins automatically with a 5s bid. If
+              everyone holds until time runs out, it's a <b>stalemate</b> and the time is <b>refunded</b>.
+            </span>
           </span>
           <span className="how-to-play-row">
             <img src={`${HELP_MEDIA_SRC}hover.gif`} alt="Hovering item details" />
-            <span>Hover over attributes/modifiers/set bonus for details.</span>
+            <span>
+              <b className="how-to-play-label">ITEM DETAILS</b>
+              <b>Hover</b> over attributes, modifiers and set bonuses for details.
+            </span>
           </span>
           <span className="how-to-play-row">
             <img className="how-to-play-items-media" src={`${HELP_MEDIA_SRC}items.gif`} alt="Item inventory" />
-            <span>Collect valuable items and complete sets. Your base item values, item effects, and set bonuses will determine your collection's final value. The player with the most valuable collection is the winner! On a tie, the smaller collection wins, then whoever has the most time left.</span>
+            <span>
+              <b className="how-to-play-label">SCORING</b>
+              Collect items and complete sets. Item values, effects and set bonuses decide your collection's worth,
+              and the <b>most valuable collection wins</b>. On a tie, the <b>smaller collection</b> wins, then
+              whoever has the most time left.
+            </span>
           </span>
         </span>
       </button>
