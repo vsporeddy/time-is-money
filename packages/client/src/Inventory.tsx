@@ -2,6 +2,7 @@ import type { ItemInstance, ItemTemplate, Player, ScoreBreakdown } from 'shared'
 import { getHiddenTrait, getMaterialValueMultiplier, getRarityValueMultiplier, getSpecialModifierValueMultiplier, getTemplate, getTraitDefinition, TRAIT_DEFINITIONS } from 'shared';
 import { SpriteIcon } from './SpriteIcon';
 import { getGlowFilter, getGlowIntensity, getItemGlowCategory, getTraitLabelColor } from './itemVisuals';
+import { usePanelDrag } from './usePanelDrag';
 
 interface InventoryProps {
   player: Player;
@@ -12,7 +13,13 @@ interface InventoryProps {
   onClose?: () => void;
   onUseItem?: (itemId: string) => void; // present only for the viewer's own inventory
   roundPhase?: 'preBid' | 'bidding' | null; // gates weapon effects tied to a round phase
+  panelKey?: string; // identity for the remembered drag position; defaults to the side
+  cascadeIndex?: number; // stagger for panels opened on top of each other
 }
+
+// Each additional panel opens down-and-left of the one before it so a stack of
+// open inventories doesn't hide itself.
+const CASCADE_STEP = 28;
 
 function isEffectUsableNow(template: ItemTemplate | undefined, roundPhase: 'preBid' | 'bidding' | null | undefined): boolean {
   if (!template) return false;
@@ -130,7 +137,22 @@ function modifiedItemValue(item: ItemInstance): number {
   );
 }
 
-export function Inventory({ player, items, score, side, showValue = true, onClose, onUseItem, roundPhase = null }: InventoryProps) {
+export function Inventory({
+  player,
+  items,
+  score,
+  side,
+  showValue = true,
+  onClose,
+  onUseItem,
+  roundPhase = null,
+  panelKey,
+  cascadeIndex = 0,
+}: InventoryProps) {
+  const { panelRef, panelStyle, headingProps, dragging } = usePanelDrag(panelKey ?? `inventory-${side}`, {
+    x: (side === 'right' ? -1 : 1) * cascadeIndex * CASCADE_STEP,
+    y: cascadeIndex * CASCADE_STEP,
+  });
   const ownedItems = player.stash.map((id) => items[id]).filter((item): item is ItemInstance => Boolean(item));
   const stash = ownedItems.slice(0, INVENTORY_SIZE);
   const cursedSetActive = score?.traitBonuses.some((trait) => trait.traitId === 'cursed' && trait.multiplier === 1.25) ?? false;
@@ -169,8 +191,13 @@ export function Inventory({ player, items, score, side, showValue = true, onClos
     : [{ text: 'No revealed items yet.' }];
 
   return (
-    <aside className={`inventory-panel inventory-panel-${side}`} aria-label={`${player.name}'s inventory`}>
-      <div className="inventory-heading">
+    <aside
+      ref={panelRef}
+      style={panelStyle}
+      className={`inventory-panel inventory-panel-${side}${dragging ? ' inventory-panel-dragging' : ''}`}
+      aria-label={`${player.name}'s inventory`}
+    >
+      <div {...headingProps}>
         <h2>{side === 'left' ? 'YOUR INVENTORY' : `${player.name.toUpperCase()}'S INVENTORY`}</h2>
         <div className="inventory-heading-actions">
           {showValue && (

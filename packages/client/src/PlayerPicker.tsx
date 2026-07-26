@@ -1,5 +1,6 @@
 import type { Player } from 'shared';
 import { PortraitIcon } from './PortraitIcon';
+import { usePanelDrag } from './usePanelDrag';
 
 interface PlayerPickerProps {
   title: string;
@@ -13,10 +14,12 @@ interface PlayerPickerProps {
 // Used by weapon effects that target a single player directly (Dual Daggers,
 // Wooden Dagger) rather than an item in their inventory.
 export function PlayerPicker({ title, subtitle, players, error, onSelect, onCancel }: PlayerPickerProps) {
+  const { panelRef, panelStyle, headingProps } = usePanelDrag<HTMLDivElement>('player-picker');
+
   return (
     <div className="mirror-picker-overlay" role="dialog" aria-label={title}>
-      <div className="panel mirror-picker-panel">
-        <div className="inventory-heading">
+      <div ref={panelRef} style={panelStyle} className="panel mirror-picker-panel">
+        <div {...headingProps}>
           <h2 className="panel-title">{title}</h2>
           <button type="button" className="inventory-close" aria-label="Cancel" onClick={onCancel}>×</button>
         </div>
