@@ -104,7 +104,7 @@ function itemAttributes(item: ItemInstance): DisplayAttribute[] {
   if (template?.effectType === 'forceWithdraw') attributes.push({ label: template.weapon?.target === 'all' ? 'Clears the Field' : 'Forces a Withdrawal', effect: true });
   if (template?.effectType === 'destroyItem') attributes.push({ label: 'Destroys an Item', effect: true });
   if (template?.effectType === 'transformLot') attributes.push({ label: 'Transforms the Lot', effect: true });
-  if (template?.effectType === 'weaponImmunity') attributes.push({ label: 'Weapon Immunity', effect: true });
+  if (template?.effectType === 'stealTime') attributes.push({ label: 'Steals Time', effect: true });
   if (template?.effectType === 'weaponMultiplier') attributes.push({ label: 'Weapon Value x2', effect: true });
   if (item.usedActiveEffect) attributes.push({ label: 'Effect Used' });
 
@@ -214,9 +214,7 @@ export function Inventory({ player, items, score, side, showValue = true, onClos
                       <>
                         <span>Modifiers:</span>
                         <ul className="inventory-detail-list">
-                          {item.material !== 'Ordinary' && (
-                            <li className={`modifier ${modifierClass(item.material)}`}>{item.material} ×{getMaterialValueMultiplier(item.material).toFixed(1)}</li>
-                          )}
+                          <li className={`modifier ${modifierClass(item.material)}`}>{item.material} ×{getMaterialValueMultiplier(item.material).toFixed(1)}</li>
                           <li className={`modifier ${modifierClass(item.rarity)}`}>{item.rarity} ×{getRarityValueMultiplier(item.rarity).toFixed(1)}</li>
                           {item.specialModifier && (
                             <li className={`modifier ${modifierClass(item.specialModifier)}`}>
@@ -258,11 +256,15 @@ export function Inventory({ player, items, score, side, showValue = true, onClos
         <div className="trait-progress" aria-label="Set bonus progress">
           {traitProgress.map((progress) => (
             <span key={progress.id} className={`trait-progress-bubble ${progress.color}`} tabIndex={0}>
-              {progress.noSetBonus ? `Trinket ${progress.count}` : `${progress.name}: ${progress.count}/${progress.target}`}
+              {progress.noSetBonus
+                ? `${progress.id === 'weapon' ? 'Weapon' : 'Trinket'} ${progress.count}`
+                : `${progress.name}: ${progress.count}/${progress.target}`}
               <span className="trait-progress-tooltip">
-                <b>{progress.noSetBonus ? 'TRINKETS' : `${progress.name} SET BONUS`}</b>
+                <b>{progress.id === 'weapon' ? 'WEAPON' : progress.noSetBonus ? 'TRINKETS' : `${progress.name} SET BONUS`}</b>
                 {progress.noSetBonus
-                  ? <><span>Trinkets are valuable on their own.</span><span>They have no SET bonus.</span></>
+                  ? progress.id === 'weapon'
+                    ? <span>Weapons are powerful one-time use items that impact other players</span>
+                    : <><span>Trinkets are valuable on their own.</span><span>They have no SET bonus.</span></>
                   : progress.tiers.map((tier, index) => (
                     <span key={tier.count} className={`set-bonus-tier ${setBonusColor(progress.tiers.length, index)}`}>
                       {tier.count}: {setBonusText(progress.id, tier)}

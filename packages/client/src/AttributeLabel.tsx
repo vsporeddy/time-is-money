@@ -30,9 +30,11 @@ export function AttributeLabel({ traitId, label }: AttributeLabelProps) {
     <span className="attribute-bonus-trigger" style={color ? { color } : undefined} tabIndex={0}>
       {label}
       <span className="attribute-bonus-tooltip">
-        <b>{trait.noSetBonus ? 'TRINKETS' : `${trait.name} SET BONUS`}</b>
+        <b>{trait.id === 'weapon' ? 'WEAPON' : trait.noSetBonus ? 'TRINKETS' : `${trait.name} SET BONUS`}</b>
         {trait.noSetBonus
-          ? <><span>Trinkets are valuable on their own.</span><span>They have no SET bonus.</span></>
+          ? trait.id === 'weapon'
+            ? <span>Weapons are powerful one-time use items that impact other players</span>
+            : <><span>Trinkets are valuable on their own.</span><span>They have no SET bonus.</span></>
           : trait.tiers.map((tier, index) => (
             <span key={tier.count} className={`set-bonus-tier ${setBonusColor(trait.tiers.length, index)}`}>
               {tier.count}: {setBonusText(trait.id, tier)}

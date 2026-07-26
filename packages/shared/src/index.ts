@@ -62,7 +62,7 @@ export interface ItemTemplate {
     | 'forceWithdraw'
     | 'destroyItem'
     | 'transformLot'
-    | 'weaponImmunity'
+    | 'stealTime'
     | 'weaponMultiplier';
   timeRefund?: TimeRefundConfig; // present when effectType === 'timeRefund'
   chest?: ChestConfig; // present when effectType === 'chest'

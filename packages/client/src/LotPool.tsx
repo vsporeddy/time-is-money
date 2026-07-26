@@ -32,7 +32,7 @@ function itemAttributes(template: ItemTemplate | undefined): DisplayAttribute[] 
   if (template.effectType === 'forceWithdraw') addEffect(template.weapon?.target === 'all' ? 'Clears the Field' : 'Forces a Withdrawal');
   if (template.effectType === 'destroyItem') addEffect('Destroys an Item');
   if (template.effectType === 'transformLot') addEffect('Transforms the Lot');
-  if (template.effectType === 'weaponImmunity') addEffect('Weapon Immunity');
+  if (template.effectType === 'stealTime') addEffect('Steals Time');
   if (template.effectType === 'weaponMultiplier') addEffect('Weapon Value ×2');
   return attributes;
 }

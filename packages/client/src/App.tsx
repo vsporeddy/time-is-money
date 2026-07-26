@@ -282,10 +282,6 @@ export default function App() {
     }
   };
 
-  // Wooden Shield grants blanket immunity to every other player's weapon effects.
-  const isImmune = (playerId: string) =>
-    room?.players.find((p) => p.id === playerId)?.stash.some((id) => knownItems[id]?.templateId === 'wooden-shield') ?? false;
-
   // Dispatches a click on a usable inventory item to the right UI: an item
   // picker (copy/destroy), a player picker (force-enter/force-withdraw one),
   // or straight to the server for effects with no target to choose.
@@ -352,10 +348,13 @@ export default function App() {
     if (playerPickerTemplate.effectType === 'forceEnter') {
       const bidders = currentRound?.round.bidders;
       if (!bidders) return [];
-      return room.players.filter((p) => p.id !== myId && bidders[p.id] && bidders[p.id].droppedAt === null && !isImmune(p.id));
+      return room.players.filter((p) => p.id !== myId && bidders[p.id] && bidders[p.id].droppedAt === null);
     }
     if (playerPickerTemplate.effectType === 'forceWithdraw') {
-      return room.players.filter((p) => p.id !== myId && liveBids[p.id] !== undefined && !isImmune(p.id));
+      return room.players.filter((p) => p.id !== myId && liveBids[p.id] !== undefined);
+    }
+    if (playerPickerTemplate.effectType === 'stealTime') {
+      return room.players.filter((p) => p.id !== myId && !p.isObserver && p.status === 'active');
     }
     return [];
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -404,11 +403,18 @@ export default function App() {
 
   const itemPickerTitle = itemPickerMode === 'destroy' ? 'CROSSBOW' : 'MIRROR OF DESIRE';
   const itemPickerSubtitle = itemPickerMode === 'destroy' ? 'Choose an item to destroy.' : 'Choose an item to copy for yourself.';
-  const itemPickerExclude = itemPickerMode === 'destroy' ? (room?.players ?? []).filter((p) => isImmune(p.id)).map((p) => p.id) : undefined;
-
-  const playerPickerTitle = playerPickerTemplate?.effectType === 'forceEnter' ? 'DUAL DAGGERS' : 'WOODEN DAGGER';
+  const playerPickerTitle =
+    playerPickerTemplate?.effectType === 'forceEnter'
+      ? 'DUAL DAGGERS'
+      : playerPickerTemplate?.effectType === 'stealTime'
+        ? "DARK KNIGHT'S GREATAXE"
+        : 'WOODEN DAGGER';
   const playerPickerSubtitle =
-    playerPickerTemplate?.effectType === 'forceEnter' ? 'Choose a player to force into this bid.' : 'Choose a bidder to force out.';
+    playerPickerTemplate?.effectType === 'forceEnter'
+      ? 'Choose a player to force into this bid.'
+      : playerPickerTemplate?.effectType === 'stealTime'
+        ? 'Choose a player to steal up to 5 seconds from.'
+        : 'Choose a bidder to force out.';
   const scoresByPlayer = useMemo(() => {
     if (!room) return new Map<string, ScoreBreakdown>();
     const wonItems = new Map(Object.entries(knownItems));
@@ -652,7 +658,6 @@ export default function App() {
           players={room.players}
           myId={myId!}
           items={knownItems}
-          excludePlayerIds={itemPickerExclude}
           error={itemPickerError}
           onSelect={handleItemPickerSelect}
           onCancel={handleItemPickerCancel}

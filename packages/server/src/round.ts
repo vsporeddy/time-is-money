@@ -52,7 +52,7 @@ function pickWeighted<T>(entries: readonly { value: T; weight: number }[]): T {
 }
 
 function itemClass(template: ItemTemplate): 'weapon' | 'curio' | 'main' {
-  if (template.weapon || template.effectType === 'weaponImmunity') return 'weapon';
+  if (template.weapon) return 'weapon';
   return template.traits.some((trait) => MAIN_TRAIT_IDS.includes(trait as MainTraitId)) ? 'main' : 'curio';
 }
 
@@ -651,12 +651,6 @@ export function useMirror(
   return { ok: true };
 }
 
-// True while the player holds a Wooden Shield — blanket immunity to every
-// other player's weapon effects.
-function isImmune(room: Room, playerId: string | undefined): boolean {
-  return ownsItemTemplate(room, playerId, 'wooden-shield');
-}
-
 // Dispatches every weapon's one-time active effect. On success the item is
 // flagged usedActiveEffect (never removed — it just stops being usable).
 export function useWeapon(
@@ -695,7 +689,7 @@ export function useWeapon(
     case 'forceEnter': {
       if (target === 'all') {
         for (const [pid, bidder] of Object.entries(ar!.round.bidders)) {
-          if (pid === playerId || bidder.isHolding || bidder.droppedAt !== null || isImmune(room, pid)) continue;
+          if (pid === playerId || bidder.isHolding || bidder.droppedAt !== null) continue;
           const p = room.players.get(pid);
           if (!p || p.status !== 'active' || p.timeRemainingMs <= 0) continue;
           bidder.isHolding = true;
@@ -706,7 +700,6 @@ export function useWeapon(
         const bidder = ar!.round.bidders[targetPlayerId];
         const targetPlayer = room.players.get(targetPlayerId);
         if (!bidder || !targetPlayer) return { ok: false, error: 'That player is not in this round.' };
-        if (isImmune(room, targetPlayerId)) return { ok: false, error: 'That player is immune to weapon effects.' };
         if (bidder.droppedAt !== null) return { ok: false, error: 'That player already withdrew this round.' };
 
         bidder.isHolding = true;
@@ -733,13 +726,12 @@ export function useWeapon(
       const targets: string[] = [];
       if (target === 'all') {
         for (const [pid, bidder] of Object.entries(ar!.round.bidders)) {
-          if (pid !== playerId && bidder.isHolding && !isImmune(room, pid)) targets.push(pid);
+          if (pid !== playerId && bidder.isHolding) targets.push(pid);
         }
       } else {
         if (!targetPlayerId) return { ok: false, error: 'Choose a player to target.' };
         const bidder = ar!.round.bidders[targetPlayerId];
         if (!bidder || !bidder.isHolding) return { ok: false, error: 'That player is not currently bidding.' };
-        if (isImmune(room, targetPlayerId)) return { ok: false, error: 'That player is immune to weapon effects.' };
         targets.push(targetPlayerId);
       }
       for (const pid of targets) forceWithdraw(room, io, ar!, pid);
@@ -752,8 +744,33 @@ export function useWeapon(
       if (targetPlayerId === playerId) return { ok: false, error: "Choose another player's item." };
       const targetPlayer = room.players.get(targetPlayerId);
       if (!targetPlayer || !targetPlayer.stash.includes(targetItemId)) return { ok: false, error: 'Item not found.' };
-      if (isImmune(room, targetPlayerId)) return { ok: false, error: 'That player is immune to weapon effects.' };
       targetPlayer.stash = targetPlayer.stash.filter((id) => id !== targetItemId);
+      break;
+    }
+
+    case 'stealTime': {
+      if (!targetPlayerId || targetPlayerId === playerId) return { ok: false, error: 'Choose another player to target.' };
+      const targetPlayer = room.players.get(targetPlayerId);
+      if (!targetPlayer || targetPlayer.isObserver) return { ok: false, error: 'That player cannot be targeted.' };
+      if (targetPlayer.timeRemainingMs <= 0) return { ok: false, error: 'That player has no time remaining.' };
+      const stolenTimeMs = Math.min(5_000, targetPlayer.timeRemainingMs);
+      targetPlayer.timeRemainingMs -= stolenTimeMs;
+      actor.timeRemainingMs += stolenTimeMs;
+      if (targetPlayer.timeRemainingMs <= 0) {
+        targetPlayer.status = 'out_of_time';
+        const targetBidder = ar?.round.bidders[targetPlayerId];
+        if (targetBidder?.isHolding && ar) {
+          if (ar.bidWindowOpen) {
+            targetBidder.isHolding = false;
+            targetBidder.committedMs = 0;
+            targetBidder.droppedAt = null;
+            io.to(targetPlayerId).emit('bidder_cancelled', { roundId: ar.round.id, playerId: targetPlayerId });
+          } else if (forceWithdraw(room, io, ar, targetPlayerId)) {
+            checkResolution(room, io, targetPlayerId);
+          }
+        }
+      }
+      if (actor.timeRemainingMs > 0 && actor.status === 'out_of_time') actor.status = 'active';
       break;
     }
 

@@ -38,7 +38,7 @@ export function getTraitDefinition(id: string): TraitDefinition | undefined {
 }
 
 // Base material rolls are independent from the optional Blessed/Cursed overlay.
-export const MATERIAL_POOL = ['Ordinary', 'Damaged', 'Mint'];
+export const MATERIAL_POOL = ['Used', 'Damaged', 'Mint'];
 
 // Hidden traits: a per-instance secret, like trueValue — not shown during
 // bidding, revealed only at round_end. Flat bonus/penalty, not a collection set.

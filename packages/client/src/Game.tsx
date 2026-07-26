@@ -51,7 +51,7 @@ function templateAttributes(template: ItemTemplate | undefined, item?: Pick<Item
   }
   if (template.effectType === 'destroyItem') attributes.push({ label: 'Destroys an Item', effect: true, tooltip: { title: 'CROSSBOW', text: "Anytime: destroy an item from another player's inventory. One-time use." } });
   if (template.effectType === 'transformLot') attributes.push({ label: 'Transforms the Lot', effect: true, tooltip: { title: 'ARCANE STAFF', text: 'During bidding: randomly replace the current lot with a new item. One-time use.' } });
-  if (template.effectType === 'weaponImmunity') attributes.push({ label: 'Weapon Immunity', effect: true, tooltip: { title: 'WOODEN SHIELD', text: "Passive: immune to every other player's weapon effects while held." } });
+  if (template.effectType === 'stealTime') attributes.push({ label: 'Steals Time', effect: true, tooltip: { title: "DARK KNIGHT'S GREATAXE", text: "Anytime: steal up to 5 seconds of another player's remaining time. One-time use." } });
   if (template.effectType === 'weaponMultiplier') attributes.push({ label: 'Weapon Value x2', effect: true, tooltip: { title: 'CONTRABAND PERMIT', text: 'Passive: multiplies the value of every weapon you own by 2x while held.' } });
   return attributes;
 }
@@ -305,12 +305,8 @@ export function Game({
                 {!getTemplate(lastResult.item.templateId)?.flatValue && (
                   <>
                     {' ('}
-                    {lastResult.item.material !== 'Ordinary' && (
-                      <>
-                        <span className={`modifier ${modifierClass(lastResult.item.material)}`}>{lastResult.item.material}</span>
-                        {', '}
-                      </>
-                    )}
+                    <span className={`modifier ${modifierClass(lastResult.item.material)}`}>{lastResult.item.material}</span>
+                    {', '}
                     <span className={`modifier ${modifierClass(lastResult.item.rarity)}`}>{lastResult.item.rarity}</span>
                     {lastResult.item.specialModifier && (
                       <>
@@ -397,7 +393,7 @@ export function Game({
               <div>
                 <p>Modifiers</p>
                 <ul>
-                  {currentRound.item.material && currentRound.item.material !== 'Ordinary' && (
+                  {currentRound.item.material && (
                     <li className={`modifier ${modifierRevealClass} ${modifierClass(currentRound.item.material)}`} onAnimationEnd={() => finishModifierReveal('material')}>
                       {currentRound.item.material} ×{getMaterialValueMultiplier(currentRound.item.material).toFixed(1)}
                     </li>
