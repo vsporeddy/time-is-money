@@ -662,7 +662,7 @@ export default function App() {
               className="btn btn-block"
               disabled={!connected || joining || !name.trim() || codeLooksWrong}
             >
-              {joining ? 'JOINING…' : pendingLobbyCode ? 'JOIN LOBBY' : 'CREATE LOBBY'}
+              {joining ? 'JOINING…' : pendingLobbyCode ? 'JOIN PRIVATE AUCTION' : 'CREATE PRIVATE AUCTION'}
             </button>
           </form>
           <button
@@ -672,7 +672,7 @@ export default function App() {
             disabled={!connected || joining || !name.trim()}
             onClick={handleMatchmake}
           >
-            MATCHMAKE
+            PUBLIC AUCTION
           </button>
           {codeLooksWrong && (
             <p className="error-text">Lobby codes are {ROOM_CODE_LENGTH} characters, letters and numbers.</p>
