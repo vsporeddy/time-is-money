@@ -621,8 +621,8 @@ export default function App() {
         <Logo scale={5} />
         <div className="panel">
           <h2 className="panel-title">MATCHMAKING</h2>
-          <p className="status-line">Finding players…</p>
-          <p className="status-line">{matchmakingCount} of 4 players ready</p>
+          <p className="status-line">Finding bidders...</p>
+          <p className="status-line">{matchmakingCount} of 4 bidders ready</p>
           <button type="button" className="btn btn-block" onClick={handleCancelMatchmaking}>
             CANCEL
           </button>

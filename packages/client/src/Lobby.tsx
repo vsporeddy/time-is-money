@@ -148,7 +148,7 @@ export function Lobby({
       )}
 
       {playerCount < 2 && (
-        <p className="error-text">Not enough players to start the game.</p>
+        <p className="error-text">Not enough bidders to start the game.</p>
       )}
     </div>
   );
