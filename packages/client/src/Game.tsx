@@ -6,6 +6,7 @@ import { PortraitIcon } from './PortraitIcon';
 import { AttributeLabel } from './AttributeLabel';
 import { getGlowFilter, getGlowIntensity, getItemGlowCategory } from './itemVisuals';
 import { playClick, playCoin, playCountdownTick } from './sound';
+import { SPENDING_URGENCY_CAP_SECONDS, type SpendTick } from './useSpendPulse';
 
 interface DisplayAttribute {
   label: string;
@@ -74,6 +75,7 @@ interface GameProps {
   roundNumber: number;
   maxRounds: number | null;
   currentRound: CurrentRound | null;
+  coinTick: SpendTick; // shared spend beat, owned by App
   liveTimes: Record<string, number>;
   liveBids: Record<string, number>; // playerId -> committedMs, present only while currently holding
   droppedThisRound: Record<string, number>; // playerId -> committedMs, present once they've folded this round
@@ -120,8 +122,6 @@ function lerpColor(from: [number, number, number], to: [number, number, number],
   return `rgb(${r}, ${g}, ${b})`;
 }
 
-// Shared with both the coin cue's volume ramp and the timer's size/color ramp.
-const SPENDING_URGENCY_CAP_SECONDS = 30;
 const COIN_MIN_VOLUME = 0.08;
 const COIN_MAX_VOLUME = 0.4;
 
@@ -133,6 +133,7 @@ export function Game({
   roundNumber,
   maxRounds,
   currentRound,
+  coinTick,
   liveTimes,
   liveBids,
   droppedThisRound,
@@ -224,17 +225,12 @@ export function Game({
 
   // Ticking "spending money" cue for as long as the player is actively spending —
   // starts quiet and ramps louder the longer the lot has been contested, capping at 30s.
+  // Cadence comes from App's shared spend clock so the portrait squash lands on
+  // the same beat; deps list only `count` so a mid-second re-render can't refire.
   useEffect(() => {
-    if (!iAmSpending) return;
-    const startedAt = currentRound?.round.spendingStartedAt ?? Date.now();
-    const tick = () => {
-      const urgency = Math.min(1, (Date.now() - startedAt) / 1000 / SPENDING_URGENCY_CAP_SECONDS);
-      playCoin(COIN_MIN_VOLUME + (COIN_MAX_VOLUME - COIN_MIN_VOLUME) * urgency);
-    };
-    tick();
-    const interval = window.setInterval(tick, 1_000);
-    return () => window.clearInterval(interval);
-  }, [iAmSpending]);
+    if (!iAmSpending || coinTick.count === 0) return;
+    playCoin(COIN_MIN_VOLUME + (COIN_MAX_VOLUME - COIN_MIN_VOLUME) * coinTick.urgency);
+  }, [coinTick.count]);
 
   const initialBidDeadline = currentRound?.round.initialBidDeadlineAt;
   const initialBidSeconds = initialBidDeadline === null || initialBidDeadline === undefined

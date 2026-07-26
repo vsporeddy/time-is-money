@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { FormEvent, ReactNode } from 'react';
+import type { CSSProperties, FormEvent, ReactNode } from 'react';
 import type { ChatMessage, ItemInstance, JoinFailureReason, MaskedRoundItem, Player, Round, RoomState, ScoreBreakdown } from 'shared';
 import {
   MAX_PLAYERS_PER_ROOM,
@@ -26,6 +26,7 @@ import { PlayerPicker } from './PlayerPicker';
 import { LotPool } from './LotPool';
 import { playChatDing, playClick, playLose, playWin } from './sound';
 import { useViewportTooltips } from './useViewportTooltips';
+import { useSpendTick } from './useSpendPulse';
 
 // Applied on every keystroke so a pasted '#QT4B' or a lowercase code becomes
 // canonical as it lands, rather than only at submit. Length is capped by the
@@ -439,6 +440,10 @@ export default function App() {
   // preBid: the opt-in window (free to enter/cancel); bidding: spending underway.
   const roundPhase: 'preBid' | 'bidding' | null =
     !currentRound || currentRound.round.status !== 'active' ? null : currentRound.round.bidWindowOpen ? 'preBid' : 'bidding';
+  // One clock for the whole round's spend beat: Game plays the coin cue off it,
+  // the dock squashes portraits off it, so the two can never drift apart.
+  const spendingActive = roundPhase === 'bidding';
+  const coinTick = useSpendTick(currentRound?.round.spendingStartedAt, spendingActive);
 
   const itemPickerTitle = itemPickerMode === 'destroy' ? 'CROSSBOW' : 'MIRROR OF DESIRE';
   const itemPickerSubtitle = itemPickerMode === 'destroy' ? 'Choose an item to destroy.' : 'Choose an item to copy for yourself.';
@@ -477,6 +482,14 @@ export default function App() {
         // the live amount swaps for the final spend line the instant you withdraw.
         const isCurrentlyHolding = liveBids[p.id] !== undefined;
         const dropped = (isMe || hasSpyglass) && droppedThisRound[p.id] !== undefined;
+        // Squash the portrait on every coin tick while this player is burning
+        // time. liveBids only carries players the viewer may see (self, or
+        // everyone once a Spyglass is held), so this can't leak hidden bidders.
+        const pulses =
+          spendingActive &&
+          (isMe || hasSpyglass) &&
+          liveBids[p.id] !== undefined &&
+          droppedThisRound[p.id] === undefined;
         const time = liveTimes[p.id] ?? p.timeRemainingMs;
         const classDef = getClassDefinition(p.classId);
         const classes = ['player-card', isMe && 'me', holding && 'holding', dropped && 'dropped']
@@ -498,7 +511,16 @@ export default function App() {
                 else setOpenOpponentIds((open) => (open.includes(p.id) ? open.filter((id) => id !== p.id) : [...open, p.id]));
               }}
             >
-              <PortraitIcon index={p.portraitIndex} />
+              {/* Wrapper, not the canvas itself: PortraitIcon draws imperatively
+                  and the responsive rules size .portrait-icon with !important.
+                  Alternating the class by tick parity restarts the animation
+                  without remounting (and re-drawing) the canvas. */}
+              <span
+                className={`portrait-pulse${pulses ? ` coin-squash-${coinTick.count % 2}` : ''}`}
+                style={pulses ? ({ '--coin-urgency': coinTick.urgency } as CSSProperties) : undefined}
+              >
+                <PortraitIcon index={p.portraitIndex} />
+              </span>
             </button>
             {classDef && (
               <div className="player-class-badge" style={{ color: classDef.color, borderColor: classDef.color }} tabIndex={0}>
@@ -683,6 +705,7 @@ export default function App() {
         roundNumber={room.currentRoundIndex + 1}
         maxRounds={room.settings.maxRounds}
         currentRound={currentRound}
+        coinTick={coinTick}
         liveTimes={liveTimes}
         liveBids={liveBids}
         droppedThisRound={droppedThisRound}
