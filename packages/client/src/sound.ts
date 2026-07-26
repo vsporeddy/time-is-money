@@ -37,3 +37,11 @@ export function playWin() {
 export function playLose() {
   playSfx('lose_a.wav', 0.5);
 }
+
+export function playWeaponUsed() {
+  playSfx('impact_b.wav', 0.5);
+}
+
+export function playMirrorUsed() {
+  playSfx('special_a.wav', 0.5);
+}

@@ -47,6 +47,7 @@ export interface Room {
   lotPool: ItemInstance[]; // this game's fixed pool, rolled once at start_game
   auctionOrder: string[]; // lotPool item ids, shuffled; only the first roundsToPlay are ever auctioned
   roundsToPlay: number; // how many lotPool items will actually go up this game
+  selectedMainTraits: string[]; // the three main attribute families bots specialize in this game
   hiddenPoolItemIds: Set<string>; // 3 random lotPool ids blurred client-side until their round starts
   revealedPoolItemIds: Set<string>; // lotPool ids whose round has already started
   wonItems: Map<string, ItemInstance>; // itemId -> instance, for end-game scoring lookups
@@ -83,6 +84,7 @@ export function createRoomObject(code: string): Room {
     lotPool: [],
     auctionOrder: [],
     roundsToPlay: 0,
+    selectedMainTraits: [],
     hiddenPoolItemIds: new Set(),
     revealedPoolItemIds: new Set(),
     wonItems: new Map(),

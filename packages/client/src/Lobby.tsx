@@ -53,7 +53,7 @@ export function Lobby({
   return (
     <div className="panel">
       <h2 className="panel-title">
-        LOBBY <span className="lobby-code">{lobbyCode}</span>
+        AUCTION <span className="lobby-code">{lobbyCode}</span>
       </h2>
 
       <div className="invite-row">
@@ -63,7 +63,7 @@ export function Lobby({
           className="invite-link-input"
           value={shareValue}
           readOnly
-          aria-label={inviteLink ? 'Invite link' : 'Lobby code'}
+          aria-label={inviteLink ? 'Invite link' : 'Auction code'}
           onFocus={(event) => event.currentTarget.select()}
         />
         <button
@@ -78,17 +78,13 @@ export function Lobby({
         {copyState === 'failed'
           ? 'Copy failed — select the box above and copy it manually.'
           : inviteLink
-            ? 'Send this link to a friend to bring them into this lobby.'
+            ? 'Send this link to a friend to bring them into this auction.'
             : 'Share this code — your friends enter it on the join screen.'}
       </p>
 
       <p className="status-line">
-        {playerCount} of {maxPlayers} players — waiting for players…
+        {playerCount} of {maxPlayers} bidders. Waiting for bidders…
       </p>
-
-      {playerCount < 2 && (
-        <p className="error-text">Not enough players to start the game.</p>
-      )}
 
       {isHost ? (
         <>
@@ -113,36 +109,46 @@ export function Lobby({
               onStartGame();
             }}
           >
-            START GAME
+            START AUCTION
           </button>
-          <button
-            className="btn btn-block"
-            style={{ marginTop: '0.75rem' }}
-            disabled={botCount >= MAX_BOTS}
-            onClick={() => {
-              playClick();
-              onAddBot();
-            }}
-          >
-            Add Bot ({botCount}/{MAX_BOTS})
-          </button>
-          <button
-            className="btn btn-block"
-            style={{ marginTop: '0.75rem' }}
-            disabled={botCount === 0}
-            onClick={() => {
-              playClick();
-              onRemoveBot();
-            }}
-          >
-            Remove Bot
-          </button>
+          <div className="bot-stepper" role="group" aria-label="Bot count">
+            <span className="bot-stepper-label">BOTS</span>
+            <button
+              type="button"
+              className="btn bot-stepper-button"
+              disabled={botCount === 0}
+              aria-label="Remove bot"
+              onClick={() => {
+                playClick();
+                onRemoveBot();
+              }}
+            >
+              −
+            </button>
+            <span className="bot-stepper-count">{botCount}/{MAX_BOTS}</span>
+            <button
+              type="button"
+              className="btn bot-stepper-button"
+              disabled={botCount >= MAX_BOTS}
+              aria-label="Add bot"
+              onClick={() => {
+                playClick();
+                onAddBot();
+              }}
+            >
+              +
+            </button>
+          </div>
         </>
       ) : (
         <>
-          <p className="status-line">Waiting for {hostName ?? 'the host'} to start…</p>
+          <p className="status-line">Waiting for {hostName ?? 'the host'} to open the auction…</p>
           <p className="status-line">Rounds: {roundLimit}</p>
         </>
+      )}
+
+      {playerCount < 2 && (
+        <p className="error-text">Not enough bidders to start the auction.</p>
       )}
     </div>
   );

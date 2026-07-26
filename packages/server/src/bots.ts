@@ -1,8 +1,16 @@
-import type { Player } from 'shared';
-import { getClassDefinition, MAX_BOTS, pickAvailableClassId } from 'shared';
+import type { ItemInstance, Player } from 'shared';
+import { computeScores, getClassDefinition, getTemplate, MAX_BOTS, pickAvailableClassId } from 'shared';
 import type { IO, Room } from './rooms.js';
 
 type HoldFn = (room: Room, playerId: string, io: IO) => void;
+type WeaponFn = (
+  room: Room,
+  io: IO,
+  playerId: string,
+  itemId: string,
+  targetPlayerId?: string,
+  targetItemId?: string
+) => { ok: true } | { ok: false; error: string };
 
 const BOT_NAMES = [
   'Chowder', 'Zalteo', 'Roffles', 'Spatika', 'Paperlisk',
@@ -12,7 +20,7 @@ const BOT_NAMES = [
 ];
 
 function pickBotName(room: Room): string {
-  const taken = new Set([...room.players.values()].map((p) => p.name.toLowerCase()));
+  const taken = new Set([...room.players.values()].map((player) => player.name.toLowerCase()));
   const available = BOT_NAMES.filter((name) => !taken.has(name.toLowerCase()));
   const pool = available.length > 0 ? available : BOT_NAMES;
   return pool[Math.floor(Math.random() * pool.length)];
@@ -21,13 +29,12 @@ function pickBotName(room: Room): string {
 export function addBot(room: Room): Player | null {
   if (room.status !== 'lobby') return null;
 
-  const botCount = [...room.players.values()].filter((p) => p.isBot).length;
+  const botCount = [...room.players.values()].filter((player) => player.isBot).length;
   if (botCount >= MAX_BOTS) return null;
 
-  const classId = pickAvailableClassId([...room.players.values()].map((p) => p.classId));
+  const classId = pickAvailableClassId([...room.players.values()].map((player) => player.classId));
   if (!classId) return null;
 
-  // Bot ids only need to be unique within their own room.
   room.botCounter += 1;
   const id = `bot-${room.botCounter}`;
   const bot: Player = {
@@ -47,53 +54,163 @@ export function addBot(room: Room): Player | null {
   return bot;
 }
 
-// Removes the most recently added bot — a simple decrement to pair with addBot.
 export function removeBot(room: Room): boolean {
   if (room.status !== 'lobby') return false;
-
-  const bots = [...room.players.entries()].filter(([, p]) => p.isBot);
+  const bots = [...room.players.entries()].filter(([, player]) => player.isBot);
   if (bots.length === 0) return false;
-
-  const [lastBotId] = bots[bots.length - 1];
-  room.players.delete(lastBotId);
+  room.players.delete(bots[bots.length - 1][0]);
   return true;
 }
 
-// A bot sits out roughly 30% of lots, and otherwise enters after a small
-// randomized delay so a room full of bots doesn't react in perfect lockstep.
-const BID_CHANCE = 0.7;
-const MIN_ENTRY_DELAY_MS = 200;
-const ENTRY_DELAY_SAFETY_MARGIN_MS = 150; // stay clear of the window's own close
+interface BotPersonality {
+  name: 'aggressive' | 'collector' | 'conservative' | 'disruptor' | 'opportunist';
+  aggression: number;
+  reserveFactor: number;
+  entryThreshold: number;
+  weaponChance: number;
+}
 
-// Called once the opt-in window opens — each bot independently rolls whether
-// to enter this lot at all.
+const BOT_PERSONALITIES: BotPersonality[] = [
+  { name: 'aggressive', aggression: 1.3, reserveFactor: 1.45, entryThreshold: 2, weaponChance: 0.8 },
+  { name: 'collector', aggression: 1.08, reserveFactor: 1.25, entryThreshold: 4, weaponChance: 0.55 },
+  { name: 'conservative', aggression: 0.78, reserveFactor: 0.85, entryThreshold: 8, weaponChance: 0.35 },
+  { name: 'disruptor', aggression: 1, reserveFactor: 1.05, entryThreshold: 5, weaponChance: 0.95 },
+  { name: 'opportunist', aggression: 0.9, reserveFactor: 1.15, entryThreshold: 3, weaponChance: 0.5 },
+];
+
+const MAIN_TRAIT_IDS = new Set(['armor', 'trinket', 'text', 'musical', 'aquatic']);
+
+function personalityFor(player: Player): BotPersonality {
+  let hash = 0;
+  for (const char of player.id) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return BOT_PERSONALITIES[hash % BOT_PERSONALITIES.length];
+}
+
+function focusTraitForBot(room: Room, bot: Player): string | undefined {
+  if (room.selectedMainTraits.length === 0) return undefined;
+  const bots = [...room.players.values()].filter((player) => player.isBot);
+  const botIndex = bots.findIndex((player) => player.id === bot.id);
+  return botIndex >= 0 ? room.selectedMainTraits[botIndex % room.selectedMainTraits.length] : undefined;
+}
+
+// A deterministic per-bot, per-lot preference keeps bot decisions varied
+// without making them flip-flop during each 250ms bidding re-evaluation.
+function lotTasteMultiplier(room: Room, bot: Player, item: ItemInstance): number {
+  const key = `${bot.id}:${room.activeRound?.round.id ?? ''}:${item.templateId}`;
+  let hash = 2166136261;
+  for (const character of key) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+
+  const preference = 0.55 + ((hash % 1_000) / 1_000) * 0.9; // 0.55–1.45
+  const isWhimBid = ((hash >>> 10) % 100) < 15;
+  return preference * (isWhimBid ? 1.35 : 1);
+}
+
+// Construct exactly the version of the lot this bot is entitled to know.
+// Prospectors see modifiers immediately; Appraisers see the hidden find.
+function botVisibleItem(room: Room, player: Player): ItemInstance | undefined {
+  const ar = room.activeRound;
+  if (!ar) return undefined;
+  const knowsModifiers = player.classId === 'prospector';
+  const revealed = new Set(ar.round.revealedFields);
+  return {
+    ...ar.item,
+    material: knowsModifiers || revealed.has('material') ? ar.item.material : 'Used',
+    rarity: knowsModifiers || revealed.has('rarity') ? ar.item.rarity : 'Common',
+    specialModifier: knowsModifiers || revealed.has('specialModifier') ? ar.item.specialModifier : undefined,
+    hiddenTraitId: player.classId === 'appraiser' ? ar.item.hiddenTraitId : undefined,
+  };
+}
+
+function scoreForPlayer(room: Room, player: Player, candidate?: ItemInstance): number {
+  const wonItems = new Map(room.wonItems);
+  const scoredPlayer = candidate ? { ...player, stash: [...player.stash, candidate.id] } : player;
+  if (candidate) wonItems.set(candidate.id, candidate);
+  return computeScores([scoredPlayer], wonItems, room.itemPricePaidMs)[0]?.total ?? 0;
+}
+
+function marginalItemScore(room: Room, player: Player): number {
+  const candidate = botVisibleItem(room, player);
+  if (!candidate) return 0;
+
+  let marginal = scoreForPlayer(room, player, candidate) - scoreForPlayer(room, player);
+  const template = getTemplate(candidate.templateId);
+  const personality = personalityFor(player);
+  const existingTemplates = player.stash
+    .map((itemId) => room.wonItems.get(itemId))
+    .map((item) => item ? getTemplate(item.templateId) : undefined)
+    .filter((itemTemplate) => itemTemplate !== undefined);
+
+  if (
+    personality.name === 'collector' &&
+    template?.traits.some((trait) => existingTemplates.some((owned) => owned.traits.includes(trait)))
+  ) marginal *= 1.2;
+
+  // Each bot owns one of this game's three main attribute lanes. Other main
+  // families are deliberately unattractive to it, while Curios and Weapons
+  // remain neutral options shared by every specialist.
+  const focusTrait = focusTraitForBot(room, player);
+  const itemMainTraits = template?.traits.filter((trait) => MAIN_TRAIT_IDS.has(trait)) ?? [];
+  if (focusTrait && itemMainTraits.length > 0) {
+    marginal *= itemMainTraits.includes(focusTrait) ? 1.4 : 0.5;
+  }
+
+  if (personality.name === 'opportunist' && candidate.trueValue <= 20) marginal *= 1.2;
+  if (player.classId === 'investor') marginal *= 0.82;
+  if (player.classId === 'auctioneer') marginal *= 1.1;
+  if (player.classId === 'insurer') marginal *= 1.08;
+  if (player.classId === 'gambler' && player.winStreak > 0) {
+    marginal *= 1 + Math.min(0.2, player.winStreak * 0.05);
+  }
+
+  return Math.max(0, marginal * lotTasteMultiplier(room, player, candidate));
+}
+
+function reservationMs(room: Room, player: Player): number {
+  const personality = personalityFor(player);
+  const marginalScore = marginalItemScore(room, player);
+  const remainingLots = Math.max(1, room.roundsToPlay - room.currentRoundIndex);
+  const sustainablePerLot = player.timeRemainingMs / remainingLots;
+  const progress = 1 - remainingLots / Math.max(1, room.roundsToPlay);
+  const lateGameFactor = 1 + progress * 0.35;
+  const activeCompetitors = room.activeRound
+    ? Object.values(room.activeRound.round.bidders).filter((bidder) => bidder.isHolding).length
+    : 1;
+  const competitionFactor = 1 + Math.min(0.25, Math.max(0, activeCompetitors - 1) * 0.08);
+  const desired = marginalScore * 220 * personality.aggression * lateGameFactor * competitionFactor;
+  const budgetCap = Math.max(1_000, sustainablePerLot * personality.reserveFactor);
+  return Math.max(0, Math.min(desired, budgetCap, 18_000, player.timeRemainingMs - 150));
+}
+
+const MIN_ENTRY_DELAY_MS = 200;
+const ENTRY_DELAY_SAFETY_MARGIN_MS = 150;
+const SOLE_BIDDER_PRICE_MS = 5_000;
+
 export function scheduleBotEntries(room: Room, io: IO, handleHoldStart: HoldFn) {
   const ar = room.activeRound;
   if (!ar) return;
 
   for (const player of room.players.values()) {
     if (!player.isBot || !ar.round.bidders[player.id]) continue;
-    if (Math.random() >= BID_CHANCE) continue;
+    const personality = personalityFor(player);
+    const marginalScore = marginalItemScore(room, player);
+    const reserve = reservationMs(room, player);
+    const confidence = Math.min(0.95, Math.max(0.1, (marginalScore - personality.entryThreshold + 10) / 25));
+    if (reserve < SOLE_BIDDER_PRICE_MS || Math.random() > confidence) continue;
 
     const windowMs = room.settings.noBidTimeoutMs;
     const latestDelay = Math.max(MIN_ENTRY_DELAY_MS, windowMs - ENTRY_DELAY_SAFETY_MARGIN_MS);
     const entryDelay = MIN_ENTRY_DELAY_MS + Math.random() * Math.max(0, latestDelay - MIN_ENTRY_DELAY_MS);
-
     setTimeout(() => {
-      if (room.activeRound !== ar) return; // round moved on before this fired
-      handleHoldStart(room, player.id, io);
+      if (room.activeRound === ar) handleHoldStart(room, player.id, io);
     }, entryDelay);
   }
 }
 
-// An arbitrary amount of time to spend before withdrawing, once spending has
-// actually started — capped by whatever time the bot has left.
-const MIN_HOLD_MS = 300;
-const MAX_HOLD_MS = 9_000;
-const HOLD_SAFETY_MARGIN_MS = 100;
-
-// Called once the window closes and spending actually starts — every bot
-// still holding at this point picks how long to hang on, then withdraws.
+// Re-evaluate throughout bidding so later reveals can raise or lower a bot's
+// spending limit. This uses only revealed fields unless the class grants more.
 export function scheduleBotReleases(room: Room, io: IO, handleHoldRelease: HoldFn) {
   const ar = room.activeRound;
   if (!ar) return;
@@ -102,14 +219,99 @@ export function scheduleBotReleases(room: Room, io: IO, handleHoldRelease: HoldF
     const player = room.players.get(playerId);
     if (!player?.isBot || !bidder.isHolding) continue;
 
-    const holdMs = Math.min(
-      MIN_HOLD_MS + Math.random() * (MAX_HOLD_MS - MIN_HOLD_MS),
-      Math.max(HOLD_SAFETY_MARGIN_MS, player.timeRemainingMs - HOLD_SAFETY_MARGIN_MS)
-    );
+    const reconsider = () => {
+      if (room.activeRound !== ar) return;
+      const currentBidder = ar.round.bidders[playerId];
+      if (!currentBidder?.isHolding) return;
+      const startedAt = ar.holdStartedAt.get(playerId);
+      if (startedAt === undefined) return;
+      const elapsed = Date.now() - startedAt;
+      const jitter = 0.9 + Math.random() * 0.2;
+      if (elapsed >= reservationMs(room, player) * jitter) {
+        handleHoldRelease(room, playerId, io);
+        return;
+      }
+      setTimeout(reconsider, 250 + Math.random() * 250);
+    };
+    setTimeout(reconsider, 250 + Math.random() * 350);
+  }
+}
+
+function strongestOpponentItem(room: Room, bot: Player): { playerId: string; itemId: string } | undefined {
+  let best: { playerId: string; itemId: string; value: number } | undefined;
+  for (const player of room.players.values()) {
+    if (player.id === bot.id || player.isObserver) continue;
+    for (const itemId of player.stash) {
+      const item = room.wonItems.get(itemId);
+      if (!item) continue;
+      if (!best || item.trueValue > best.value) best = { playerId: player.id, itemId, value: item.trueValue };
+    }
+  }
+  return best;
+}
+
+function richestOpponent(room: Room, bot: Player): Player | undefined {
+  return [...room.players.values()]
+    .filter((player) => player.id !== bot.id && !player.isObserver && player.timeRemainingMs > 0)
+    .sort((a, b) => b.timeRemainingMs - a.timeRemainingMs)[0];
+}
+
+export function scheduleBotWeaponUses(
+  room: Room,
+  io: IO,
+  phase: 'preBid' | 'bidding',
+  useWeapon: WeaponFn
+) {
+  const ar = room.activeRound;
+  if (!ar) return;
+
+  for (const bot of room.players.values()) {
+    if (!bot.isBot || bot.status !== 'active') continue;
+    const personality = personalityFor(bot);
+    if (Math.random() > personality.weaponChance) continue;
+
+    const weapons = bot.stash
+      .map((itemId) => ({ itemId, item: room.wonItems.get(itemId) }))
+      .map(({ itemId, item }) => ({ itemId, item, template: item ? getTemplate(item.templateId) : undefined }))
+      .filter(({ item, template }) =>
+        Boolean(
+          item &&
+          !item.usedActiveEffect &&
+          template?.weapon &&
+          (template.weapon.phase === phase || (phase === 'preBid' && template.weapon.phase === 'anytime'))
+        )
+      );
+
+    const choice = weapons.find(({ template }) => {
+      if (template?.effectType === 'destroyLot') return marginalItemScore(room, bot) < 7;
+      if (template?.effectType === 'transformLot') return marginalItemScore(room, bot) < 10;
+      if (template?.effectType === 'forceWithdraw') {
+        return Object.entries(ar.round.bidders).some(([id, bidder]) => id !== bot.id && bidder.isHolding);
+      }
+      return true;
+    });
+    if (!choice?.template) continue;
+
+    let targetPlayerId: string | undefined;
+    let targetItemId: string | undefined;
+    if (choice.template.effectType === 'destroyItem') {
+      const target = strongestOpponentItem(room, bot);
+      targetPlayerId = target?.playerId;
+      targetItemId = target?.itemId;
+      if (!targetPlayerId || !targetItemId) continue;
+    } else if (choice.template.weapon?.target === 'one') {
+      const target = choice.template.effectType === 'forceWithdraw'
+        ? [...room.players.values()].find((player) =>
+          player.id !== bot.id && ar.round.bidders[player.id]?.isHolding
+        )
+        : richestOpponent(room, bot);
+      if (!target) continue;
+      targetPlayerId = target.id;
+    }
 
     setTimeout(() => {
       if (room.activeRound !== ar) return;
-      handleHoldRelease(room, playerId, io);
-    }, holdMs);
+      useWeapon(room, io, bot.id, choice.itemId, targetPlayerId, targetItemId);
+    }, 250 + Math.random() * 650);
   }
 }

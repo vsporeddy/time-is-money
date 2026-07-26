@@ -8,7 +8,6 @@ import {
   computeScores,
   getClassDefinition,
   getTemplate,
-  getTraitDefinition,
   normalizeRoomCode,
   rankScores,
 } from 'shared';
@@ -21,12 +20,14 @@ import { PortraitIcon } from './PortraitIcon';
 import { CoinBurst } from './CoinBurst';
 import { Chat } from './Chat';
 import { BackgroundMusic } from './BackgroundMusic';
-import { Inventory } from './Inventory';
+import { Inventory, breakdownTraitText } from './Inventory';
 import { ItemTargetPicker } from './ItemTargetPicker';
 import { PlayerPicker } from './PlayerPicker';
 import { LotPool } from './LotPool';
-import { playChatDing, playClick, playLose, playWin } from './sound';
+import { Credits } from './Credits';
+import { playChatDing, playClick, playLose, playMirrorUsed, playWeaponUsed, playWin } from './sound';
 import { useViewportTooltips } from './useViewportTooltips';
+import { addTotalEarnings, loadPlayerName, loadTotalEarnings, savePlayerName } from './playerStats';
 
 // Applied on every keystroke so a pasted '#QT4B' or a lowercase code becomes
 // canonical as it lands, rather than only at submit. Length is capped by the
@@ -64,7 +65,8 @@ export default function App() {
   // handleHoldRelease in round.ts). Suppress the "lose" cue for that case
   // so it doesn't play right before the "win" cue.
   const suppressNextLoseRef = useRef(false);
-  const [name, setName] = useState('');
+  const [name, setName] = useState(loadPlayerName);
+  const [totalEarnings, setTotalEarnings] = useState(loadTotalEarnings);
   const [room, setRoom] = useState<RoomState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -76,6 +78,8 @@ export default function App() {
   const [lobbyCode, setLobbyCode] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
   const [joinErrorReason, setJoinErrorReason] = useState<JoinFailureReason | null>(null);
+  const [matchmaking, setMatchmaking] = useState(false);
+  const [matchmakingCount, setMatchmakingCount] = useState(0);
   // null means "no code entered" — join_room reads that as "create a new lobby".
   const pendingLobbyCode = normalizeRoomCode(codeInput);
   const codeLooksWrong = codeInput.length > 0 && pendingLobbyCode === null;
@@ -94,7 +98,7 @@ export default function App() {
   // Any number of opponent inventories can be open at once; order is open order,
   // which also drives the cascade offset of their panels.
   const [openOpponentIds, setOpenOpponentIds] = useState<string[]>([]);
-  const [myInventoryOpen, setMyInventoryOpen] = useState(true);
+  const [myInventoryOpen, setMyInventoryOpen] = useState(false);
   const [roundLimit, setRoundLimit] = useState(15);
   // Mirror of Desire (copy) and Crossbow (destroy) both target an item in
   // someone else's inventory — one picker overlay serves both.
@@ -105,6 +109,7 @@ export default function App() {
   const [playerPickerError, setPlayerPickerError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [lotPoolOpen, setLotPoolOpen] = useState(false);
+  const [creditsOpen, setCreditsOpen] = useState(false);
 
   useEffect(() => {
     if (!actionError) return;
@@ -116,7 +121,31 @@ export default function App() {
     socket.connect();
 
     const onConnect = () => setConnected(true);
-    const onDisconnect = () => setConnected(false);
+    const onDisconnect = () => {
+      setConnected(false);
+      setMatchmaking(false);
+      setMatchmakingCount(0);
+    };
+    const onMatchmakingStatus = ({ queuedPlayers }: { queuedPlayers: number; requiredPlayers: number }) => {
+      setMatchmakingCount(queuedPlayers);
+    };
+    const onMatchmakingError = ({ error: matchmakingError }: { error: string }) => {
+      setMatchmaking(false);
+      setMatchmakingCount(0);
+      setError(matchmakingError);
+    };
+    const onMatchFound = ({ code, playerId, state }: { code: string; playerId: string; state: RoomState }) => {
+      setMyId(playerId);
+      setRoom(state);
+      setLobbyCode(code);
+      writeLobbyCodeToUrl(code);
+      setJoined(true);
+      setJoining(false);
+      setMatchmaking(false);
+      setMatchmakingCount(0);
+      setError(null);
+      setJoinErrorReason(null);
+    };
     const onRoomState = (state: RoomState) => {
       setRoom(state);
       // Belt-and-braces against a raced ack or a hash the user wiped.
@@ -143,7 +172,8 @@ export default function App() {
         setLiveBids({});
         setHoldingPlayerIds([]);
         setDroppedThisRound({});
-        setSelectedOpponentId(null);
+        setOpenOpponentIds([]);
+        setMyInventoryOpen(false);
         setItemPickerItemId(null);
         setItemPickerError(null);
         setPlayerPickerItemId(null);
@@ -236,15 +266,22 @@ export default function App() {
     const onGameOver = (payload: { players: Player[]; scores: ScoreBreakdown[] }) => {
       setGameOverPlayers(payload.players);
       setScores(payload.scores);
+      const myScore = payload.scores.find((s) => s.playerId === myIdRef.current);
+      if (myScore) setTotalEarnings(addTotalEarnings(myScore.total));
     };
     const onChatHistory = (history: ChatMessage[]) => setChatMessages(history);
     const onChatMessage = (message: ChatMessage) => {
       playChatDing();
       setChatMessages((prev) => [...prev, message].slice(-100));
     };
+    const onWeaponUsed = () => playWeaponUsed();
+    const onMirrorUsed = () => playMirrorUsed();
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
+    socket.on('matchmaking_status', onMatchmakingStatus);
+    socket.on('matchmaking_error', onMatchmakingError);
+    socket.on('match_found', onMatchFound);
     socket.on('room_state', onRoomState);
     socket.on('round_start', onRoundStart);
     socket.on('reveal', onReveal);
@@ -258,10 +295,15 @@ export default function App() {
     socket.on('game_over', onGameOver);
     socket.on('chat_history', onChatHistory);
     socket.on('chat_message', onChatMessage);
+    socket.on('weapon_used', onWeaponUsed);
+    socket.on('mirror_used', onMirrorUsed);
 
     return () => {
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
+      socket.off('matchmaking_status', onMatchmakingStatus);
+      socket.off('matchmaking_error', onMatchmakingError);
+      socket.off('match_found', onMatchFound);
       socket.off('room_state', onRoomState);
       socket.off('round_start', onRoundStart);
       socket.off('reveal', onReveal);
@@ -275,6 +317,8 @@ export default function App() {
       socket.off('game_over', onGameOver);
       socket.off('chat_history', onChatHistory);
       socket.off('chat_message', onChatMessage);
+      socket.off('weapon_used', onWeaponUsed);
+      socket.off('mirror_used', onMirrorUsed);
       socket.disconnect();
     };
   }, []);
@@ -306,6 +350,54 @@ export default function App() {
     });
   };
 
+  const handleMatchmake = () => {
+    playClick();
+    setError(null);
+    setJoinErrorReason(null);
+    socket.emit('join_matchmaking', { playerName: name }, (res) => {
+      if (res.ok) {
+        setMatchmaking(true);
+        return;
+      }
+      setError(res.error);
+      setJoinErrorReason(res.reason);
+    });
+  };
+
+  const handleCancelMatchmaking = () => {
+    playClick();
+    socket.emit('cancel_matchmaking');
+    setMatchmaking(false);
+    setMatchmakingCount(0);
+  };
+
+  const handleLeaveLobby = () => {
+    playClick();
+    socket.emit('leave_room', () => {
+      setJoined(false);
+      setMyId(null);
+      setRoom(null);
+      setLobbyCode(null);
+      setCodeInput('');
+      setGameOverPlayers(null);
+      setScores(null);
+      setCurrentRound(null);
+      setLastResult(null);
+      setKnownItems({});
+      setItemPrices({});
+      setLiveTimes({});
+      setLiveBids({});
+      setHoldingPlayerIds([]);
+      setDroppedThisRound({});
+      setOpenOpponentIds([]);
+      setMyInventoryOpen(false);
+      setChatMessages([]);
+      setError(null);
+      setJoinErrorReason(null);
+      clearLobbyCodeFromUrl();
+    });
+  };
+
   // Bails out of a full lobby into a brand-new one of your own.
   const handleStartOwnLobby = () => {
     playClick();
@@ -317,7 +409,7 @@ export default function App() {
 
   const handleResetGame = () => {
     playClick();
-    if (window.confirm('Reset this lobby for everyone? This clears all progress.')) {
+    if (window.confirm('Reset this auction for everyone? This clears all progress.')) {
       socket.emit('reset_game');
     }
   };
@@ -447,7 +539,7 @@ export default function App() {
     playerPickerTemplate?.effectType === 'forceEnter'
       ? 'DUAL DAGGERS'
       : playerPickerTemplate?.effectType === 'stealTime'
-        ? "DARK KNIGHT'S GREATAXE"
+        ? "BANDIT'S DAGGER"
         : 'WOODEN DAGGER';
   const playerPickerSubtitle =
     playerPickerTemplate?.effectType === 'forceEnter'
@@ -499,7 +591,7 @@ export default function App() {
                 else setOpenOpponentIds((open) => (open.includes(p.id) ? open.filter((id) => id !== p.id) : [...open, p.id]));
               }}
             >
-              <PortraitIcon index={p.portraitIndex} />
+              <PortraitIcon index={p.portraitIndex} size={96} />
               {isMe && (
                 <CoinBurst
                   active={
@@ -544,19 +636,42 @@ export default function App() {
 
   let screen: ReactNode;
 
-  if (!joined) {
+  if (!joined && matchmaking) {
+    screen = (
+      <main className="app-shell">
+        <Logo scale={5} />
+        <div className="panel">
+          <h2 className="panel-title">MATCHMAKING</h2>
+          <p className="status-line">Finding bidders...</p>
+          <p className="status-line">{matchmakingCount} of 4 bidders ready</p>
+          <button type="button" className="btn btn-block" onClick={handleCancelMatchmaking}>
+            CANCEL
+          </button>
+        </div>
+      </main>
+    );
+  } else if (!joined) {
     screen = (
       <main className="app-shell">
         <Logo scale={5} />
         <div className="panel">
           <p className="status-line">{connected ? 'Connected to server' : 'Connecting…'}</p>
+          <p className="status-line">Net worth: ${totalEarnings}</p>
           <form onSubmit={handleJoin}>
             <div className="field">
               <label htmlFor="name">Your name</label>
-              <input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} />
+              <input
+                id="name"
+                type="text"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  savePlayerName(e.target.value);
+                }}
+              />
             </div>
             <div className="field">
-              <label htmlFor="lobby-code">Lobby code (optional)</label>
+              <label htmlFor="lobby-code">Auction code (optional)</label>
               <input
                 id="lobby-code"
                 type="text"
@@ -570,23 +685,32 @@ export default function App() {
                 spellCheck={false}
                 placeholder="TIME"
               />
-              <p className="field-hint">Leave blank to start a new lobby.</p>
+              <p className="field-hint">Leave blank to start a new auction.</p>
             </div>
             <button
               type="submit"
               className="btn btn-block"
               disabled={!connected || joining || !name.trim() || codeLooksWrong}
             >
-              {joining ? 'JOINING…' : pendingLobbyCode ? 'JOIN LOBBY' : 'CREATE LOBBY'}
+              {joining ? 'JOINING…' : pendingLobbyCode ? 'JOIN PRIVATE AUCTION' : 'CREATE PRIVATE AUCTION'}
             </button>
           </form>
+          <button
+            type="button"
+            className="btn btn-block"
+            style={{ marginTop: '0.75rem' }}
+            disabled={!connected || joining || !name.trim()}
+            onClick={handleMatchmake}
+          >
+            PUBLIC AUCTION
+          </button>
           {codeLooksWrong && (
-            <p className="error-text">Lobby codes are {ROOM_CODE_LENGTH} characters, letters and numbers.</p>
+            <p className="error-text">Auction codes are {ROOM_CODE_LENGTH} characters, letters and numbers.</p>
           )}
           {error && <p className="error-text">{error}</p>}
           {joinErrorReason === 'room_full' && (
             <button className="btn btn-block" style={{ marginTop: '0.75rem' }} onClick={handleStartOwnLobby}>
-              START A NEW LOBBY INSTEAD
+              START A NEW AUCTION INSTEAD
             </button>
           )}
         </div>
@@ -596,8 +720,9 @@ export default function App() {
     const ranked = rankScores(scores, gameOverPlayers);
 
     screen = shellWithHeader(
+      <>
       <div className="panel">
-        <h2 className="panel-title">GAME OVER</h2>
+        <h2 className="panel-title">AUCTION OVER</h2>
         <ol className="results-list">
           {ranked.map(({ score: s, rank, shared }) => {
             const player = gameOverPlayers.find((p) => p.id === s.playerId);
@@ -607,14 +732,12 @@ export default function App() {
               .map((item) => getTemplate(item.templateId)?.name ?? item.templateId);
 
             const extras: string[] = [];
-            if (s.hiddenTraitBonus !== 0) extras.push(`hidden ${s.hiddenTraitBonus >= 0 ? '+' : ''}${s.hiddenTraitBonus}`);
-            if (s.scoreScalingBonus !== 0) extras.push(`scaling +${s.scoreScalingBonus}`);
-            if (s.solitaireBonus !== 0) extras.push(`solitaire +${s.solitaireBonus}`);
-            if (s.hoarderBonus !== 0) extras.push(`hoarder +${s.hoarderBonus}`);
+            if (s.hiddenTraitBonus !== 0) extras.push(`Finds: ${s.hiddenTraitBonus >= 0 ? '+' : ''}$${s.hiddenTraitBonus}`);
+            if (s.scoreScalingBonus !== 0) extras.push(`Item effects: +$${s.scoreScalingBonus}`);
+            if (s.solitaireBonus !== 0) extras.push(`Solitaire bonus: +$${s.solitaireBonus}`);
+            if (s.hoarderBonus !== 0) extras.push(`Hoarder bonus: +$${s.hoarderBonus}`);
             for (const t of s.traitBonuses) {
-              extras.push(
-                `${getTraitDefinition(t.traitId)?.name ?? t.traitId} x${t.count} ${t.multiplier ? `×${t.multiplier}` : `+${t.bonus}`}`
-              );
+              extras.push(breakdownTraitText(t.traitId, t.count, t.bonus, t.multiplier));
             }
 
             return (
@@ -628,7 +751,7 @@ export default function App() {
                       {shared && <span className="tied-label"> (tied)</span>}
                     </div>
                     <div className="rank-breakdown">
-                      base ${s.baseValue}
+                      Items: ${s.baseValue}
                       {extras.length > 0 ? `, ${extras.join(', ')}` : ''}
                     </div>
                     {itemNames.length > 0 && <div className="rank-items">{itemNames.join(', ')}</div>}
@@ -647,14 +770,23 @@ export default function App() {
               socket.emit('restart_game');
             }}
           >
-            PLAY AGAIN
+            ANOTHER ROUND
           </button>
         ) : (
           <p className="status-line" style={{ marginTop: '1rem' }}>
-            Waiting for {hostName ?? 'the host'} to start another game…
+            Waiting for {hostName ?? 'the host'} to open another auction…
           </p>
         )}
       </div>
+      <button
+        type="button"
+        className="btn"
+        style={{ marginTop: '0.75rem' }}
+        onClick={handleLeaveLobby}
+      >
+        LEAVE AUCTION
+      </button>
+      </>
     );
   } else if (!room) {
     screen = shellWithHeader(<p className="status-line">Loading…</p>);
@@ -662,7 +794,12 @@ export default function App() {
     // room.status flipped to game_over before we had a chance to see the
     // one-time game_over event (e.g. joined right as it fired). Nothing to
     // rank, just wait for the next game.
-    screen = shellWithHeader(<p className="status-line">A game just ended! Waiting for a new one to start.</p>);
+    screen = shellWithHeader(
+      <>
+        <p className="status-line">An auction just ended! Waiting for a new one to start.</p>
+        <button type="button" className="btn" onClick={handleLeaveLobby}>LEAVE AUCTION</button>
+      </>
+    );
   } else if (room.status === 'lobby') {
     screen = shellWithHeader(
       <Lobby
@@ -706,7 +843,7 @@ export default function App() {
           }
           socket.emit('hold_release');
         }}
-        onOpenLotPool={() => setLotPoolOpen(true)}
+        onOpenLotPool={() => setLotPoolOpen((open) => !open)}
       />
     );
   }
@@ -767,10 +904,15 @@ export default function App() {
             />
           );
         })}
-      <BackgroundMusic ducked={currentRound !== null} muffled={!joined || room?.status === 'lobby'} />
+      <BackgroundMusic
+        ducked={currentRound !== null}
+        muffled={!joined || room?.status === 'lobby'}
+        onOpenCredits={() => setCreditsOpen(true)}
+      />
+      {creditsOpen && <Credits onClose={() => setCreditsOpen(false)} />}
       {isHost && (
         <button className="dev-reset-button" onClick={handleResetGame}>
-          Reset Game
+          Reset Auction
         </button>
       )}
       <div className="bottom-bar">

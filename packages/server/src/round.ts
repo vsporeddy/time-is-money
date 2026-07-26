@@ -2,7 +2,7 @@ import type { ItemTemplate, MaskedRoundItem, Player, Round, TimeRefundConfig } f
 import { cloneItemInstance, computeScores, getTemplate, ITEM_TEMPLATES, rollItemInstanceForTemplate, shuffle } from 'shared';
 import { emitRoomState, humanPlayerIds, ownsItemTemplate, playerHasClass } from './rooms.js';
 import type { ActiveRound, IO, Room } from './rooms.js';
-import { scheduleBotEntries, scheduleBotReleases } from './bots.js';
+import { scheduleBotEntries, scheduleBotReleases, scheduleBotWeaponUses } from './bots.js';
 import { addSystemChatMessage } from './chat.js';
 
 const SOLE_BIDDER_PRICE_MS = 5_000;
@@ -10,6 +10,7 @@ const MODIFIER_REVEAL_INTERVAL_MS = 7_000;
 const INVESTOR_INTEREST_RATE = 0.03; // Investor: % of unspent time added at the end of every round
 const AUCTIONEER_REBATE_RATE = 0.1; // Auctioneer: % of the price paid rebated back on every win
 const INSURER_REFUND_RATE = 0.25; // Insurer: % of committed time recovered on a lost bid
+const HOURGLASS_REFUND_RATE = 0.5; // Chronomancer's Hourglass: % of committed time recovered on a lost bid
 const GAMBLER_STREAK_REBATE_RATE_PER_WIN = 0.05; // Gambler: % of price rebated per consecutive win, additive
 const GAMBLER_MAX_STREAK_WINS = 4; // caps the rebate scaling at a 4-win streak (20%)
 const EARLY_UTILITY_TEMPLATE_IDS = new Set(['spyglass', 'chronomancers-hourglass']);
@@ -111,6 +112,7 @@ function buildLotPool(room: Room) {
     main: [...mainTemplates],
   };
   const selectedMainTraits = maxRounds === null ? [...MAIN_TRAIT_IDS] : selectMainTraits(mainTemplates);
+  room.selectedMainTraits = selectedMainTraits.slice(0, 3);
   const auctionTemplates: ItemTemplate[] = [];
 
   for (let slot = 0; slot < roundsToPlay; slot += 1) {
@@ -238,6 +240,7 @@ function activateRound(room: Room, io: IO) {
   ar.round.bidWindowOpen = true;
   ar.bidWindowOpen = true;
   emitRoundStart(room, io);
+  scheduleBotWeaponUses(room, io, 'preBid', useWeapon);
   scheduleBotEntries(room, io, handleHoldStart);
 
   ar.noBidTimer = setTimeout(() => closeBidWindow(room, io), room.settings.noBidTimeoutMs);
@@ -272,6 +275,7 @@ function closeBidWindow(room: Room, io: IO) {
   for (const [playerId] of activeBidders) {
     ar.holdStartedAt.set(playerId, spendingStartedAt);
   }
+  scheduleBotWeaponUses(room, io, 'bidding', useWeapon);
   scheduleBotReleases(room, io, handleHoldRelease);
 
   // Holding to the buzzer is a mutual failure, not a win for anyone: every
@@ -496,8 +500,8 @@ function resolveRound(room: Room, io: IO, winnerId: string | null, opts?: { stal
   }
 
   // Chronomancer's Hourglass: anyone who spent time on this lot and didn't
-  // win it gets that time back in full. Insurer is the same idea as a
-  // passive class ability, but only a partial refund — the two don't stack.
+  // win it gets part of that time back. Insurer is the same idea as a
+  // passive class ability, but at a lower refund rate — the two don't stack.
   // Stalemate holders were already made whole above, so the Hourglass has
   // nothing left to give them; the Insurer still pays out on top, coming out
   // of the stalemate ahead. Anyone who folded earlier in the round is a normal
@@ -509,7 +513,7 @@ function resolveRound(room: Room, io: IO, winnerId: string | null, opts?: { stal
     if (!loser) continue;
 
     if (ownsItemTemplate(room, playerId, 'chronomancers-hourglass') && !stalemateIds.has(playerId)) {
-      loser.timeRemainingMs += bidder.committedMs;
+      loser.timeRemainingMs += Math.round(bidder.committedMs * HOURGLASS_REFUND_RATE);
     } else if (loser.classId === 'insurer') {
       loser.timeRemainingMs += Math.round(bidder.committedMs * INSURER_REFUND_RATE);
     } else {
@@ -573,6 +577,7 @@ export function resetRoomToLobby(room: Room) {
   room.lotPool = [];
   room.auctionOrder = [];
   room.roundsToPlay = 0;
+  room.selectedMainTraits = [];
   room.hiddenPoolItemIds = new Set();
   room.revealedPoolItemIds = new Set();
   room.wonItems.clear();
@@ -615,16 +620,13 @@ function emitBidderDropped(room: Room, io: IO, payload: { roundId: string; playe
 // Combining a chest with its matching key consumes both and grants a handful
 // of random items from the chest's reward trait. Checked right after a win
 // changes the winner's stash, since that's the only way stash contents change.
-// A Locksmith skips the key requirement entirely — the chest alone opens.
 function tryOpenChests(room: Room, player: Player) {
-  const isLocksmith = player.classId === 'locksmith';
-
   for (const chestTemplate of ITEM_TEMPLATES) {
     if (!chestTemplate.chest) continue;
 
     const chestItemId = player.stash.find((id) => room.wonItems.get(id)?.templateId === chestTemplate.id);
     const keyItemId = player.stash.find((id) => room.wonItems.get(id)?.templateId === chestTemplate.chest!.keyTemplateId);
-    if (!chestItemId || (!keyItemId && !isLocksmith)) continue;
+    if (!chestItemId || !keyItemId) continue;
 
     player.stash = player.stash.filter((id) => id !== chestItemId && id !== keyItemId);
 
@@ -671,6 +673,7 @@ export function useMirror(
   player.stash.push(copy.id);
   tryOpenChests(room, player);
   logGameEvent(room, io, `${player.name} has used ${template.name} on ${targetOwner.name}.`);
+  io.to(room.code).emit('mirror_used', { playerId, itemId });
 
   return { ok: true };
 }
@@ -823,6 +826,7 @@ export function useWeapon(
     io,
     `${actor.name} has used ${template.name}${affectedPlayerNames.length > 0 ? ` on ${affectedPlayerNames.join(', ')}` : ''}.`
   );
+  io.to(room.code).emit('weapon_used', { playerId, itemId });
   emitRoomState(room, io);
   return { ok: true };
 }

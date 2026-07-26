@@ -45,6 +45,7 @@ export interface WeaponEffectConfig {
 export interface ItemTemplate {
   id: string;
   name: string;
+  flavorText: string; // short italic blurb shown on the bidding screen
   baseSpriteId: string;
   baseValue: number; // fixed per template — variance now comes entirely from rolled modifiers
   materials: string[];
@@ -181,6 +182,12 @@ export interface ClientToServerEvents {
         | { ok: false; reason: JoinFailureReason; error: string }
     ) => void
   ) => void;
+  join_matchmaking: (
+    payload: { playerName: string },
+    ack: (res: { ok: true } | { ok: false; reason: JoinFailureReason; error: string }) => void
+  ) => void;
+  cancel_matchmaking: () => void;
+  leave_room: (ack: () => void) => void;
   start_game: () => void;
   add_bot: () => void;
   remove_bot: () => void;
@@ -223,6 +230,9 @@ export type MaskedRoundItem = Omit<ItemInstance, 'hiddenTraitId' | 'material' | 
   };
 
 export interface ServerToClientEvents {
+  matchmaking_status: (payload: { queuedPlayers: number; requiredPlayers: number }) => void;
+  matchmaking_error: (payload: { error: string }) => void;
+  match_found: (payload: { code: string; playerId: string; state: RoomState }) => void;
   room_state: (state: RoomState) => void;
   round_start: (payload: { round: Round; item: MaskedRoundItem }) => void;
   bid_window_closed: (payload: { roundId: string; spendingStartedAt: number }) => void;
@@ -238,4 +248,8 @@ export interface ServerToClientEvents {
   lot_transformed: (payload: { roundId: string; item: MaskedRoundItem }) => void;
   // Dual Daggers: bidding on this lot is now locked to the listed player ids.
   bid_restricted: (payload: { roundId: string; allowedPlayerIds: string[] }) => void;
+  // Any weapon's active effect was used — a cue for all players, not just those affected.
+  weapon_used: (payload: { playerId: string; itemId: string }) => void;
+  // Mirror of Desire was used — a cue for all players, not just those affected.
+  mirror_used: (payload: { playerId: string; itemId: string }) => void;
 }
