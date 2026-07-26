@@ -111,6 +111,7 @@ function buildLotPool(room: Room) {
     main: [...mainTemplates],
   };
   const selectedMainTraits = maxRounds === null ? [...MAIN_TRAIT_IDS] : selectMainTraits(mainTemplates);
+  room.selectedMainTraits = selectedMainTraits.slice(0, 3);
   const auctionTemplates: ItemTemplate[] = [];
 
   for (let slot = 0; slot < roundsToPlay; slot += 1) {
@@ -575,6 +576,7 @@ export function resetRoomToLobby(room: Room) {
   room.lotPool = [];
   room.auctionOrder = [];
   room.roundsToPlay = 0;
+  room.selectedMainTraits = [];
   room.hiddenPoolItemIds = new Set();
   room.revealedPoolItemIds = new Set();
   room.wonItems.clear();

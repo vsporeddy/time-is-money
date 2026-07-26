@@ -78,10 +78,19 @@ const BOT_PERSONALITIES: BotPersonality[] = [
   { name: 'opportunist', aggression: 0.9, reserveFactor: 1.15, entryThreshold: 3, weaponChance: 0.5 },
 ];
 
+const MAIN_TRAIT_IDS = new Set(['armor', 'trinket', 'text', 'musical', 'aquatic']);
+
 function personalityFor(player: Player): BotPersonality {
   let hash = 0;
   for (const char of player.id) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
   return BOT_PERSONALITIES[hash % BOT_PERSONALITIES.length];
+}
+
+function focusTraitForBot(room: Room, bot: Player): string | undefined {
+  if (room.selectedMainTraits.length === 0) return undefined;
+  const bots = [...room.players.values()].filter((player) => player.isBot);
+  const botIndex = bots.findIndex((player) => player.id === bot.id);
+  return botIndex >= 0 ? room.selectedMainTraits[botIndex % room.selectedMainTraits.length] : undefined;
 }
 
 // Construct exactly the version of the lot this bot is entitled to know.
@@ -123,6 +132,16 @@ function marginalItemScore(room: Room, player: Player): number {
     personality.name === 'collector' &&
     template?.traits.some((trait) => existingTemplates.some((owned) => owned.traits.includes(trait)))
   ) marginal *= 1.2;
+
+  // Each bot owns one of this game's three main attribute lanes. Other main
+  // families are deliberately unattractive to it, while Curios and Weapons
+  // remain neutral options shared by every specialist.
+  const focusTrait = focusTraitForBot(room, player);
+  const itemMainTraits = template?.traits.filter((trait) => MAIN_TRAIT_IDS.has(trait)) ?? [];
+  if (focusTrait && itemMainTraits.length > 0) {
+    marginal *= itemMainTraits.includes(focusTrait) ? 1.4 : 0.5;
+  }
+
   if (personality.name === 'opportunist' && candidate.trueValue <= 20) marginal *= 1.2;
   if (player.classId === 'investor') marginal *= 0.82;
   if (player.classId === 'auctioneer') marginal *= 1.1;
