@@ -25,6 +25,7 @@ import { PlayerPicker } from './PlayerPicker';
 import { LotPool } from './LotPool';
 import { playChatDing, playClick, playLose, playWin } from './sound';
 import { useViewportTooltips } from './useViewportTooltips';
+import { addTotalEarnings, loadPlayerName, loadTotalEarnings, savePlayerName } from './playerStats';
 
 // Applied on every keystroke so a pasted '#QT4B' or a lowercase code becomes
 // canonical as it lands, rather than only at submit. Length is capped by the
@@ -62,7 +63,8 @@ export default function App() {
   // handleHoldRelease in round.ts). Suppress the "lose" cue for that case
   // so it doesn't play right before the "win" cue.
   const suppressNextLoseRef = useRef(false);
-  const [name, setName] = useState('');
+  const [name, setName] = useState(loadPlayerName);
+  const [totalEarnings, setTotalEarnings] = useState(loadTotalEarnings);
   const [room, setRoom] = useState<RoomState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -261,6 +263,8 @@ export default function App() {
     const onGameOver = (payload: { players: Player[]; scores: ScoreBreakdown[] }) => {
       setGameOverPlayers(payload.players);
       setScores(payload.scores);
+      const myScore = payload.scores.find((s) => s.playerId === myIdRef.current);
+      if (myScore) setTotalEarnings(addTotalEarnings(myScore.total));
     };
     const onChatHistory = (history: ChatMessage[]) => setChatMessages(history);
     const onChatMessage = (message: ChatMessage) => {
@@ -634,10 +638,19 @@ export default function App() {
         <Logo scale={5} />
         <div className="panel">
           <p className="status-line">{connected ? 'Connected to server' : 'Connecting…'}</p>
+          <p className="status-line">Net worth: ${totalEarnings}</p>
           <form onSubmit={handleJoin}>
             <div className="field">
               <label htmlFor="name">Your name</label>
-              <input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} />
+              <input
+                id="name"
+                type="text"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  savePlayerName(e.target.value);
+                }}
+              />
             </div>
             <div className="field">
               <label htmlFor="lobby-code">Auction code (optional)</label>
