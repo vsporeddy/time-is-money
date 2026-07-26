@@ -483,7 +483,7 @@ export default function App() {
                 else setSelectedOpponentId((selected) => (selected === p.id ? null : p.id));
               }}
             >
-              <PortraitIcon index={p.portraitIndex} size={64} />
+              <PortraitIcon index={p.portraitIndex} />
             </button>
             {classDef && (
               <div className="player-class-badge" style={{ color: classDef.color, borderColor: classDef.color }} tabIndex={0}>
