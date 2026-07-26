@@ -62,6 +62,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   maxRoundDurationMs: 60_000,
   interRoundDelayMs: 4_000,
   maxRounds: ROUND_LIMIT_ENABLED ? ROUND_LIMIT : null,
+  openBidding: false,
 };
 
 // Every room owns its own settings object — sharing one would make any host's
@@ -133,7 +134,9 @@ export function toRoomState(r: Room, viewerId?: string): RoomState {
     hostId: r.hostId,
     status: r.status,
     players: [...r.players.values()].map((player) =>
-      player.id === viewerId || ownsItemTemplate(r, viewerId, 'spyglass') ? player : { ...player, timeRemainingMs: 0 }
+      player.id === viewerId || r.settings.openBidding || ownsItemTemplate(r, viewerId, 'spyglass')
+        ? player
+        : { ...player, timeRemainingMs: 0 }
     ),
     knownItems: [...r.wonItems.values()],
     itemPrices: Object.fromEntries(r.itemPricePaidMs),

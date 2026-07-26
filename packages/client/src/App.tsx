@@ -551,9 +551,11 @@ export default function App() {
   const isHost = !!myId && hostId === myId;
   const hostName = room?.players.find((p) => p.id === hostId)?.name ?? null;
   const inviteLink = useMemo(() => (lobbyCode ? buildInviteLink(lobbyCode) : null), [lobbyCode]);
-  // A Spyglass reveals everyone's time/bids — the server already sends that
-  // data once owned, this just decides whether the dock renders it.
+  // A Spyglass, or the whole room playing Open Bid, reveals everyone's
+  // time/bids — the server already sends that data either way, this just
+  // decides whether the dock renders it.
   const hasSpyglass = myPlayer?.stash.some((id) => knownItems[id]?.templateId === 'spyglass') ?? false;
+  const canSeeAllTimes = hasSpyglass || (room?.settings.openBidding ?? false);
   // preBid: the opt-in window (free to enter/cancel); bidding: spending underway.
   const roundPhase: 'preBid' | 'bidding' | null =
     !currentRound || currentRound.round.status !== 'active' ? null : currentRound.round.bidWindowOpen ? 'preBid' : 'bidding';
@@ -593,7 +595,7 @@ export default function App() {
         const holding = holdingPlayerIds.includes(p.id);
         // Distinct from `holding` above: only true while actively spending.
         const isCurrentlyHolding = liveBids[p.id] !== undefined;
-        const dropped = (isMe || hasSpyglass) && droppedThisRound[p.id] !== undefined;
+        const dropped = (isMe || canSeeAllTimes) && droppedThisRound[p.id] !== undefined;
         const time = liveTimes[p.id] ?? p.timeRemainingMs;
         const classDef = getClassDefinition(p.classId);
         const classes = ['player-card', isMe && 'me', holding && 'holding', dropped && 'dropped']
@@ -644,7 +646,7 @@ export default function App() {
             </div>
             {p.isObserver ? (
               <div>Observing</div>
-            ) : isMe || hasSpyglass ? (
+            ) : isMe || canSeeAllTimes ? (
               <>
                 <div className="player-time-left">{fmt(time)} left</div>
                 {dropped && <div>withdrew! Spent {fmt(droppedThisRound[p.id])}</div>}
@@ -849,6 +851,8 @@ export default function App() {
           setRoundLimit(maxRounds);
           socket.emit('set_round_limit', { maxRounds });
         }}
+        openBidding={room.settings.openBidding}
+        onOpenBiddingChange={(openBidding) => socket.emit('set_open_bidding', { openBidding })}
         onStartGame={() => socket.emit('start_game')}
         onAddBot={() => socket.emit('add_bot')}
         onRemoveBot={() => socket.emit('remove_bot')}

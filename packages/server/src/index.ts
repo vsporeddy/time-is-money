@@ -306,6 +306,13 @@ io.on('connection', (socket: AppSocket) => {
     emitRoomState(room, io);
   });
 
+  socket.on('set_open_bidding', ({ openBidding }) => {
+    const room = hostRoom(socket);
+    if (!room || room.status !== 'lobby') return;
+    room.settings.openBidding = !!openBidding;
+    emitRoomState(room, io);
+  });
+
   socket.on('restart_game', () => {
     const room = hostRoom(socket);
     if (room) restartGame(room, io);

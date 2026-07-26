@@ -13,6 +13,8 @@ interface LobbyProps {
   botCount: number;
   roundLimit: number;
   onRoundLimitChange: (maxRounds: number) => void;
+  openBidding: boolean;
+  onOpenBiddingChange: (openBidding: boolean) => void;
   onStartGame: () => void;
   onAddBot: () => void;
   onRemoveBot: () => void;
@@ -28,6 +30,8 @@ export function Lobby({
   botCount,
   roundLimit,
   onRoundLimitChange,
+  openBidding,
+  onOpenBiddingChange,
   onStartGame,
   onAddBot,
   onRemoveBot,
@@ -101,6 +105,28 @@ export function Lobby({
             />
             <div className="round-limit-labels"><span>10</span><span>25</span></div>
           </div>
+          <div className="game-mode-control">
+            <span className={`game-mode-label${!openBidding ? ' game-mode-label-active' : ''}`}>Sealed Bid</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={openBidding}
+              aria-label="Auction mode"
+              className={`mode-switch${openBidding ? ' mode-switch-on' : ''}`}
+              onClick={() => {
+                playClick();
+                onOpenBiddingChange(!openBidding);
+              }}
+            >
+              <span className="mode-switch-thumb" />
+            </button>
+            <span className={`game-mode-label${openBidding ? ' game-mode-label-active' : ''}`}>Open Bid</span>
+          </div>
+          <p className="field-hint game-mode-hint">
+            {openBidding
+              ? "Everyone's remaining time and live bids are always visible to the whole table."
+              : 'Only your own remaining time and live bids are visible to you.'}
+          </p>
           <button
             className="btn btn-block"
             disabled={playerCount < 2}
@@ -144,6 +170,7 @@ export function Lobby({
         <>
           <p className="status-line">Waiting for {hostName ?? 'the host'} to open the auction…</p>
           <p className="status-line">Rounds: {roundLimit}</p>
+          <p className="status-line">Mode: {openBidding ? 'Open Bid' : 'Sealed Bid'}</p>
         </>
       )}
 

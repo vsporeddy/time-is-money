@@ -96,11 +96,17 @@ function drawMainTemplate(available: ItemTemplate[], selectedTraits: MainTraitId
 // Main slot draws only from those pools. Three extra templates stay in reserve
 // for Arcane Staff transforms without affecting the auction's class mix.
 function buildLotPool(room: Room) {
+  // Open Bid already makes every clock public, so Spyglass (whose only
+  // effect is revealing that) would have nothing left to grant — leave it
+  // out of the pool entirely in that mode, reserves included.
+  const templatePool = room.settings.openBidding
+    ? ITEM_TEMPLATES.filter((template) => template.id !== 'spyglass')
+    : ITEM_TEMPLATES;
   const maxRounds = room.settings.maxRounds;
-  const roundsToPlay = maxRounds !== null ? Math.min(maxRounds, ITEM_TEMPLATES.length) : ITEM_TEMPLATES.length;
-  const weaponTemplates = ITEM_TEMPLATES.filter((template) => itemClass(template) === 'weapon');
-  const curioTemplates = ITEM_TEMPLATES.filter((template) => itemClass(template) === 'curio');
-  const mainTemplates = ITEM_TEMPLATES.filter((template) => itemClass(template) === 'main');
+  const roundsToPlay = maxRounds !== null ? Math.min(maxRounds, templatePool.length) : templatePool.length;
+  const weaponTemplates = templatePool.filter((template) => itemClass(template) === 'weapon');
+  const curioTemplates = templatePool.filter((template) => itemClass(template) === 'curio');
+  const mainTemplates = templatePool.filter((template) => itemClass(template) === 'main');
   const classWeights = [
     { value: 'weapon' as const, weight: weaponTemplates.length },
     { value: 'curio' as const, weight: curioTemplates.length },
@@ -133,7 +139,7 @@ function buildLotPool(room: Room) {
   ensureTreasureChestAndKey(auctionTemplates);
 
   const selectedIds = new Set(auctionTemplates.map((template) => template.id));
-  const remainingTemplates = ITEM_TEMPLATES.filter((template) =>
+  const remainingTemplates = templatePool.filter((template) =>
     !selectedIds.has(template.id) &&
     (itemClass(template) !== 'main' || selectedMainTraits.some((trait) => template.traits.includes(trait)))
   );
@@ -611,7 +617,7 @@ export function forceResetGame(room: Room, io: IO) {
 // themself, plus anyone currently holding a Spyglass.
 function emitBidderDropped(room: Room, io: IO, payload: { roundId: string; playerId: string; committedMs: number }) {
   for (const viewerId of humanPlayerIds(room)) {
-    if (viewerId === payload.playerId || ownsItemTemplate(room, viewerId, 'spyglass')) {
+    if (viewerId === payload.playerId || room.settings.openBidding || ownsItemTemplate(room, viewerId, 'spyglass')) {
       io.to(viewerId).emit('bidder_dropped', payload);
     }
   }
@@ -952,14 +958,15 @@ export function tickRoom(room: Room, io: IO) {
     .map(([playerId]) => playerId);
 
   // A player sees only their own live clock and spend, unless they hold a
-  // Spyglass — that reveals everyone's.
+  // Spyglass — or the whole room is playing Open Bid, where every clock is
+  // public by design — either of which reveals everyone's.
   for (const viewerId of humanPlayerIds(room)) {
-    const hasSpyglass = ownsItemTemplate(room, viewerId, 'spyglass');
+    const seesAll = room.settings.openBidding || ownsItemTemplate(room, viewerId, 'spyglass');
     const ownTime = players[viewerId];
     const ownBid = bidders[viewerId];
     io.to(viewerId).emit('round_tick', {
-      players: hasSpyglass ? players : ownTime === undefined ? {} : { [viewerId]: ownTime },
-      bidders: hasSpyglass ? bidders : ownBid === undefined ? {} : { [viewerId]: ownBid },
+      players: seesAll ? players : ownTime === undefined ? {} : { [viewerId]: ownTime },
+      bidders: seesAll ? bidders : ownBid === undefined ? {} : { [viewerId]: ownBid },
       holding,
     });
   }

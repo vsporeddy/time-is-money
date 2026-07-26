@@ -247,6 +247,56 @@ input[type='text']:focus {
   font-size: 0.5rem;
 }
 
+/* --- Auction mode toggle (Blind vs. Open) --- */
+
+.game-mode-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  margin: 0;
+}
+
+.game-mode-hint {
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.game-mode-label {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  transition: color 0.15s ease;
+}
+
+.game-mode-label-active {
+  color: var(--gold-bright);
+}
+
+.mode-switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 2.6rem;
+  height: 1.4rem;
+  padding: 0.15rem;
+  background: var(--bg);
+  border: 2px solid var(--border-gold);
+  cursor: pointer;
+}
+
+.mode-switch-thumb {
+  display: block;
+  width: 0.9rem;
+  height: 0.9rem;
+  background: var(--gold);
+  transition: translate 0.15s ease;
+}
+
+.mode-switch-on .mode-switch-thumb {
+  translate: 1.15rem 0;
+  background: var(--gold-bright);
+}
+
 .bot-stepper {
   display: flex;
   align-items: center;

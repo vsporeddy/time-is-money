@@ -128,6 +128,11 @@ export interface GameSettings {
   maxRoundDurationMs: number; // failsafe cutoff if holders never release
   interRoundDelayMs: number; // pause between round end and the next round starting
   maxRounds: number | null; // null means unlimited rounds
+  // Sealed Bid (false, default): everyone only sees their own time/bids.
+  // Open Bid (true): every player's time/bids are always public, like
+  // everyone holds a permanent Spyglass — so Spyglass itself is excluded
+  // from the lot pool in this mode, since it'd have nothing left to reveal.
+  openBidding: boolean;
 }
 
 // One slot in the game's fixed lot pool. 'hidden' means the template is
@@ -195,6 +200,7 @@ export interface ClientToServerEvents {
   hold_start: () => void;
   hold_release: () => void;
   set_round_limit: (payload: { maxRounds: number }) => void;
+  set_open_bidding: (payload: { openBidding: boolean }) => void;
   restart_game: () => void;
   reset_game: () => void; // dev-only escape hatch — works from any state, remove before shipping
   send_chat: (payload: { name: string; text: string }) => void;
