@@ -93,7 +93,7 @@ io.on('connection', (socket: AppSocket) => {
       (player) => player.name.toLowerCase() === normalizedName
     );
     if (isNameTaken) {
-      ack({ ok: false, error: 'That name is already taken!' });
+      ack({ ok: false, reason: 'name_taken', error: 'That name is already taken!' });
       return;
     }
 
