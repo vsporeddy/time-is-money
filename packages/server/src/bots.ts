@@ -1,6 +1,6 @@
 import type { ItemInstance, Player } from 'shared';
 import { computeScores, getClassDefinition, getTemplate, MAX_BOTS, pickAvailableClassId } from 'shared';
-import type { IO, Room } from './rooms.js';
+import type { ActiveRound, IO, Room } from './rooms.js';
 
 type HoldFn = (room: Room, playerId: string, io: IO) => void;
 type WeaponFn = (
@@ -66,17 +66,77 @@ interface BotPersonality {
   name: 'aggressive' | 'collector' | 'conservative' | 'disruptor' | 'opportunist';
   aggression: number;
   reserveFactor: number;
-  entryThreshold: number;
+  // Minimum interest in a lot before this bot will opt in, as a fraction of
+  // what it expects an average lot to be worth to it. Relative rather than an
+  // absolute point count so rebalancing item values doesn't mistune entry.
+  entryThresholdRatio: number;
+  // How this bot reacts to a crowded lot. Positive escalates (chest-beating);
+  // negative shades down, which is the all-pay-rational read — every extra
+  // rival buys a lower chance of the lot for the same spent time.
+  competitionBias: number;
   weaponChance: number;
 }
 
 const BOT_PERSONALITIES: BotPersonality[] = [
-  { name: 'aggressive', aggression: 1.3, reserveFactor: 1.45, entryThreshold: 2, weaponChance: 0.8 },
-  { name: 'collector', aggression: 1.08, reserveFactor: 1.25, entryThreshold: 4, weaponChance: 0.55 },
-  { name: 'conservative', aggression: 0.78, reserveFactor: 0.85, entryThreshold: 8, weaponChance: 0.35 },
-  { name: 'disruptor', aggression: 1, reserveFactor: 1.05, entryThreshold: 5, weaponChance: 0.95 },
-  { name: 'opportunist', aggression: 0.9, reserveFactor: 1.15, entryThreshold: 3, weaponChance: 0.5 },
+  { name: 'aggressive', aggression: 1.3, reserveFactor: 1.45, entryThresholdRatio: 0.2, competitionBias: 0.08, weaponChance: 0.8 },
+  { name: 'collector', aggression: 1.08, reserveFactor: 1.25, entryThresholdRatio: 0.4, competitionBias: 0, weaponChance: 0.55 },
+  { name: 'conservative', aggression: 0.78, reserveFactor: 0.85, entryThresholdRatio: 0.8, competitionBias: -0.1, weaponChance: 0.35 },
+  { name: 'disruptor', aggression: 1, reserveFactor: 1.05, entryThresholdRatio: 0.5, competitionBias: 0.08, weaponChance: 0.95 },
+  { name: 'opportunist', aggression: 0.9, reserveFactor: 1.15, entryThresholdRatio: 0.3, competitionBias: -0.06, weaponChance: 0.5 },
 ];
+
+// Per-room, per-bot state that outlives a single round. Kept module-private in
+// a WeakMap so Room stays a pure data record and a reaped room takes its bot
+// memory with it.
+interface BotRoundNerve {
+  roundId: string;
+  multiplier: number; // this round's frozen nerve roll, applied to every reservation re-read
+  secondWinds: number; // times it has talked itself into staying past the target
+}
+
+interface BotMemory {
+  lotScores: Map<string, { sum: number; count: number }>; // botId -> running marginal-score stats
+  nerve: Map<string, BotRoundNerve>; // botId -> current-round nerve state
+}
+
+const BOT_MEMORY = new WeakMap<Room, BotMemory>();
+
+function memoryFor(room: Room): BotMemory {
+  let memory = BOT_MEMORY.get(room);
+  if (!memory) {
+    memory = { lotScores: new Map(), nerve: new Map() };
+    BOT_MEMORY.set(room, memory);
+  }
+  return memory;
+}
+
+const EXPECTED_LOT_PRIOR = 10; // points; a plausible mid lot before any evidence
+const EXPECTED_LOT_PRIOR_WEIGHT = 3;
+
+// What this bot expects an average lot to be worth to it, in score points.
+// Prior-seeded so the first lot of a game doesn't set the whole exchange rate.
+function expectedLotValue(room: Room, bot: Player): number {
+  const stats = memoryFor(room).lotScores.get(bot.id) ?? { sum: 0, count: 0 };
+  return (
+    (EXPECTED_LOT_PRIOR * EXPECTED_LOT_PRIOR_WEIGHT + stats.sum) /
+    (EXPECTED_LOT_PRIOR_WEIGHT + stats.count)
+  );
+}
+
+// Exactly one sample per bot per lot — including lots it declines, which are
+// just as much evidence about this game's item pool as the ones it bids on.
+function recordLotObservation(room: Room, bot: Player, marginalScore: number) {
+  const stats = memoryFor(room).lotScores;
+  const current = stats.get(bot.id) ?? { sum: 0, count: 0 };
+  stats.set(bot.id, { sum: current.sum + marginalScore, count: current.count + 1 });
+}
+
+// Box-Muller. Only the noise paths use it; every deterministic decision still
+// goes through lotTasteMultiplier.
+function gaussian(): number {
+  const u = Math.max(Number.EPSILON, Math.random());
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * Math.random());
+}
 
 const MAIN_TRAIT_IDS = new Set(['armor', 'trinket', 'text', 'musical', 'aquatic']);
 
@@ -124,18 +184,32 @@ function botVisibleItem(room: Room, player: Player): ItemInstance | undefined {
   };
 }
 
-function scoreForPlayer(room: Room, player: Player, candidate?: ItemInstance): number {
+// assumedPriceMs is what the bot supposes it would pay for the candidate.
+// Investment and Bargain items score off the price paid (scoring.ts), so
+// leaving it at zero would have bots max out every Bargain bonus and value
+// every Investment upside at nothing.
+function scoreForPlayer(
+  room: Room,
+  player: Player,
+  candidate?: ItemInstance,
+  assumedPriceMs = 0
+): number {
   const wonItems = new Map(room.wonItems);
+  const pricePaid = new Map(room.itemPricePaidMs);
   const scoredPlayer = candidate ? { ...player, stash: [...player.stash, candidate.id] } : player;
-  if (candidate) wonItems.set(candidate.id, candidate);
-  return computeScores([scoredPlayer], wonItems, room.itemPricePaidMs)[0]?.total ?? 0;
+  if (candidate) {
+    wonItems.set(candidate.id, candidate);
+    pricePaid.set(candidate.id, assumedPriceMs);
+  }
+  return computeScores([scoredPlayer], wonItems, pricePaid)[0]?.total ?? 0;
 }
 
-function marginalItemScore(room: Room, player: Player): number {
+function marginalItemScore(room: Room, player: Player, assumedPriceMs = 0): number {
   const candidate = botVisibleItem(room, player);
   if (!candidate) return 0;
 
-  let marginal = scoreForPlayer(room, player, candidate) - scoreForPlayer(room, player);
+  let marginal =
+    scoreForPlayer(room, player, candidate, assumedPriceMs) - scoreForPlayer(room, player);
   const template = getTemplate(candidate.templateId);
   const personality = personalityFor(player);
   const existingTemplates = player.stash
@@ -168,25 +242,101 @@ function marginalItemScore(room: Room, player: Player): number {
   return Math.max(0, marginal * lotTasteMultiplier(room, player, candidate));
 }
 
-function reservationMs(room: Room, player: Player): number {
-  const personality = personalityFor(player);
-  const marginalScore = marginalItemScore(room, player);
+const ABSOLUTE_RESERVE_CAP_MS = 18_000;
+const SELF_ELIMINATION_GUARD_MS = 150;
+
+// One lot's fair share of the clock this bot has left.
+function sustainablePerLot(room: Room, player: Player): number {
   const remainingLots = Math.max(1, room.roundsToPlay - room.currentRoundIndex);
-  const sustainablePerLot = player.timeRemainingMs / remainingLots;
-  const progress = 1 - remainingLots / Math.max(1, room.roundsToPlay);
-  const lateGameFactor = 1 + progress * 0.35;
+  return player.timeRemainingMs / remainingLots;
+}
+
+function competitionFactor(room: Room, player: Player): number {
   const activeCompetitors = room.activeRound
     ? Object.values(room.activeRound.round.bidders).filter((bidder) => bidder.isHolding).length
     : 1;
-  const competitionFactor = 1 + Math.min(0.25, Math.max(0, activeCompetitors - 1) * 0.08);
-  const desired = marginalScore * 220 * personality.aggression * lateGameFactor * competitionFactor;
-  const budgetCap = Math.max(1_000, sustainablePerLot * personality.reserveFactor);
-  return Math.max(0, Math.min(desired, budgetCap, 18_000, player.timeRemainingMs - 150));
+  const rivals = Math.max(0, activeCompetitors - 1);
+  return Math.min(1.25, Math.max(0.6, 1 + personalityFor(player).competitionBias * rivals));
+}
+
+// How long this bot is willing to hold, derived rather than tuned: the budget
+// unit is one lot's fair share of its remaining clock, and the value unit is
+// what it expects an average lot to be worth. A lot worth twice the average is
+// worth twice the fair share. That makes the metric scale-free — doubling
+// startingTimeMs or halving the round count re-tunes every bot automatically,
+// where the old fixed ms-per-point rate did not.
+// nerveMultiplier is this round's noise (see scheduleBotReleases). It is
+// applied inside this function rather than to its result so the safety caps
+// stay inviolable — an emboldened bot may overrun its soft per-lot budget, but
+// never the absolute cap and never its own clock.
+function reservationMs(room: Room, player: Player, assumedPriceMs = 0, nerveMultiplier = 1): number {
+  const personality = personalityFor(player);
+  const value = marginalItemScore(room, player, assumedPriceMs);
+  if (value <= 0) return 0;
+
+  const perLot = sustainablePerLot(room, player);
+  const msPerPoint = perLot / Math.max(1, expectedLotValue(room, player));
+
+  const remainingLots = Math.max(1, room.roundsToPlay - room.currentRoundIndex);
+  const progress = 1 - remainingLots / Math.max(1, room.roundsToPlay);
+  const lateGameFactor = 1 + progress * 0.35; // spend freer as the game runs out
+
+  const desired =
+    value * msPerPoint * personality.aggression * lateGameFactor * competitionFactor(room, player);
+
+  // Soft ceiling so a single whale lot can't eat a whole clock. Nerve is
+  // allowed to push past it — that's the whole point of a bot that gets
+  // carried away — but not past the two hard caps below.
+  const budgetCap = Math.max(1_000, perLot * personality.reserveFactor * lateGameFactor);
+  const willing = Math.min(desired, budgetCap) * nerveMultiplier;
+
+  // Hard: the absolute cap, and enough left on the clock that a bot can never
+  // bid itself out of the game. timeRemainingMs isn't debited until release,
+  // so it's directly comparable to the elapsed hold this bounds.
+  return Math.max(
+    0,
+    Math.min(willing, ABSOLUTE_RESERVE_CAP_MS, player.timeRemainingMs - SELF_ELIMINATION_GUARD_MS)
+  );
 }
 
 const MIN_ENTRY_DELAY_MS = 200;
 const ENTRY_DELAY_SAFETY_MARGIN_MS = 150;
 const SOLE_BIDDER_PRICE_MS = 5_000;
+
+// Nerve: the round-to-round inconsistency that keeps two games from playing
+// the same. Sampled once per bot per round and then held to, rather than
+// re-rolled each poll — re-rolling a threshold every tick makes the exit the
+// minimum of ~40 draws, which is both narrower and systematically earlier than
+// the spread it looks like.
+const NERVE_SIGMA = 0.25; // log-normal: ~±28% one-sigma, with a fat "won't let go" tail
+const FLINCH_RATE_PER_SEC = 0.02; // hazard of losing your nerve mid-war
+const FLINCH_MIN_PROGRESS = 0.4; // no flinching before this fraction of the target
+const SECOND_WIND_CHANCE = 0.05; // "one more push" on reaching the target
+const SECOND_WIND_MULTIPLIER = 1.3;
+const MAX_SECOND_WINDS = 2;
+const POLL_PRECISION_MS = 300; // switch from polling to an exact wake inside this gap
+
+// Debug surface for scripts/bot-sim.ts, which samples these distributions
+// offline. Nothing in the running server reads it.
+export const __botInternals = {
+  reservationMs,
+  marginalItemScore,
+  expectedLotValue,
+  recordLotObservation,
+  personalityFor,
+  sustainablePerLot,
+  sampleNerveMultiplier: () => Math.exp(gaussian() * NERVE_SIGMA),
+  constants: {
+    NERVE_SIGMA,
+    FLINCH_RATE_PER_SEC,
+    FLINCH_MIN_PROGRESS,
+    SECOND_WIND_CHANCE,
+    SECOND_WIND_MULTIPLIER,
+    MAX_SECOND_WINDS,
+    SOLE_BIDDER_PRICE_MS,
+    ABSOLUTE_RESERVE_CAP_MS,
+  },
+};
 
 export function scheduleBotEntries(room: Room, io: IO, handleHoldStart: HoldFn) {
   const ar = room.activeRound;
@@ -195,9 +345,24 @@ export function scheduleBotEntries(room: Room, io: IO, handleHoldStart: HoldFn) 
   for (const player of room.players.values()) {
     if (!player.isBot || !ar.round.bidders[player.id]) continue;
     const personality = personalityFor(player);
-    const marginalScore = marginalItemScore(room, player);
-    const reserve = reservationMs(room, player);
-    const confidence = Math.min(0.95, Math.max(0.1, (marginalScore - personality.entryThreshold + 10) / 25));
+
+    // Price and reservation depend on each other for Investment and Bargain
+    // lots, so settle it in two passes: a neutral guess of one lot's fair
+    // share, then the reservation that guess produces.
+    const firstPass = reservationMs(room, player, sustainablePerLot(room, player));
+    const reserve = reservationMs(room, player, firstPass);
+    const marginalScore = marginalItemScore(room, player, firstPass);
+
+    // Every bot appraises every lot, so record the observation whether or not
+    // it ends up bidding — a declined lot is evidence about this game's pool.
+    const expected = expectedLotValue(room, player);
+    recordLotObservation(room, player, marginalScore);
+
+    const threshold = personality.entryThresholdRatio * expected;
+    const confidence = Math.min(
+      0.95,
+      Math.max(0.1, 0.5 + (marginalScore - threshold) / (2 * Math.max(1, expected)))
+    );
     if (reserve < SOLE_BIDDER_PRICE_MS || Math.random() > confidence) continue;
 
     const windowMs = room.settings.noBidTimeoutMs;
@@ -209,29 +374,78 @@ export function scheduleBotEntries(room: Room, io: IO, handleHoldStart: HoldFn) 
   }
 }
 
+function rivalsStillHolding(ar: ActiveRound, playerId: string): number {
+  return Object.entries(ar.round.bidders).filter(([id, bidder]) => id !== playerId && bidder.isHolding).length;
+}
+
 // Re-evaluate throughout bidding so later reveals can raise or lower a bot's
 // spending limit. This uses only revealed fields unless the class grants more.
+// Safe to call more than once per round: a bot already enrolled keeps its
+// existing loop and its already-sampled nerve.
 export function scheduleBotReleases(room: Room, io: IO, handleHoldRelease: HoldFn) {
   const ar = room.activeRound;
   if (!ar) return;
+  const memory = memoryFor(room);
 
   for (const [playerId, bidder] of Object.entries(ar.round.bidders)) {
     const player = room.players.get(playerId);
     if (!player?.isBot || !bidder.isHolding) continue;
+    if (memory.nerve.get(playerId)?.roundId === ar.round.id) continue;
 
+    memory.nerve.set(playerId, {
+      roundId: ar.round.id,
+      multiplier: Math.exp(gaussian() * NERVE_SIGMA),
+      secondWinds: 0,
+    });
+
+    let lastTickAt = Date.now();
     const reconsider = () => {
       if (room.activeRound !== ar) return;
       const currentBidder = ar.round.bidders[playerId];
       if (!currentBidder?.isHolding) return;
       const startedAt = ar.holdStartedAt.get(playerId);
       if (startedAt === undefined) return;
-      const elapsed = Date.now() - startedAt;
-      const jitter = 0.9 + Math.random() * 0.2;
-      if (elapsed >= reservationMs(room, player) * jitter) {
-        handleHoldRelease(room, playerId, io);
-        return;
+      const nerve = memory.nerve.get(playerId);
+      if (nerve?.roundId !== ar.round.id) return;
+
+      const now = Date.now();
+      const dtMs = now - lastTickAt;
+      lastTickAt = now;
+      const elapsed = now - startedAt;
+
+      // Assume it pays what it has spent so far. For a Bargain lot that means
+      // the bonus decays as the hold runs on, so the bot's own reservation
+      // falls in real time and it lets go rather than paying away the very
+      // bonus it wanted.
+      const target = reservationMs(
+        room,
+        player,
+        elapsed,
+        nerve.multiplier * Math.pow(SECOND_WIND_MULTIPLIER, nerve.secondWinds)
+      );
+
+      if (elapsed >= target) {
+        if (nerve.secondWinds < MAX_SECOND_WINDS && Math.random() < SECOND_WIND_CHANCE) {
+          nerve.secondWinds += 1; // talked itself into one more push
+        } else {
+          handleHoldRelease(room, playerId, io);
+          return;
+        }
+      } else if (elapsed > target * FLINCH_MIN_PROGRESS && rivalsStillHolding(ar, playerId) > 0) {
+        // Rate-based, not per-tick, so the poll interval can change without
+        // silently changing how often bots bail.
+        const flinchChance = 1 - Math.exp(-FLINCH_RATE_PER_SEC * (dtMs / 1000));
+        if (Math.random() < flinchChance) {
+          handleHoldRelease(room, playerId, io);
+          return;
+        }
       }
-      setTimeout(reconsider, 250 + Math.random() * 250);
+
+      // Polling at 250–500ms would blunt the target by up to half a second,
+      // which is a lot of a short hold — wake exactly on it when it's close.
+      const remaining = target - (Date.now() - startedAt);
+      const delay = remaining < POLL_PRECISION_MS ? Math.max(50, remaining) : 250 + Math.random() * 250;
+      setTimeout(reconsider, delay);
     };
     setTimeout(reconsider, 250 + Math.random() * 350);
   }
@@ -283,9 +497,12 @@ export function scheduleBotWeaponUses(
         )
       );
 
+    // Appraise the lot at a neutral assumed price, the same guess entry uses,
+    // so a Bargain lot isn't scored as if it were free.
+    const assumedPrice = sustainablePerLot(room, bot);
     const choice = weapons.find(({ template }) => {
-      if (template?.effectType === 'destroyLot') return marginalItemScore(room, bot) < 7;
-      if (template?.effectType === 'transformLot') return marginalItemScore(room, bot) < 10;
+      if (template?.effectType === 'destroyLot') return marginalItemScore(room, bot, assumedPrice) < 7;
+      if (template?.effectType === 'transformLot') return marginalItemScore(room, bot, assumedPrice) < 10;
       if (template?.effectType === 'forceWithdraw') {
         return Object.entries(ar.round.bidders).some(([id, bidder]) => id !== bot.id && bidder.isHolding);
       }
