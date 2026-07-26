@@ -1986,27 +1986,9 @@ input[type='text']:focus {
     max-width: 2rem;
   }
 
-  /* Hourglass + coins flanking the title reads as decoration when centered,
-     but crowds the corner — keep just the hourglass. */
-  .top-bar .logo canvas:last-of-type {
-    display: none;
-  }
-
   /* Out from under the docked logo. */
   .dev-reset-button {
     top: 4.75rem;
-  }
-
-  /* The full-size dock leaves no room for the timer below the item card on
-     shorter screens — float it in the empty right rail instead, below the
-     sound controls, where it's always visible without scrolling. Kept under
-     the inventory overlays (z-index 15) so an opened panel wins. */
-  .initial-bid-timer {
-    position: fixed;
-    top: 4.5rem;
-    right: 1.25rem;
-    z-index: 10;
-    width: 20rem;
   }
 }
 

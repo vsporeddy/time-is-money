@@ -815,7 +815,7 @@ export default function App() {
           }
           socket.emit('hold_release');
         }}
-        onOpenLotPool={() => setLotPoolOpen(true)}
+        onOpenLotPool={() => setLotPoolOpen((open) => !open)}
       />
     );
   }
