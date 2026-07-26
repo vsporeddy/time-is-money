@@ -397,7 +397,7 @@ export default function App() {
 
   const handleResetGame = () => {
     playClick();
-    if (window.confirm('Reset this lobby for everyone? This clears all progress.')) {
+    if (window.confirm('Reset this auction for everyone? This clears all progress.')) {
       socket.emit('reset_game');
     }
   };
@@ -641,7 +641,7 @@ export default function App() {
               <input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div className="field">
-              <label htmlFor="lobby-code">Lobby code (optional)</label>
+              <label htmlFor="lobby-code">Auction code (optional)</label>
               <input
                 id="lobby-code"
                 type="text"
@@ -655,7 +655,7 @@ export default function App() {
                 spellCheck={false}
                 placeholder="TIME"
               />
-              <p className="field-hint">Leave blank to start a new lobby.</p>
+              <p className="field-hint">Leave blank to start a new auction.</p>
             </div>
             <button
               type="submit"
@@ -675,12 +675,12 @@ export default function App() {
             PUBLIC AUCTION
           </button>
           {codeLooksWrong && (
-            <p className="error-text">Lobby codes are {ROOM_CODE_LENGTH} characters, letters and numbers.</p>
+            <p className="error-text">Auction codes are {ROOM_CODE_LENGTH} characters, letters and numbers.</p>
           )}
           {error && <p className="error-text">{error}</p>}
           {joinErrorReason === 'room_full' && (
             <button className="btn btn-block" style={{ marginTop: '0.75rem' }} onClick={handleStartOwnLobby}>
-              START A NEW LOBBY INSTEAD
+              START A NEW AUCTION INSTEAD
             </button>
           )}
         </div>
@@ -742,11 +742,11 @@ export default function App() {
               socket.emit('restart_game');
             }}
           >
-            PLAY AGAIN
+            ANOTHER ROUND
           </button>
         ) : (
           <p className="status-line" style={{ marginTop: '1rem' }}>
-            Waiting for {hostName ?? 'the host'} to start another game…
+            Waiting for {hostName ?? 'the host'} to open another auction…
           </p>
         )}
       </div>
@@ -756,7 +756,7 @@ export default function App() {
         style={{ marginTop: '0.75rem' }}
         onClick={handleLeaveLobby}
       >
-        LEAVE LOBBY
+        LEAVE AUCTION
       </button>
       </>
     );
@@ -768,8 +768,8 @@ export default function App() {
     // rank, just wait for the next game.
     screen = shellWithHeader(
       <>
-        <p className="status-line">A game just ended! Waiting for a new one to start.</p>
-        <button type="button" className="btn" onClick={handleLeaveLobby}>LEAVE LOBBY</button>
+        <p className="status-line">An auction just ended! Waiting for a new one to start.</p>
+        <button type="button" className="btn" onClick={handleLeaveLobby}>LEAVE AUCTION</button>
       </>
     );
   } else if (room.status === 'lobby') {

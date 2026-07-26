@@ -53,7 +53,7 @@ export function Lobby({
   return (
     <div className="panel">
       <h2 className="panel-title">
-        LOBBY <span className="lobby-code">{lobbyCode}</span>
+        AUCTION <span className="lobby-code">{lobbyCode}</span>
       </h2>
 
       <div className="invite-row">
@@ -63,7 +63,7 @@ export function Lobby({
           className="invite-link-input"
           value={shareValue}
           readOnly
-          aria-label={inviteLink ? 'Invite link' : 'Lobby code'}
+          aria-label={inviteLink ? 'Invite link' : 'Auction code'}
           onFocus={(event) => event.currentTarget.select()}
         />
         <button
@@ -78,12 +78,12 @@ export function Lobby({
         {copyState === 'failed'
           ? 'Copy failed — select the box above and copy it manually.'
           : inviteLink
-            ? 'Send this link to a friend to bring them into this lobby.'
+            ? 'Send this link to a friend to bring them into this auction.'
             : 'Share this code — your friends enter it on the join screen.'}
       </p>
 
       <p className="status-line">
-        {playerCount} of {maxPlayers} players — waiting for players…
+        {playerCount} of {maxPlayers} players — waiting for bidders…
       </p>
 
       {isHost ? (
@@ -142,7 +142,7 @@ export function Lobby({
         </>
       ) : (
         <>
-          <p className="status-line">Waiting for {hostName ?? 'the host'} to start…</p>
+          <p className="status-line">Waiting for {hostName ?? 'the host'} to open the auction…</p>
           <p className="status-line">Rounds: {roundLimit}</p>
         </>
       )}
