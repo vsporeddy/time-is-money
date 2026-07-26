@@ -62,7 +62,7 @@ export interface ItemTemplate {
     | 'forceWithdraw'
     | 'destroyItem'
     | 'transformLot'
-    | 'weaponImmunity'
+    | 'stealTime'
     | 'weaponMultiplier';
   timeRefund?: TimeRefundConfig; // present when effectType === 'timeRefund'
   chest?: ChestConfig; // present when effectType === 'chest'
@@ -166,6 +166,7 @@ export type JoinFailureReason =
   | 'invalid_name'
   | 'invalid_code' // the code was malformed (or the socket already joined a lobby)
   | 'not_found' // well-formed code, but no such lobby — expired, or the server restarted
+  | 'name_taken' // someone in that lobby already goes by this name
   | 'room_full' // every class is taken
   | 'server_full'; // the server is hosting too many lobbies to create another
 

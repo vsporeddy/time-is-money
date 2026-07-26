@@ -23,7 +23,7 @@ const RARITY_MULTIPLIERS: Record<string, number> = {
 };
 
 const MATERIAL_MULTIPLIERS: Record<string, number> = {
-  Ordinary: 1,
+  Used: 1,
   Damaged: 0.8,
   Mint: 1.2,
 };
@@ -139,7 +139,7 @@ export function computeScores(
       // bonus (from specialSetMultiplier) still applies on top if earned.
       const fenceIgnoresCursedPenalty = player.classId === 'fence' && item.specialModifier === 'Cursed';
       const specialMultiplier = specialSetMultiplier ?? (fenceIgnoresCursedPenalty ? 1 : getSpecialModifierValueMultiplier(item.specialModifier));
-      const weaponMultiplier = hasContrabandPermit && (template?.weapon || template?.effectType === 'weaponImmunity') ? CONTRABAND_WEAPON_MULTIPLIER : 1;
+      const weaponMultiplier = hasContrabandPermit && template?.weapon ? CONTRABAND_WEAPON_MULTIPLIER : 1;
       const aquaticMultiplier = template?.traits.includes('aquatic')
         ? activeTraitTiers.get('aquatic')?.matchingItemMultiplier ?? 1
         : 1;

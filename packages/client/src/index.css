@@ -169,6 +169,19 @@ input[type='text']:focus {
   border-color: var(--gold-bright);
 }
 
+/* Matches the .lobby-code display style so the code reads the same whether
+   you're typing it or looking at it in the lobby. */
+.lobby-code-input {
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.field-hint {
+  margin: 0;
+  font-size: 0.55rem;
+  color: var(--text-dim);
+}
+
 .round-limit-control {
   margin: 0 0 1.25rem;
 }
@@ -1148,6 +1161,53 @@ input[type='text']:focus {
   font-size: 0.7rem;
   color: var(--text-dim);
   margin: 0.3rem 0;
+}
+
+.current-item-value {
+  font-size: clamp(1rem, 4vw, 1.35rem);
+  font-weight: 700;
+  margin-top: 0.75rem;
+}
+
+.value-number {
+  display: inline-block;
+  color: var(--text);
+}
+
+.value-flash-increase {
+  animation: value-pulse-increase 0.8s ease-out;
+}
+
+.value-flash-decrease {
+  animation: value-pulse-decrease 0.8s ease-out;
+}
+
+@keyframes value-pulse-increase {
+  0%, 100% {
+    color: var(--text);
+    transform: scale(1);
+    text-shadow: none;
+  }
+
+  35% {
+    color: #6dff8a;
+    transform: scale(1.35);
+    text-shadow: 0 0 10px #38d763, 0 0 20px rgba(56, 215, 99, 0.75);
+  }
+}
+
+@keyframes value-pulse-decrease {
+  0%, 100% {
+    color: var(--text);
+    transform: scale(1);
+    text-shadow: none;
+  }
+
+  35% {
+    color: #ff6464;
+    transform: scale(1.35);
+    text-shadow: 0 0 10px #e33d3d, 0 0 20px rgba(227, 61, 61, 0.75);
+  }
 }
 
 .auction-details {

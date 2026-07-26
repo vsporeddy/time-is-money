@@ -25,14 +25,14 @@ export function getTraitLabelColor(traitId: string): string | undefined {
 
 export function getItemGlowCategory(template: ItemTemplate | undefined): ItemGlowCategory {
   if (!template) return 'curio';
-  if (template.weapon || template.effectType === 'weaponImmunity') return 'weapon';
+  if (template.weapon) return 'weapon';
   return MAIN_TRAIT_PRIORITY.find((trait) => template.traits.includes(trait)) ?? 'curio';
 }
 
 const RARITY_ORDER = ['Common', 'Rare', 'Legendary'];
-const MATERIAL_ORDER = ['Damaged', 'Ordinary', 'Mint'];
+const MATERIAL_ORDER = ['Damaged', 'Used', 'Mint'];
 
-// 0 (unknown, or Common/Ordinary baseline) to 1 (Legendary + Mint) — glows
+// 0 (unknown, or Common/Used baseline) to 1 (Legendary + Mint) — glows
 // start dull and intensify as an item's rolled condition/rarity improve.
 export function getGlowIntensity(material?: string, rarity?: string): number {
   const rarityScore = rarity ? Math.max(0, RARITY_ORDER.indexOf(rarity)) : 0;

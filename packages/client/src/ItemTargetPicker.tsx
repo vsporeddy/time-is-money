@@ -9,7 +9,7 @@ interface ItemTargetPickerProps {
   players: Player[];
   myId: string;
   items: Record<string, ItemInstance>;
-  excludePlayerIds?: string[]; // e.g. Wooden Shield holders, immune to Crossbow
+  excludePlayerIds?: string[];
   error?: string | null;
   onSelect: (targetPlayerId: string, targetItemId: string) => void;
   onCancel: () => void;

@@ -1,7 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import type { ChatMessage, ItemInstance, JoinFailureReason, MaskedRoundItem, Player, Round, RoomState, ScoreBreakdown } from 'shared';
-import { MAX_PLAYERS_PER_ROOM, computeScores, getClassDefinition, getTemplate, getTraitDefinition, rankScores } from 'shared';
+import {
+  MAX_PLAYERS_PER_ROOM,
+  ROOM_CODE_ALPHABET,
+  ROOM_CODE_LENGTH,
+  computeScores,
+  getClassDefinition,
+  getTemplate,
+  getTraitDefinition,
+  normalizeRoomCode,
+  rankScores,
+} from 'shared';
 import { socket } from './socket';
 import { buildInviteLink, clearLobbyCodeFromUrl, readLobbyCodeFromUrl, writeLobbyCodeToUrl } from './lobbyLink';
 import { Logo } from './Logo';
@@ -16,6 +26,18 @@ import { PlayerPicker } from './PlayerPicker';
 import { LotPool } from './LotPool';
 import { playChatDing, playClick, playLose, playWin } from './sound';
 import { useViewportTooltips } from './useViewportTooltips';
+
+// Applied on every keystroke so a pasted '#QT4B' or a lowercase code becomes
+// canonical as it lands, rather than only at submit. Length is capped by the
+// input's maxLength, not here, so backspacing over a long paste still works.
+function sanitizeCodeInput(raw: string): string {
+  return raw
+    .toUpperCase()
+    .replace(/^[#/]+/, '')
+    .split('')
+    .filter((c) => ROOM_CODE_ALPHABET.includes(c))
+    .join('');
+}
 
 interface CurrentRound {
   round: Round;
@@ -45,13 +67,17 @@ export default function App() {
   const [room, setRoom] = useState<RoomState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // The code we're trying to join, seeded once from the URL. Empty means
-  // "create a new lobby". Read lazily so nothing re-reads the hash later —
-  // after joining, the hash is write-only.
-  const [pendingLobbyCode, setPendingLobbyCode] = useState<string | null>(() => readLobbyCodeFromUrl());
+  // Raw text of the lobby-code field, seeded once from the URL so an invite
+  // link prefills it. Read lazily so nothing re-reads the hash later — after
+  // joining, the hash is write-only. Kept raw rather than normalized so a
+  // half-typed code doesn't fight the user mid-keystroke.
+  const [codeInput, setCodeInput] = useState(() => readLobbyCodeFromUrl() ?? '');
   const [lobbyCode, setLobbyCode] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
   const [joinErrorReason, setJoinErrorReason] = useState<JoinFailureReason | null>(null);
+  // null means "no code entered" — join_room reads that as "create a new lobby".
+  const pendingLobbyCode = normalizeRoomCode(codeInput);
+  const codeLooksWrong = codeInput.length > 0 && pendingLobbyCode === null;
 
   const [currentRound, setCurrentRound] = useState<CurrentRound | null>(null);
   const [liveTimes, setLiveTimes] = useState<Record<string, number>>({});
@@ -262,7 +288,7 @@ export default function App() {
       setError(res.error);
       // A dead code shouldn't linger — retrying then just creates a fresh lobby.
       if (res.reason === 'not_found' || res.reason === 'invalid_code') {
-        setPendingLobbyCode(null);
+        setCodeInput('');
         clearLobbyCodeFromUrl();
       }
     });
@@ -271,7 +297,7 @@ export default function App() {
   // Bails out of a full lobby into a brand-new one of your own.
   const handleStartOwnLobby = () => {
     playClick();
-    setPendingLobbyCode(null);
+    setCodeInput('');
     clearLobbyCodeFromUrl();
     setError(null);
     setJoinErrorReason(null);
@@ -283,10 +309,6 @@ export default function App() {
       socket.emit('reset_game');
     }
   };
-
-  // Wooden Shield grants blanket immunity to every other player's weapon effects.
-  const isImmune = (playerId: string) =>
-    room?.players.find((p) => p.id === playerId)?.stash.some((id) => knownItems[id]?.templateId === 'wooden-shield') ?? false;
 
   // Dispatches a click on a usable inventory item to the right UI: an item
   // picker (copy/destroy), a player picker (force-enter/force-withdraw one),
@@ -354,10 +376,13 @@ export default function App() {
     if (playerPickerTemplate.effectType === 'forceEnter') {
       const bidders = currentRound?.round.bidders;
       if (!bidders) return [];
-      return room.players.filter((p) => p.id !== myId && bidders[p.id] && bidders[p.id].droppedAt === null && !isImmune(p.id));
+      return room.players.filter((p) => p.id !== myId && bidders[p.id] && bidders[p.id].droppedAt === null);
     }
     if (playerPickerTemplate.effectType === 'forceWithdraw') {
-      return room.players.filter((p) => p.id !== myId && liveBids[p.id] !== undefined && !isImmune(p.id));
+      return room.players.filter((p) => p.id !== myId && liveBids[p.id] !== undefined);
+    }
+    if (playerPickerTemplate.effectType === 'stealTime') {
+      return room.players.filter((p) => p.id !== myId && !p.isObserver && p.status === 'active');
     }
     return [];
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -406,11 +431,18 @@ export default function App() {
 
   const itemPickerTitle = itemPickerMode === 'destroy' ? 'CROSSBOW' : 'MIRROR OF DESIRE';
   const itemPickerSubtitle = itemPickerMode === 'destroy' ? 'Choose an item to destroy.' : 'Choose an item to copy for yourself.';
-  const itemPickerExclude = itemPickerMode === 'destroy' ? (room?.players ?? []).filter((p) => isImmune(p.id)).map((p) => p.id) : undefined;
-
-  const playerPickerTitle = playerPickerTemplate?.effectType === 'forceEnter' ? 'DUAL DAGGERS' : 'WOODEN DAGGER';
+  const playerPickerTitle =
+    playerPickerTemplate?.effectType === 'forceEnter'
+      ? 'DUAL DAGGERS'
+      : playerPickerTemplate?.effectType === 'stealTime'
+        ? "DARK KNIGHT'S GREATAXE"
+        : 'WOODEN DAGGER';
   const playerPickerSubtitle =
-    playerPickerTemplate?.effectType === 'forceEnter' ? 'Choose a player to force into this bid.' : 'Choose a bidder to force out.';
+    playerPickerTemplate?.effectType === 'forceEnter'
+      ? 'Choose a player to force into this bid.'
+      : playerPickerTemplate?.effectType === 'stealTime'
+        ? 'Choose a player to steal up to 5 seconds from.'
+        : 'Choose a bidder to force out.';
   const scoresByPlayer = useMemo(() => {
     if (!room) return new Map<string, ScoreBreakdown>();
     const wonItems = new Map(Object.entries(knownItems));
@@ -493,18 +525,39 @@ export default function App() {
         <Logo scale={5} />
         <div className="panel">
           <p className="status-line">{connected ? 'Connected to server' : 'Connecting…'}</p>
-          <p className="status-line">
-            {pendingLobbyCode ? `Joining lobby ${pendingLobbyCode}` : 'A new lobby will be created for you.'}
-          </p>
           <form onSubmit={handleJoin}>
             <div className="field">
               <label htmlFor="name">Your name</label>
               <input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} />
             </div>
-            <button type="submit" className="btn btn-block" disabled={!connected || joining || !name.trim()}>
-              {joining ? 'JOINING…' : 'JOIN'}
+            <div className="field">
+              <label htmlFor="lobby-code">Lobby code (optional)</label>
+              <input
+                id="lobby-code"
+                type="text"
+                className="lobby-code-input"
+                value={codeInput}
+                onChange={(e) => setCodeInput(sanitizeCodeInput(e.target.value))}
+                // 4 *or* 5: generateCode widens to 5 characters on collision.
+                maxLength={ROOM_CODE_LENGTH + 1}
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="TIME"
+              />
+              <p className="field-hint">Leave blank to start a new lobby.</p>
+            </div>
+            <button
+              type="submit"
+              className="btn btn-block"
+              disabled={!connected || joining || !name.trim() || codeLooksWrong}
+            >
+              {joining ? 'JOINING…' : pendingLobbyCode ? 'JOIN LOBBY' : 'CREATE LOBBY'}
             </button>
           </form>
+          {codeLooksWrong && (
+            <p className="error-text">Lobby codes are {ROOM_CODE_LENGTH} characters, letters and numbers.</p>
+          )}
           {error && <p className="error-text">{error}</p>}
           {joinErrorReason === 'room_full' && (
             <button className="btn btn-block" style={{ marginTop: '0.75rem' }} onClick={handleStartOwnLobby}>
@@ -654,7 +707,6 @@ export default function App() {
           players={room.players}
           myId={myId!}
           items={knownItems}
-          excludePlayerIds={itemPickerExclude}
           error={itemPickerError}
           onSelect={handleItemPickerSelect}
           onCancel={handleItemPickerCancel}
