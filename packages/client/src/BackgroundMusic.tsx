@@ -13,9 +13,10 @@ const RAMP_SECONDS = 0.4;
 interface BackgroundMusicProps {
   ducked: boolean; // fade down for the whole round — pre-bid countdown through spending
   muffled: boolean; // low-pass filter for the main menu/lobby
+  onOpenCredits: () => void;
 }
 
-export function BackgroundMusic({ ducked, muffled }: BackgroundMusicProps) {
+export function BackgroundMusic({ ducked, muffled, onOpenCredits }: BackgroundMusicProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
   const gainRef = useRef<GainNode | null>(null);
@@ -139,6 +140,9 @@ export function BackgroundMusic({ ducked, muffled }: BackgroundMusicProps) {
       </button>
       <button type="button" className="sfx-toggle" onClick={toggleSfx}>
         {audioSettings.sfxEnabled ? 'SFX: On' : 'SFX: Off'}
+      </button>
+      <button type="button" className="credits-toggle" onClick={onOpenCredits}>
+        Credits
       </button>
     </div>
   );

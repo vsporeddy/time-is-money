@@ -23,6 +23,7 @@ import { Inventory, breakdownTraitText } from './Inventory';
 import { ItemTargetPicker } from './ItemTargetPicker';
 import { PlayerPicker } from './PlayerPicker';
 import { LotPool } from './LotPool';
+import { Credits } from './Credits';
 import { playChatDing, playClick, playLose, playMirrorUsed, playWeaponUsed, playWin } from './sound';
 import { useViewportTooltips } from './useViewportTooltips';
 import { addTotalEarnings, loadPlayerName, loadTotalEarnings, savePlayerName } from './playerStats';
@@ -107,6 +108,7 @@ export default function App() {
   const [playerPickerError, setPlayerPickerError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [lotPoolOpen, setLotPoolOpen] = useState(false);
+  const [creditsOpen, setCreditsOpen] = useState(false);
 
   useEffect(() => {
     if (!actionError) return;
@@ -892,7 +894,12 @@ export default function App() {
             />
           );
         })}
-      <BackgroundMusic ducked={currentRound !== null} muffled={!joined || room?.status === 'lobby'} />
+      <BackgroundMusic
+        ducked={currentRound !== null}
+        muffled={!joined || room?.status === 'lobby'}
+        onOpenCredits={() => setCreditsOpen(true)}
+      />
+      {creditsOpen && <Credits onClose={() => setCreditsOpen(false)} />}
       {isHost && (
         <button className="dev-reset-button" onClick={handleResetGame}>
           Reset Auction
