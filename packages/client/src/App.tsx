@@ -23,7 +23,7 @@ import { Inventory, breakdownTraitText } from './Inventory';
 import { ItemTargetPicker } from './ItemTargetPicker';
 import { PlayerPicker } from './PlayerPicker';
 import { LotPool } from './LotPool';
-import { playChatDing, playClick, playLose, playWin } from './sound';
+import { playChatDing, playClick, playLose, playWeaponUsed, playWin } from './sound';
 import { useViewportTooltips } from './useViewportTooltips';
 import { addTotalEarnings, loadPlayerName, loadTotalEarnings, savePlayerName } from './playerStats';
 
@@ -271,6 +271,7 @@ export default function App() {
       playChatDing();
       setChatMessages((prev) => [...prev, message].slice(-100));
     };
+    const onWeaponUsed = () => playWeaponUsed();
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
@@ -290,6 +291,7 @@ export default function App() {
     socket.on('game_over', onGameOver);
     socket.on('chat_history', onChatHistory);
     socket.on('chat_message', onChatMessage);
+    socket.on('weapon_used', onWeaponUsed);
 
     return () => {
       socket.off('connect', onConnect);
@@ -310,6 +312,7 @@ export default function App() {
       socket.off('game_over', onGameOver);
       socket.off('chat_history', onChatHistory);
       socket.off('chat_message', onChatMessage);
+      socket.off('weapon_used', onWeaponUsed);
       socket.disconnect();
     };
   }, []);

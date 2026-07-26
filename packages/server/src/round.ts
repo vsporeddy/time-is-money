@@ -825,6 +825,7 @@ export function useWeapon(
     io,
     `${actor.name} has used ${template.name}${affectedPlayerNames.length > 0 ? ` on ${affectedPlayerNames.join(', ')}` : ''}.`
   );
+  io.to(room.code).emit('weapon_used', { playerId, itemId });
   emitRoomState(room, io);
   return { ok: true };
 }

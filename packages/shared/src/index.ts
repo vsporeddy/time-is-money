@@ -248,4 +248,6 @@ export interface ServerToClientEvents {
   lot_transformed: (payload: { roundId: string; item: MaskedRoundItem }) => void;
   // Dual Daggers: bidding on this lot is now locked to the listed player ids.
   bid_restricted: (payload: { roundId: string; allowedPlayerIds: string[] }) => void;
+  // Any weapon's active effect was used — a cue for all players, not just those affected.
+  weapon_used: (payload: { playerId: string; itemId: string }) => void;
 }
