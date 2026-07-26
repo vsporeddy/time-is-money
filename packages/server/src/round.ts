@@ -10,6 +10,7 @@ const MODIFIER_REVEAL_INTERVAL_MS = 7_000;
 const INVESTOR_INTEREST_RATE = 0.03; // Investor: % of unspent time added at the end of every round
 const AUCTIONEER_REBATE_RATE = 0.1; // Auctioneer: % of the price paid rebated back on every win
 const INSURER_REFUND_RATE = 0.25; // Insurer: % of committed time recovered on a lost bid
+const HOURGLASS_REFUND_RATE = 0.5; // Chronomancer's Hourglass: % of committed time recovered on a lost bid
 const GAMBLER_STREAK_REBATE_RATE_PER_WIN = 0.05; // Gambler: % of price rebated per consecutive win, additive
 const GAMBLER_MAX_STREAK_WINS = 4; // caps the rebate scaling at a 4-win streak (20%)
 const EARLY_UTILITY_TEMPLATE_IDS = new Set(['spyglass', 'chronomancers-hourglass']);
@@ -499,8 +500,8 @@ function resolveRound(room: Room, io: IO, winnerId: string | null, opts?: { stal
   }
 
   // Chronomancer's Hourglass: anyone who spent time on this lot and didn't
-  // win it gets that time back in full. Insurer is the same idea as a
-  // passive class ability, but only a partial refund — the two don't stack.
+  // win it gets part of that time back. Insurer is the same idea as a
+  // passive class ability, but at a lower refund rate — the two don't stack.
   // Stalemate holders were already made whole above, so the Hourglass has
   // nothing left to give them; the Insurer still pays out on top, coming out
   // of the stalemate ahead. Anyone who folded earlier in the round is a normal
@@ -512,7 +513,7 @@ function resolveRound(room: Room, io: IO, winnerId: string | null, opts?: { stal
     if (!loser) continue;
 
     if (ownsItemTemplate(room, playerId, 'chronomancers-hourglass') && !stalemateIds.has(playerId)) {
-      loser.timeRemainingMs += bidder.committedMs;
+      loser.timeRemainingMs += Math.round(bidder.committedMs * HOURGLASS_REFUND_RATE);
     } else if (loser.classId === 'insurer') {
       loser.timeRemainingMs += Math.round(bidder.committedMs * INSURER_REFUND_RATE);
     } else {
