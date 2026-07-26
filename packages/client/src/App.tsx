@@ -75,6 +75,8 @@ export default function App() {
   const [lobbyCode, setLobbyCode] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
   const [joinErrorReason, setJoinErrorReason] = useState<JoinFailureReason | null>(null);
+  const [matchmaking, setMatchmaking] = useState(false);
+  const [matchmakingCount, setMatchmakingCount] = useState(0);
   // null means "no code entered" — join_room reads that as "create a new lobby".
   const pendingLobbyCode = normalizeRoomCode(codeInput);
   const codeLooksWrong = codeInput.length > 0 && pendingLobbyCode === null;
@@ -93,7 +95,7 @@ export default function App() {
   // Any number of opponent inventories can be open at once; order is open order,
   // which also drives the cascade offset of their panels.
   const [openOpponentIds, setOpenOpponentIds] = useState<string[]>([]);
-  const [myInventoryOpen, setMyInventoryOpen] = useState(true);
+  const [myInventoryOpen, setMyInventoryOpen] = useState(false);
   const [roundLimit, setRoundLimit] = useState(15);
   // Mirror of Desire (copy) and Crossbow (destroy) both target an item in
   // someone else's inventory — one picker overlay serves both.
@@ -115,7 +117,31 @@ export default function App() {
     socket.connect();
 
     const onConnect = () => setConnected(true);
-    const onDisconnect = () => setConnected(false);
+    const onDisconnect = () => {
+      setConnected(false);
+      setMatchmaking(false);
+      setMatchmakingCount(0);
+    };
+    const onMatchmakingStatus = ({ queuedPlayers }: { queuedPlayers: number; requiredPlayers: number }) => {
+      setMatchmakingCount(queuedPlayers);
+    };
+    const onMatchmakingError = ({ error: matchmakingError }: { error: string }) => {
+      setMatchmaking(false);
+      setMatchmakingCount(0);
+      setError(matchmakingError);
+    };
+    const onMatchFound = ({ code, playerId, state }: { code: string; playerId: string; state: RoomState }) => {
+      setMyId(playerId);
+      setRoom(state);
+      setLobbyCode(code);
+      writeLobbyCodeToUrl(code);
+      setJoined(true);
+      setJoining(false);
+      setMatchmaking(false);
+      setMatchmakingCount(0);
+      setError(null);
+      setJoinErrorReason(null);
+    };
     const onRoomState = (state: RoomState) => {
       setRoom(state);
       // Belt-and-braces against a raced ack or a hash the user wiped.
@@ -142,7 +168,8 @@ export default function App() {
         setLiveBids({});
         setHoldingPlayerIds([]);
         setDroppedThisRound({});
-        setSelectedOpponentId(null);
+        setOpenOpponentIds([]);
+        setMyInventoryOpen(false);
         setItemPickerItemId(null);
         setItemPickerError(null);
         setPlayerPickerItemId(null);
@@ -244,6 +271,9 @@ export default function App() {
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
+    socket.on('matchmaking_status', onMatchmakingStatus);
+    socket.on('matchmaking_error', onMatchmakingError);
+    socket.on('match_found', onMatchFound);
     socket.on('room_state', onRoomState);
     socket.on('round_start', onRoundStart);
     socket.on('reveal', onReveal);
@@ -261,6 +291,9 @@ export default function App() {
     return () => {
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
+      socket.off('matchmaking_status', onMatchmakingStatus);
+      socket.off('matchmaking_error', onMatchmakingError);
+      socket.off('match_found', onMatchFound);
       socket.off('room_state', onRoomState);
       socket.off('round_start', onRoundStart);
       socket.off('reveal', onReveal);
@@ -302,6 +335,54 @@ export default function App() {
         setCodeInput('');
         clearLobbyCodeFromUrl();
       }
+    });
+  };
+
+  const handleMatchmake = () => {
+    playClick();
+    setError(null);
+    setJoinErrorReason(null);
+    socket.emit('join_matchmaking', { playerName: name }, (res) => {
+      if (res.ok) {
+        setMatchmaking(true);
+        return;
+      }
+      setError(res.error);
+      setJoinErrorReason(res.reason);
+    });
+  };
+
+  const handleCancelMatchmaking = () => {
+    playClick();
+    socket.emit('cancel_matchmaking');
+    setMatchmaking(false);
+    setMatchmakingCount(0);
+  };
+
+  const handleLeaveLobby = () => {
+    playClick();
+    socket.emit('leave_room', () => {
+      setJoined(false);
+      setMyId(null);
+      setRoom(null);
+      setLobbyCode(null);
+      setCodeInput('');
+      setGameOverPlayers(null);
+      setScores(null);
+      setCurrentRound(null);
+      setLastResult(null);
+      setKnownItems({});
+      setItemPrices({});
+      setLiveTimes({});
+      setLiveBids({});
+      setHoldingPlayerIds([]);
+      setDroppedThisRound({});
+      setOpenOpponentIds([]);
+      setMyInventoryOpen(false);
+      setChatMessages([]);
+      setError(null);
+      setJoinErrorReason(null);
+      clearLobbyCodeFromUrl();
     });
   };
 
@@ -446,7 +527,7 @@ export default function App() {
     playerPickerTemplate?.effectType === 'forceEnter'
       ? 'DUAL DAGGERS'
       : playerPickerTemplate?.effectType === 'stealTime'
-        ? "DARK KNIGHT'S GREATAXE"
+        ? "BANDIT'S DAGGER"
         : 'WOODEN DAGGER';
   const playerPickerSubtitle =
     playerPickerTemplate?.effectType === 'forceEnter'
@@ -534,7 +615,21 @@ export default function App() {
 
   let screen: ReactNode;
 
-  if (!joined) {
+  if (!joined && matchmaking) {
+    screen = (
+      <main className="app-shell">
+        <Logo scale={5} />
+        <div className="panel">
+          <h2 className="panel-title">MATCHMAKING</h2>
+          <p className="status-line">Finding players…</p>
+          <p className="status-line">{matchmakingCount} of 4 players ready</p>
+          <button type="button" className="btn btn-block" onClick={handleCancelMatchmaking}>
+            CANCEL
+          </button>
+        </div>
+      </main>
+    );
+  } else if (!joined) {
     screen = (
       <main className="app-shell">
         <Logo scale={5} />
@@ -570,6 +665,15 @@ export default function App() {
               {joining ? 'JOINING…' : pendingLobbyCode ? 'JOIN LOBBY' : 'CREATE LOBBY'}
             </button>
           </form>
+          <button
+            type="button"
+            className="btn btn-block"
+            style={{ marginTop: '0.75rem' }}
+            disabled={!connected || joining || !name.trim()}
+            onClick={handleMatchmake}
+          >
+            MATCHMAKE
+          </button>
           {codeLooksWrong && (
             <p className="error-text">Lobby codes are {ROOM_CODE_LENGTH} characters, letters and numbers.</p>
           )}
@@ -586,6 +690,7 @@ export default function App() {
     const ranked = rankScores(scores, gameOverPlayers);
 
     screen = shellWithHeader(
+      <>
       <div className="panel">
         <h2 className="panel-title">GAME OVER</h2>
         <ol className="results-list">
@@ -597,7 +702,7 @@ export default function App() {
               .map((item) => getTemplate(item.templateId)?.name ?? item.templateId);
 
             const extras: string[] = [];
-            if (s.hiddenTraitBonus !== 0) extras.push(`hidden ${s.hiddenTraitBonus >= 0 ? '+' : ''}${s.hiddenTraitBonus}`);
+            if (s.hiddenTraitBonus !== 0) extras.push(`finds ${s.hiddenTraitBonus >= 0 ? '+' : ''}${s.hiddenTraitBonus}`);
             if (s.scoreScalingBonus !== 0) extras.push(`scaling +${s.scoreScalingBonus}`);
             if (s.solitaireBonus !== 0) extras.push(`solitaire +${s.solitaireBonus}`);
             if (s.hoarderBonus !== 0) extras.push(`hoarder +${s.hoarderBonus}`);
@@ -645,6 +750,15 @@ export default function App() {
           </p>
         )}
       </div>
+      <button
+        type="button"
+        className="btn"
+        style={{ marginTop: '0.75rem' }}
+        onClick={handleLeaveLobby}
+      >
+        LEAVE LOBBY
+      </button>
+      </>
     );
   } else if (!room) {
     screen = shellWithHeader(<p className="status-line">Loading…</p>);
@@ -652,7 +766,12 @@ export default function App() {
     // room.status flipped to game_over before we had a chance to see the
     // one-time game_over event (e.g. joined right as it fired). Nothing to
     // rank, just wait for the next game.
-    screen = shellWithHeader(<p className="status-line">A game just ended! Waiting for a new one to start.</p>);
+    screen = shellWithHeader(
+      <>
+        <p className="status-line">A game just ended! Waiting for a new one to start.</p>
+        <button type="button" className="btn" onClick={handleLeaveLobby}>LEAVE LOBBY</button>
+      </>
+    );
   } else if (room.status === 'lobby') {
     screen = shellWithHeader(
       <Lobby

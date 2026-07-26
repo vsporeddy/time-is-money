@@ -25,7 +25,7 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   { id: 'scimitar', name: 'Scimitar', baseSpriteId: '85', baseValue: 10, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'forceWithdraw', weapon: { phase: 'bidding', target: 'all' }, traits: ['weapon'] },
   { id: 'crossbow', name: 'Crossbow', baseSpriteId: '100', baseValue: 10, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'destroyItem', weapon: { phase: 'anytime', target: 'one' }, traits: ['weapon'] },
   { id: 'arcane-staff', name: 'Arcane Staff', baseSpriteId: '103', baseValue: 10, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'transformLot', weapon: { phase: 'bidding', target: 'none' }, traits: ['weapon', 'magic'] },
-  { id: 'dark-knights-greataxe', name: "Dark Knight's Greataxe", baseSpriteId: '91', baseValue: 10, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'stealTime', weapon: { phase: 'anytime', target: 'one' }, traits: ['weapon'] },
+  { id: 'bandits-dagger', name: "Bandit's Dagger", baseSpriteId: '87', baseValue: 10, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'stealTime', weapon: { phase: 'anytime', target: 'one' }, traits: ['weapon'] },
   // --- Armor (broad trait: armor) ---
   { id: 'iron-helm', name: 'Iron Helm', baseSpriteId: '115', baseValue: 29, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['armor'] },
   { id: 'leather-vest', name: 'Leather Vest', baseSpriteId: '118', baseValue: 21, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'none', traits: ['armor'] },

@@ -181,6 +181,12 @@ export interface ClientToServerEvents {
         | { ok: false; reason: JoinFailureReason; error: string }
     ) => void
   ) => void;
+  join_matchmaking: (
+    payload: { playerName: string },
+    ack: (res: { ok: true } | { ok: false; reason: JoinFailureReason; error: string }) => void
+  ) => void;
+  cancel_matchmaking: () => void;
+  leave_room: (ack: () => void) => void;
   start_game: () => void;
   add_bot: () => void;
   remove_bot: () => void;
@@ -223,6 +229,9 @@ export type MaskedRoundItem = Omit<ItemInstance, 'hiddenTraitId' | 'material' | 
   };
 
 export interface ServerToClientEvents {
+  matchmaking_status: (payload: { queuedPlayers: number; requiredPlayers: number }) => void;
+  matchmaking_error: (payload: { error: string }) => void;
+  match_found: (payload: { code: string; playerId: string; state: RoomState }) => void;
   room_state: (state: RoomState) => void;
   round_start: (payload: { round: Round; item: MaskedRoundItem }) => void;
   bid_window_closed: (payload: { roundId: string; spendingStartedAt: number }) => void;

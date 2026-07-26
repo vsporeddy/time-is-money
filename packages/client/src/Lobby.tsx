@@ -115,28 +115,34 @@ export function Lobby({
           >
             START GAME
           </button>
-          <button
-            className="btn btn-block"
-            style={{ marginTop: '0.75rem' }}
-            disabled={botCount >= MAX_BOTS}
-            onClick={() => {
-              playClick();
-              onAddBot();
-            }}
-          >
-            Add Bot ({botCount}/{MAX_BOTS})
-          </button>
-          <button
-            className="btn btn-block"
-            style={{ marginTop: '0.75rem' }}
-            disabled={botCount === 0}
-            onClick={() => {
-              playClick();
-              onRemoveBot();
-            }}
-          >
-            Remove Bot
-          </button>
+          <div className="bot-stepper" role="group" aria-label="Bot count">
+            <span className="bot-stepper-label">BOTS</span>
+            <button
+              type="button"
+              className="btn bot-stepper-button"
+              disabled={botCount === 0}
+              aria-label="Remove bot"
+              onClick={() => {
+                playClick();
+                onRemoveBot();
+              }}
+            >
+              −
+            </button>
+            <span className="bot-stepper-count">{botCount}/{MAX_BOTS}</span>
+            <button
+              type="button"
+              className="btn bot-stepper-button"
+              disabled={botCount >= MAX_BOTS}
+              aria-label="Add bot"
+              onClick={() => {
+                playClick();
+                onAddBot();
+              }}
+            >
+              +
+            </button>
+          </div>
         </>
       ) : (
         <>

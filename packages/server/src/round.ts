@@ -615,16 +615,13 @@ function emitBidderDropped(room: Room, io: IO, payload: { roundId: string; playe
 // Combining a chest with its matching key consumes both and grants a handful
 // of random items from the chest's reward trait. Checked right after a win
 // changes the winner's stash, since that's the only way stash contents change.
-// A Locksmith skips the key requirement entirely — the chest alone opens.
 function tryOpenChests(room: Room, player: Player) {
-  const isLocksmith = player.classId === 'locksmith';
-
   for (const chestTemplate of ITEM_TEMPLATES) {
     if (!chestTemplate.chest) continue;
 
     const chestItemId = player.stash.find((id) => room.wonItems.get(id)?.templateId === chestTemplate.id);
     const keyItemId = player.stash.find((id) => room.wonItems.get(id)?.templateId === chestTemplate.chest!.keyTemplateId);
-    if (!chestItemId || (!keyItemId && !isLocksmith)) continue;
+    if (!chestItemId || !keyItemId) continue;
 
     player.stash = player.stash.filter((id) => id !== chestItemId && id !== keyItemId);
 

@@ -39,7 +39,7 @@ function templateAttributes(template: ItemTemplate | undefined, item?: Pick<Item
     attributes.push(
       template.weapon.exclusive
         ? { label: 'Forces a Duel', effect: true, tooltip: { title: 'DUAL DAGGERS', text: 'Pre-bid: force one chosen player to bid, and lock everyone else out of this lot. One-time use.' } }
-        : { label: 'Forces All to Bid', effect: true, tooltip: { title: "DARK KNIGHT'S GREATAXE", text: 'Pre-bid: force every other player to enter this lot. One-time use.' } }
+        : { label: 'Forces All to Bid', effect: true, tooltip: { title: template.name.toUpperCase(), text: 'Pre-bid: force every other player to enter this lot. One-time use.' } }
     );
   }
   if (template.effectType === 'forceWithdraw' && template.weapon) {
@@ -51,7 +51,7 @@ function templateAttributes(template: ItemTemplate | undefined, item?: Pick<Item
   }
   if (template.effectType === 'destroyItem') attributes.push({ label: 'Destroys an Item', effect: true, tooltip: { title: 'CROSSBOW', text: "Anytime: destroy an item from another player's inventory. One-time use." } });
   if (template.effectType === 'transformLot') attributes.push({ label: 'Transforms the Lot', effect: true, tooltip: { title: 'ARCANE STAFF', text: 'During bidding: randomly replace the current lot with a new item. One-time use.' } });
-  if (template.effectType === 'stealTime') attributes.push({ label: 'Steals Time', effect: true, tooltip: { title: "DARK KNIGHT'S GREATAXE", text: "Anytime: steal up to 5 seconds of another player's remaining time. One-time use." } });
+  if (template.effectType === 'stealTime') attributes.push({ label: 'Steals Time', effect: true, tooltip: { title: "BANDIT'S DAGGER", text: "Anytime: steal up to 5 seconds of another player's remaining time. One-time use." } });
   if (template.effectType === 'weaponMultiplier') attributes.push({ label: 'Weapon Value x2', effect: true, tooltip: { title: 'CONTRABAND PERMIT', text: 'Passive: multiplies the value of every weapon you own by 2x while held.' } });
   return attributes;
 }

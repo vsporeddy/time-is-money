@@ -19,7 +19,7 @@ import {
   useMirror,
   useWeapon,
 } from './round.js';
-import { addChatMessage, getChatHistory } from './chat.js';
+import { addChatMessage, addSystemChatMessage, getChatHistory } from './chat.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -27,6 +27,75 @@ const httpServer = createServer(app);
 const io = new Server<ClientToServerEvents, ServerToClientEvents, DefaultEventsMap, SocketData>(httpServer, {
   cors: { origin: '*' },
 });
+
+const MATCHMAKING_PLAYER_COUNT = 4;
+const matchmakingQueue = new Map<string, { socket: AppSocket; name: string }>();
+
+function emitMatchmakingStatus() {
+  const payload = {
+    queuedPlayers: matchmakingQueue.size,
+    requiredPlayers: MATCHMAKING_PLAYER_COUNT,
+  };
+  for (const { socket } of matchmakingQueue.values()) socket.emit('matchmaking_status', payload);
+}
+
+function removeFromMatchmaking(socketId: string) {
+  if (!matchmakingQueue.delete(socketId)) return;
+  emitMatchmakingStatus();
+}
+
+function startReadyMatchmakingGames() {
+  while (matchmakingQueue.size >= MATCHMAKING_PLAYER_COUNT) {
+    const entries = [...matchmakingQueue.values()].slice(0, MATCHMAKING_PLAYER_COUNT);
+    const room = createRoom();
+    if (!room) {
+      for (const { socket } of entries) {
+        matchmakingQueue.delete(socket.id);
+        socket.emit('matchmaking_error', { error: 'The server is too busy to create a match. Try again shortly.' });
+      }
+      emitMatchmakingStatus();
+      return;
+    }
+
+    for (const { socket, name } of entries) {
+      matchmakingQueue.delete(socket.id);
+      const classId = pickAvailableClassId([...room.players.values()].map((player) => player.classId));
+      if (!classId) continue;
+      const player: Player = {
+        id: socket.id,
+        name,
+        timeRemainingMs: room.settings.startingTimeMs,
+        status: 'active',
+        stash: [],
+        connected: true,
+        portraitIndex: getClassDefinition(classId)!.portraitIndex,
+        classId,
+        winStreak: 0,
+        isObserver: false,
+        isBot: false,
+      };
+      room.players.set(player.id, player);
+      socket.data.roomCode = room.code;
+      socket.join(room.code);
+      logLobbyEvent(room, `${player.name} has joined the auction.`);
+    }
+
+    room.hostId = room.players.keys().next().value ?? null;
+    room.emptySince = null;
+
+    for (const { socket } of entries) {
+      socket.emit('match_found', {
+        code: room.code,
+        playerId: socket.id,
+        state: toRoomState(room, socket.id),
+      });
+      socket.emit('chat_history', getChatHistory(room));
+    }
+    emitRoomState(room, io);
+    startGame(room, io);
+  }
+  emitMatchmakingStatus();
+}
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true, rooms: roomCount(), players: playerCount() });
@@ -46,7 +115,74 @@ function hostRoom(socket: AppSocket): Room | undefined {
   return room && isHost(room, socket.id) ? room : undefined;
 }
 
+function logLobbyEvent(room: Room, text: string) {
+  const message = addSystemChatMessage(room, text);
+  io.to(room.code).emit('chat_message', message);
+}
+
+function leaveCurrentRoom(socket: AppSocket) {
+  const room = roomOf(socket);
+  socket.data.roomCode = undefined;
+  if (!room || !room.players.has(socket.id)) return;
+
+  const playerName = room.players.get(socket.id)!.name;
+  handleHoldRelease(room, socket.id, io);
+  room.players.delete(socket.id);
+  socket.leave(room.code);
+  logLobbyEvent(room, `${playerName} has left the auction.`);
+
+  // Longest-tenured remaining human inherits the room. Bots cannot host.
+  if (room.hostId === socket.id) {
+    room.hostId = [...room.players.values()].find((player) => !player.isBot)?.id ?? null;
+  }
+
+  if (humanCount(room) === 0) {
+    resetRoomToLobby(room);
+    for (const [id, player] of room.players) {
+      if (player.isBot) room.players.delete(id);
+    }
+    room.hostId = null;
+    room.emptySince = Date.now();
+    return;
+  }
+
+  emitRoomState(room, io);
+}
+
 io.on('connection', (socket: AppSocket) => {
+  socket.on('join_matchmaking', ({ playerName }, ack) => {
+    const name = playerName.trim().slice(0, 20);
+    if (!name) {
+      ack({ ok: false, reason: 'invalid_name', error: 'Name is required.' });
+      return;
+    }
+    if (socket.data.roomCode) {
+      ack({ ok: false, reason: 'invalid_code', error: 'Already in a lobby.' });
+      return;
+    }
+    if (matchmakingQueue.has(socket.id)) {
+      ack({ ok: true });
+      emitMatchmakingStatus();
+      return;
+    }
+    const normalizedName = name.toLowerCase();
+    if ([...matchmakingQueue.values()].some((entry) => entry.name.toLowerCase() === normalizedName)) {
+      ack({ ok: false, reason: 'name_taken', error: 'That name is already waiting for a match.' });
+      return;
+    }
+
+    matchmakingQueue.set(socket.id, { socket, name });
+    ack({ ok: true });
+    emitMatchmakingStatus();
+    startReadyMatchmakingGames();
+  });
+
+  socket.on('cancel_matchmaking', () => removeFromMatchmaking(socket.id));
+  socket.on('leave_room', (ack) => {
+    leaveCurrentRoom(socket);
+    ack();
+  });
+
   socket.on('send_chat', ({ name, text }) => {
     const room = roomOf(socket);
     if (!room) return;
@@ -66,6 +202,7 @@ io.on('connection', (socket: AppSocket) => {
       ack({ ok: false, reason: 'invalid_code', error: 'Already in a lobby.' });
       return;
     }
+    removeFromMatchmaking(socket.id);
 
     let room: Room | undefined;
     if (code) {
@@ -123,6 +260,7 @@ io.on('connection', (socket: AppSocket) => {
     socket.data.roomCode = room.code;
     socket.join(room.code);
     room.emptySince = null;
+    logLobbyEvent(room, `${player.name} has joined the auction.`);
 
     // Whoever arrives to a hostless room takes it over — covers both creating
     // a lobby and walking into one the previous host abandoned.
@@ -199,35 +337,8 @@ io.on('connection', (socket: AppSocket) => {
   });
 
   socket.on('disconnect', () => {
-    const room = roomOf(socket);
-    socket.data.roomCode = undefined;
-    if (!room || !room.players.has(socket.id)) return;
-
-    handleHoldRelease(room, socket.id, io); // don't leave them stuck "holding" if they vanish mid-round
-    room.players.delete(socket.id);
-
-    // Longest-tenured remaining human inherits the room (Map keeps insertion
-    // order). A bot can never be host — it has no socket to press Start with.
-    if (room.hostId === socket.id) {
-      room.hostId = [...room.players.values()].find((p) => !p.isBot)?.id ?? null;
-    }
-
-    if (humanCount(room) === 0) {
-      // Nobody left to play with. A returning player gets a new socket id and
-      // so a new identity anyway, which makes a half-finished round
-      // unresolvable — a clean lobby on the same code is the only coherent
-      // state to hold open. Chat and the round limit survive; the reaper
-      // deletes the whole room once the grace period lapses.
-      resetRoomToLobby(room);
-      for (const [id, player] of room.players) {
-        if (player.isBot) room.players.delete(id);
-      }
-      room.hostId = null;
-      room.emptySince = Date.now();
-      return;
-    }
-
-    emitRoomState(room, io);
+    removeFromMatchmaking(socket.id);
+    leaveCurrentRoom(socket);
   });
 });
 

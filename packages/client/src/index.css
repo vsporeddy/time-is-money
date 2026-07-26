@@ -247,6 +247,40 @@ input[type='text']:focus {
   font-size: 0.5rem;
 }
 
+.bot-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+}
+
+.bot-stepper-label {
+  margin-right: 0.25rem;
+  color: var(--gold);
+  font-size: 0.65rem;
+}
+
+.bot-stepper-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  font-size: 1.7rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.bot-stepper-count {
+  min-width: 3.5rem;
+  color: var(--text);
+  font-size: 0.65rem;
+  text-align: center;
+}
+
 /* --- Lobby invite link --- */
 
 .lobby-code {

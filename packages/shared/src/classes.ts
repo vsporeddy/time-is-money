@@ -19,7 +19,6 @@ export const CLASS_DEFINITIONS: ClassDefinition[] = [
   { id: 'appraiser', name: 'Appraiser', description: "Sees an item's hidden trait before bidding even opens.", color: '#bfe6f0', portraitIndex: 31 },
   { id: 'auctioneer', name: 'Auctioneer', description: 'Takes a small commission rebate of time back on every lot won.', color: '#f0923c', portraitIndex: 38 },
   { id: 'insurer', name: 'Insurer', description: 'Recovers part of the time spent on lots bid on and lost.', color: '#7fa8c9', portraitIndex: 13 },
-  { id: 'locksmith', name: 'Locksmith', description: 'Chests you win open immediately without a key.', color: '#b8c0c9', portraitIndex: 116 },
   { id: 'hoarder', name: 'Hoarder', description: 'Earns a small flat bonus for every item owned, no matter how cheap.', color: '#9a5a42', portraitIndex: 128 },
   { id: 'gambler', name: 'Gambler', description: 'Each lot won in a row grows a time rebate on the next win. Any lot someone else wins resets the streak.', color: '#e6529c', portraitIndex: 147 },
 ];
