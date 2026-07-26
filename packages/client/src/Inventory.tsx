@@ -79,7 +79,7 @@ function setBonusText(traitId: string, tier: SetBonusTier): string {
   return tier.multiplier ? `×${tier.multiplier}` : `+$${tier.bonus}`;
 }
 
-function breakdownTraitText(traitId: string, count: number, bonus: number, multiplier?: number): string {
+export function breakdownTraitText(traitId: string, count: number, bonus: number, multiplier?: number): string {
   const name = getTraitDefinition(traitId)?.name ?? traitId;
   if (traitId === 'musical') return `${name} ${count}: +$${bonus}`;
   if (traitId === 'aquatic') return `${name} ${count}: Aquatic items ×${multiplier}`;

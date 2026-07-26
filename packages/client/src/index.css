@@ -22,9 +22,9 @@
   --red-bright: #c94f4f;
   --shadow: rgba(0, 0, 0, 0.65);
   --font-pixel: 'Press Start 2P', 'Courier New', monospace;
-  /* Sized so a full player card (120px portrait + badges + name + two time
+  /* Sized so a full player card (96px portrait + badges + name + two time
      lines) fits without clipping. */
-  --dock-height: 18rem;
+  --dock-height: 16.5rem;
   --chat-height: 16rem;
 }
 
@@ -102,13 +102,13 @@ input {
 /* The join screen renders the sprites at 160px — cap them by viewport width
    so the logo shrinks on phones instead of overflowing sideways. */
 .logo canvas {
-  max-width: clamp(2.5rem, 12vw, 10rem);
+  max-width: clamp(3rem, 12vw, 10rem);
   height: auto;
 }
 
 .logo-title {
   color: var(--gold);
-  font-size: clamp(1rem, 4vw, 1.6rem);
+  font-size: clamp(1.15rem, 4vw, 1.6rem);
   letter-spacing: 0.06em;
   text-shadow: 2px 2px 0 var(--shadow);
   line-height: 1.4;
@@ -1519,8 +1519,9 @@ input[type='text']:focus {
 
 .dev-reset-button {
   position: fixed;
-  top: 1rem;
-  left: 1rem;
+  /* Sits under the music/SFX/how-to-play row in the top-right corner. */
+  top: 3.25rem;
+  right: 1rem;
   z-index: 40;
   font-family: var(--font-pixel);
   font-size: 0.55rem;
@@ -1833,8 +1834,8 @@ input[type='text']:focus {
   /* Portraits dominate the crowded dock at desktop size (120px) — shrink
      them so the dock (and the chat panel stacked above it) both fit. */
   .player-row .portrait-icon {
-    width: 3rem !important;
-    height: 3rem !important;
+    width: 2.75rem !important;
+    height: 2.75rem !important;
     margin-bottom: 0.25rem;
   }
 
@@ -1901,7 +1902,7 @@ input[type='text']:focus {
 
 @media (min-width: 561px) and (max-height: 900px) {
   :root {
-    --dock-height: 17.5rem;
+    --dock-height: 16rem;
   }
 
   .app-shell {
@@ -1914,11 +1915,11 @@ input[type='text']:focus {
   }
 
   .top-bar .logo-title {
-    font-size: 0.85rem;
+    font-size: 0.95rem;
   }
 
   .top-bar .logo canvas {
-    max-width: 2rem;
+    max-width: 2.25rem;
   }
 
   .item-card {
@@ -1946,11 +1947,10 @@ input[type='text']:focus {
   }
 }
 
-/* Shorter still: tighten the dock's card chrome (the portraits stay
-   full-size — they're the point of the dock). */
+/* Shorter still: tighten the dock's card chrome further. */
 @media (min-width: 561px) and (max-height: 780px) {
   :root {
-    --dock-height: 16.5rem;
+    --dock-height: 15rem;
   }
 
   .player-row .portrait-icon {
@@ -1965,37 +1965,6 @@ input[type='text']:focus {
 
   .initial-bid-timer {
     min-height: 5.5rem;
-  }
-}
-
-/* --- Wide desktop: dock the header in the top-left corner ---
-       (after the short-viewport tiers so its logo sizing wins there) */
-
-/* 1280px is the narrowest width where both the 19rem inventory panel and a
-   compact logo fit beside the 640px center column without overlapping it. */
-@media (min-width: 1280px) {
-  .top-bar {
-    position: fixed;
-    top: 0.75rem;
-    left: 1.25rem;
-    z-index: 30;
-    width: auto;
-    max-width: none;
-    justify-content: flex-start;
-    padding-bottom: 0.4rem;
-  }
-
-  .top-bar .logo-title {
-    font-size: 1rem;
-  }
-
-  .top-bar .logo canvas {
-    max-width: 2rem;
-  }
-
-  /* Out from under the docked logo. */
-  .dev-reset-button {
-    top: 4.75rem;
   }
 }
 

@@ -8,7 +8,6 @@ import {
   computeScores,
   getClassDefinition,
   getTemplate,
-  getTraitDefinition,
   normalizeRoomCode,
   rankScores,
 } from 'shared';
@@ -20,7 +19,7 @@ import { Lobby } from './Lobby';
 import { PortraitIcon } from './PortraitIcon';
 import { Chat } from './Chat';
 import { BackgroundMusic } from './BackgroundMusic';
-import { Inventory } from './Inventory';
+import { Inventory, breakdownTraitText } from './Inventory';
 import { ItemTargetPicker } from './ItemTargetPicker';
 import { PlayerPicker } from './PlayerPicker';
 import { LotPool } from './LotPool';
@@ -579,7 +578,7 @@ export default function App() {
                 else setOpenOpponentIds((open) => (open.includes(p.id) ? open.filter((id) => id !== p.id) : [...open, p.id]));
               }}
             >
-              <PortraitIcon index={p.portraitIndex} />
+              <PortraitIcon index={p.portraitIndex} size={96} />
             </button>
             {classDef && (
               <div className="player-class-badge" style={{ color: classDef.color, borderColor: classDef.color }} tabIndex={0}>
@@ -702,14 +701,12 @@ export default function App() {
               .map((item) => getTemplate(item.templateId)?.name ?? item.templateId);
 
             const extras: string[] = [];
-            if (s.hiddenTraitBonus !== 0) extras.push(`finds ${s.hiddenTraitBonus >= 0 ? '+' : ''}${s.hiddenTraitBonus}`);
-            if (s.scoreScalingBonus !== 0) extras.push(`scaling +${s.scoreScalingBonus}`);
-            if (s.solitaireBonus !== 0) extras.push(`solitaire +${s.solitaireBonus}`);
-            if (s.hoarderBonus !== 0) extras.push(`hoarder +${s.hoarderBonus}`);
+            if (s.hiddenTraitBonus !== 0) extras.push(`Finds: ${s.hiddenTraitBonus >= 0 ? '+' : ''}$${s.hiddenTraitBonus}`);
+            if (s.scoreScalingBonus !== 0) extras.push(`Item effects: +$${s.scoreScalingBonus}`);
+            if (s.solitaireBonus !== 0) extras.push(`Solitaire bonus: +$${s.solitaireBonus}`);
+            if (s.hoarderBonus !== 0) extras.push(`Hoarder bonus: +$${s.hoarderBonus}`);
             for (const t of s.traitBonuses) {
-              extras.push(
-                `${getTraitDefinition(t.traitId)?.name ?? t.traitId} x${t.count} ${t.multiplier ? `×${t.multiplier}` : `+${t.bonus}`}`
-              );
+              extras.push(breakdownTraitText(t.traitId, t.count, t.bonus, t.multiplier));
             }
 
             return (
@@ -723,7 +720,7 @@ export default function App() {
                       {shared && <span className="tied-label"> (tied)</span>}
                     </div>
                     <div className="rank-breakdown">
-                      base ${s.baseValue}
+                      Items: ${s.baseValue}
                       {extras.length > 0 ? `, ${extras.join(', ')}` : ''}
                     </div>
                     {itemNames.length > 0 && <div className="rank-items">{itemNames.join(', ')}</div>}
