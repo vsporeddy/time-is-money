@@ -1330,6 +1330,10 @@ input[type='text']:focus {
   line-height: 1.55;
 }
 
+.curio-effect-callout {
+  color: #8fbf5a;
+}
+
 .tag-row {
   display: flex;
   flex-wrap: wrap;

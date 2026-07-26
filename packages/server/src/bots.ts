@@ -93,6 +93,21 @@ function focusTraitForBot(room: Room, bot: Player): string | undefined {
   return botIndex >= 0 ? room.selectedMainTraits[botIndex % room.selectedMainTraits.length] : undefined;
 }
 
+// A deterministic per-bot, per-lot preference keeps bot decisions varied
+// without making them flip-flop during each 250ms bidding re-evaluation.
+function lotTasteMultiplier(room: Room, bot: Player, item: ItemInstance): number {
+  const key = `${bot.id}:${room.activeRound?.round.id ?? ''}:${item.templateId}`;
+  let hash = 2166136261;
+  for (const character of key) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+
+  const preference = 0.55 + ((hash % 1_000) / 1_000) * 0.9; // 0.55–1.45
+  const isWhimBid = ((hash >>> 10) % 100) < 15;
+  return preference * (isWhimBid ? 1.35 : 1);
+}
+
 // Construct exactly the version of the lot this bot is entitled to know.
 // Prospectors see modifiers immediately; Appraisers see the hidden find.
 function botVisibleItem(room: Room, player: Player): ItemInstance | undefined {
@@ -150,7 +165,7 @@ function marginalItemScore(room: Room, player: Player): number {
     marginal *= 1 + Math.min(0.2, player.winStreak * 0.05);
   }
 
-  return Math.max(0, marginal);
+  return Math.max(0, marginal * lotTasteMultiplier(room, player, candidate));
 }
 
 function reservationMs(room: Room, player: Player): number {

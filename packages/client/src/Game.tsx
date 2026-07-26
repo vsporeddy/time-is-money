@@ -21,6 +21,9 @@ function capitalize(text: string): string {
 function templateAttributes(template: ItemTemplate | undefined, item?: Pick<ItemInstance, 'investment' | 'fairTrade' | 'solitaire'>): DisplayAttribute[] {
   if (!template) return [];
   const attributes: DisplayAttribute[] = template.traits.map((id) => ({ label: getTraitDefinition(id)?.name ?? capitalize(id), traitId: id }));
+  // Curios communicate their one-off ability in the highlighted callout below
+  // the item card, rather than mixing it into the Attributes list.
+  if (template.flatValue) return attributes;
   if (item?.investment) attributes.push({ label: 'Investment', effect: true, tooltip: { title: '+1$ for each second used to bid for this item', text: '' } });
   if (template.scoreScaling === 'bargain') attributes.push({ label: 'Bargain' });
   if (item?.fairTrade) attributes.push({ label: 'Fair Trade', effect: true, tooltip: { title: 'FAIR TRADE', text: "Only costs the runner-up's time spent" } });
@@ -54,6 +57,23 @@ function templateAttributes(template: ItemTemplate | undefined, item?: Pick<Item
   if (template.effectType === 'stealTime') attributes.push({ label: 'Steals Time', effect: true, tooltip: { title: "BANDIT'S DAGGER", text: "Anytime: steal up to 5 seconds of another player's remaining time. One-time use." } });
   if (template.effectType === 'weaponMultiplier') attributes.push({ label: 'Weapon Value x2', effect: true, tooltip: { title: 'CONTRABAND PERMIT', text: 'Passive: multiplies the value of every weapon you own by 2x while held.' } });
   return attributes;
+}
+
+function curioEffectCallout(template: ItemTemplate | undefined): string | null {
+  if (!template?.flatValue) return null;
+  switch (template.effectType) {
+    case 'revealBidding': return "Scouts Bidders: Reveals other players' time left and bids";
+    case 'chest': {
+      const [minimum, maximum] = template.chest?.grantsCountRange ?? [0, 0];
+      const trait = template.chest ? getTraitDefinition(template.chest.grantsTraitId)?.name ?? template.chest.grantsTraitId : 'items';
+      return `Locked Chest: Use a Key to claim ${minimum}-${maximum} ${trait} items`;
+    }
+    case 'key': return 'Rusty Key: Opens a locked chest';
+    case 'refundOnLoss': return 'Emergency Refund: Refunds 50% of time spent on lost bids';
+    case 'copyItem': return "Mirror of Desire: Copy an opponent's item once";
+    case 'weaponMultiplier': return 'Contraband Permit: All weapons are worth ×2';
+    default: return null;
+  }
 }
 
 interface CurrentRound {
@@ -285,6 +305,9 @@ export function Game({
 
   // Prospectors get modifiers up front — so skip the blur reveal for them.
   const modifierRevealClass = currentRound?.item.modifiersRevealedInstantly ? '' : 'modifier-reveal';
+  const currentItemTemplate = currentRound ? getTemplate(currentRound.item.templateId) : undefined;
+  const currentItemAttributes = currentRound ? templateAttributes(currentItemTemplate, currentRound.item) : [];
+  const currentCurioCallout = curioEffectCallout(currentItemTemplate);
 
   return (
     <>
@@ -434,22 +457,27 @@ export function Game({
                 </ul>
               </div>
             )}
-            <div>
-              <p>Attributes</p>
-              <ul>
-                {templateAttributes(getTemplate(currentRound.item.templateId), currentRound.item).map((attribute) => (
-                  <li key={attribute.label}>
-                    {attribute.tooltip ? (
-                      <span className={`attribute-bonus-trigger${attribute.effect ? ' item-effect-label' : ''}`}>
-                        {attribute.label}
-                        <span className="attribute-bonus-tooltip"><b>{attribute.tooltip.title}</b><span>{attribute.tooltip.text}</span></span>
-                      </span>
-                    ) : <AttributeLabel {...attribute} />}
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {currentItemAttributes.length > 0 && (
+              <div>
+                <p>Attributes</p>
+                <ul>
+                  {currentItemAttributes.map((attribute) => (
+                    <li key={attribute.label}>
+                      {attribute.tooltip ? (
+                        <span className={`attribute-bonus-trigger${attribute.effect ? ' item-effect-label' : ''}`}>
+                          {attribute.label}
+                          <span className="attribute-bonus-tooltip"><b>{attribute.tooltip.title}</b><span>{attribute.tooltip.text}</span></span>
+                        </span>
+                      ) : <AttributeLabel {...attribute} />}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
+          {currentCurioCallout && (
+            <div className="item-effect-callout curio-effect-callout">{currentCurioCallout}</div>
+          )}
           {getTemplate(currentRound.item.templateId)?.effectType === 'timeRefund' &&
             getTemplate(currentRound.item.templateId)?.timeRefund?.mode === 'catchup' && (
               <div className="item-effect-callout">Emergency Refund: Refunds time based on remaining time</div>
