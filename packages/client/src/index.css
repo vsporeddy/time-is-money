@@ -463,6 +463,17 @@ input[type='text']:focus {
   color: var(--bg);
 }
 
+.player-time-left {
+  font-size: 1rem;
+  color: var(--gold-bright);
+  text-shadow: 1px 1px 0 var(--shadow);
+  margin-top: 0.15rem;
+}
+
+.player-card.holding .player-time-left {
+  color: var(--bg);
+}
+
 /* --- Item / auction card --- */
 
 .round-progress {
