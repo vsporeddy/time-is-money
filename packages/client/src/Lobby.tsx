@@ -86,10 +86,6 @@ export function Lobby({
         {playerCount} of {maxPlayers} players — waiting for players…
       </p>
 
-      {playerCount < 2 && (
-        <p className="error-text">Not enough players to start the game.</p>
-      )}
-
       {isHost ? (
         <>
           <div className="round-limit-control">
@@ -149,6 +145,10 @@ export function Lobby({
           <p className="status-line">Waiting for {hostName ?? 'the host'} to start…</p>
           <p className="status-line">Rounds: {roundLimit}</p>
         </>
+      )}
+
+      {playerCount < 2 && (
+        <p className="error-text">Not enough players to start the game.</p>
       )}
     </div>
   );

@@ -1236,6 +1236,13 @@ input[type='text']:focus {
   margin: 0 0 0.6rem;
 }
 
+.item-flavor-text {
+  font-style: italic;
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  margin: 0 0 0.75rem;
+}
+
 .item-meta {
   font-size: 0.7rem;
   color: var(--text-dim);

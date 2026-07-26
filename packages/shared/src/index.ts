@@ -45,6 +45,7 @@ export interface WeaponEffectConfig {
 export interface ItemTemplate {
   id: string;
   name: string;
+  flavorText: string; // short italic blurb shown on the bidding screen
   baseSpriteId: string;
   baseValue: number; // fixed per template — variance now comes entirely from rolled modifiers
   materials: string[];

@@ -395,6 +395,7 @@ export function Game({
             />
           </div>
           <h3 className="item-name">{getTemplate(currentRound.item.templateId)?.name}</h3>
+          {/* <p className="item-flavor-text">{getTemplate(currentRound.item.templateId)?.flavorText}</p> */}
           {(() => {
             // Only populated for an Appraiser — everyone else's hiddenTraitId is stripped server-side until round_end.
             const hidden = getHiddenTrait(currentRound.item.hiddenTraitId);
