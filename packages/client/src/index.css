@@ -787,12 +787,13 @@ input[type='text']:focus {
 
 /* --- One-time weapon effects: spent items grey out but stay in the stash --- */
 
-.inventory-slot-used {
+.inventory-slot-used canvas {
   opacity: 0.65;
+  filter: grayscale(1) brightness(0.6);
 }
 
-.inventory-slot-used canvas {
-  filter: grayscale(1) brightness(0.6);
+.inventory-slot-used .inventory-item-tooltip {
+  opacity: 0.65;
 }
 
 /* --- Lot pool: the whole game's fixed item list, visible up front --- */
@@ -1187,6 +1188,13 @@ input[type='text']:focus {
   display: block;
 }
 
+/* Inventory panels normally sit beneath the player dock, but a visible item
+   tooltip must be able to clear that dock instead of being clipped behind it. */
+.inventory-panel:has(.inventory-slot:hover .inventory-item-tooltip),
+.inventory-panel:has(.inventory-slot:focus-within .inventory-item-tooltip) {
+  z-index: 21;
+}
+
 .inventory-item-tooltip {
   bottom: calc(100% + 0.35rem);
   left: 50%;
@@ -1351,6 +1359,28 @@ input[type='text']:focus {
 
 .curio-effect-callout {
   color: #8fbf5a;
+}
+
+.weapon-effect-callout {
+  color: #ff6b6b;
+}
+
+.inventory-weapon-ability {
+  margin-top: 0.45rem;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid #ff6b6b;
+  background: rgba(209, 73, 92, 0.18);
+  color: #ff6b6b;
+  text-align: center;
+}
+
+.inventory-curio-ability {
+  margin-top: 0.45rem;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid #8fbf5a;
+  background: rgba(143, 191, 90, 0.18);
+  color: #8fbf5a;
+  text-align: center;
 }
 
 .tag-row {

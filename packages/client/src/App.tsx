@@ -726,6 +726,7 @@ export default function App() {
             if (s.scoreScalingBonus !== 0) extras.push(`Item effects: +$${s.scoreScalingBonus}`);
             if (s.solitaireBonus !== 0) extras.push(`Solitaire bonus: +$${s.solitaireBonus}`);
             if (s.hoarderBonus !== 0) extras.push(`Hoarder bonus: +$${s.hoarderBonus}`);
+            if (s.gildedValueMultiplier > 1) extras.push(`Gilded Value: Items ×${s.gildedValueMultiplier.toFixed(1)}`);
             for (const t of s.traitBonuses) {
               extras.push(breakdownTraitText(t.traitId, t.count, t.bonus, t.multiplier));
             }

@@ -64,7 +64,8 @@ export interface ItemTemplate {
     | 'destroyItem'
     | 'transformLot'
     | 'stealTime'
-    | 'weaponMultiplier';
+    | 'weaponMultiplier'
+    | 'itemValueMultiplier';
   timeRefund?: TimeRefundConfig; // present when effectType === 'timeRefund'
   chest?: ChestConfig; // present when effectType === 'chest'
   weapon?: WeaponEffectConfig; // present for the active-use weapon effect types above
@@ -214,6 +215,7 @@ export interface ScoreBreakdown {
   scoreScalingBonus: number; // investment/bargain, from price paid
   solitaireBonus: number;
   hoarderBonus: number; // Hoarder: flat bonus per item owned
+  gildedValueMultiplier: number; // Midas's Golden Coin: multiplier applied to item values
   traitBonuses: { traitId: string; count: number; bonus: number; multiplier?: number }[];
   total: number;
   itemCount: number; // stash size — the first tiebreak on equal totals (fewer items wins)

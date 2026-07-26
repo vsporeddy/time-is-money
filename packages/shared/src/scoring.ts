@@ -104,6 +104,7 @@ export function computeScores(
     const solitaireBonus = items.filter((item) => item.solitaire).length === 1 ? 20 : 0;
     const hoarderBonus = player.classId === 'hoarder' ? items.length * HOARDER_BONUS_PER_ITEM : 0;
     const hasContrabandPermit = items.some((item) => getTemplate(item.templateId)?.effectType === 'weaponMultiplier');
+    const gildedValueMultiplier = items.some((item) => getTemplate(item.templateId)?.effectType === 'itemValueMultiplier') ? 1.2 : 1;
     const armorMultiplier = activeTraitTiers.get('armor')?.strongestMatchingItemMultiplier ?? 1;
     const strongestArmorItemId = armorMultiplier > 1
       ? items
@@ -141,7 +142,8 @@ export function computeScores(
         specialMultiplier *
         weaponMultiplier *
         aquaticMultiplier *
-        strongestArmorMultiplier;
+        strongestArmorMultiplier *
+        gildedValueMultiplier;
 
       const hidden = getHiddenTrait(item.hiddenTraitId);
       if (hidden) hiddenTraitBonus += hidden.scoreBonus;
@@ -167,6 +169,7 @@ export function computeScores(
       scoreScalingBonus: Math.round(scoreScalingBonus),
       solitaireBonus,
       hoarderBonus,
+      gildedValueMultiplier,
       traitBonuses,
       total: Math.round(total),
       itemCount: items.length,

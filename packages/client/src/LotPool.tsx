@@ -35,6 +35,7 @@ function itemAttributes(template: ItemTemplate | undefined): DisplayAttribute[] 
   if (template.effectType === 'transformLot') addEffect('Transforms the Lot');
   if (template.effectType === 'stealTime') addEffect('Steals Time');
   if (template.effectType === 'weaponMultiplier') addEffect('Weapon Value ×2');
+  if (template.effectType === 'itemValueMultiplier') addEffect('Gilded Value');
   return attributes;
 }
 

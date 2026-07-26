@@ -30,6 +30,7 @@ function isEffectUsableNow(template: ItemTemplate | undefined, roundPhase: 'preB
 }
 
 const INVENTORY_SIZE = 12;
+const SMUGGLER_WEAPON_TIERS: SetBonusTier[] = [{ count: 2, bonus: 10 }, { count: 4, bonus: 25 }];
 
 interface DisplayAttribute {
   label: string;
@@ -96,6 +97,7 @@ function itemAttributes(item: ItemInstance): DisplayAttribute[] {
   const attributes: DisplayAttribute[] = [];
 
   for (const traitId of template?.traits ?? []) attributes.push({ label: getTraitDefinition(traitId)?.name ?? capitalize(traitId), traitId });
+  if (template?.flatValue) return attributes;
   if (item.investment) attributes.push({ label: 'Investment', effect: true });
   if (template?.scoreScaling === 'bargain') attributes.push({ label: 'Bargain' });
   if (item.fairTrade) attributes.push({ label: 'Fair Trade', effect: true });
@@ -106,16 +108,45 @@ function itemAttributes(item: ItemInstance): DisplayAttribute[] {
   if (template?.effectType === 'key') attributes.push({ label: 'Opens Chests', effect: true });
   if (template?.effectType === 'refundOnLoss') attributes.push({ label: 'Refunds Losses', effect: true });
   if (template?.effectType === 'copyItem') attributes.push({ label: 'Copies an Item (click to use)', effect: true });
-  if (template?.effectType === 'destroyLot') attributes.push({ label: 'Destroys the Lot', effect: true });
-  if (template?.effectType === 'forceEnter') attributes.push({ label: template.weapon?.exclusive ? 'Forces a Duel' : 'Forces All to Bid', effect: true });
-  if (template?.effectType === 'forceWithdraw') attributes.push({ label: template.weapon?.target === 'all' ? 'Clears the Field' : 'Forces a Withdrawal', effect: true });
-  if (template?.effectType === 'destroyItem') attributes.push({ label: 'Destroys an Item', effect: true });
-  if (template?.effectType === 'transformLot') attributes.push({ label: 'Transforms the Lot', effect: true });
-  if (template?.effectType === 'stealTime') attributes.push({ label: 'Steals Time', effect: true });
+  if (!template?.weapon && template?.effectType === 'destroyLot') attributes.push({ label: 'Destroys the Lot', effect: true });
+  if (!template?.weapon && template?.effectType === 'forceEnter') attributes.push({ label: 'Forces All to Bid', effect: true });
+  if (!template?.weapon && template?.effectType === 'forceWithdraw') attributes.push({ label: 'Forced Withdrawal', effect: true });
+  if (!template?.weapon && template?.effectType === 'destroyItem') attributes.push({ label: 'Destroys an Item', effect: true });
+  if (!template?.weapon && template?.effectType === 'transformLot') attributes.push({ label: 'Transform Lot', effect: true });
+  if (!template?.weapon && template?.effectType === 'stealTime') attributes.push({ label: 'Steals Time', effect: true });
   if (template?.effectType === 'weaponMultiplier') attributes.push({ label: 'Weapon Value x2', effect: true });
-  if (item.usedActiveEffect) attributes.push({ label: 'Effect Used' });
+  if (template?.effectType === 'itemValueMultiplier') attributes.push({ label: 'Gilded Value', effect: true });
+  if (item.usedActiveEffect && !template?.weapon) attributes.push({ label: 'Effect Used' });
 
   return attributes;
+}
+
+function weaponAbilityShortName(template: ItemTemplate | undefined): string | null {
+  if (!template?.weapon) return null;
+  switch (template.effectType) {
+    case 'destroyLot': return 'Pass Lot';
+    case 'forceEnter': return template.weapon.exclusive ? 'Forces a Duel' : 'Forces All to Bid';
+    case 'forceWithdraw': return 'Forced Withdrawal';
+    case 'destroyItem': return 'Destroys an Item';
+    case 'transformLot': return 'Transform Lot';
+    case 'stealTime': return 'Steals Time';
+    case 'copyItem': return 'Mirror of Desire';
+    default: return null;
+  }
+}
+
+function curioAbilityShortName(template: ItemTemplate | undefined): string | null {
+  if (!template?.flatValue) return null;
+  switch (template.effectType) {
+    case 'revealBidding': return 'Scouts Bidders';
+    case 'chest': return 'Locked Chest';
+    case 'key': return 'Rusty Key';
+    case 'refundOnLoss': return 'Emergency Refund';
+    case 'copyItem': return 'Mirror of Desire';
+    case 'weaponMultiplier': return 'Contraband Permit';
+    case 'itemValueMultiplier': return 'Gilded Value';
+    default: return null;
+  }
 }
 
 function modifierClass(value: string): string {
@@ -162,29 +193,35 @@ export function Inventory({
       : ownedItems.filter((item) => getTemplate(item.templateId)?.traits.includes(trait.id)).length;
     if (count === 0) return null;
 
-    if (trait.noSetBonus) {
+    const isSmugglerWeapon = trait.id === 'weapon' && player.classId === 'smuggler';
+    const tiers = isSmugglerWeapon ? SMUGGLER_WEAPON_TIERS : trait.tiers;
+    if (trait.noSetBonus && !isSmugglerWeapon) {
       return { id: trait.id, name: trait.name, count, color: 'gold', tiers: [], noSetBonus: true };
     }
 
-    const reachedTierIndex = trait.tiers.reduce((highest, tier, index) => (count >= tier.count ? index : highest), -1);
-    const target = trait.tiers.find((tier) => count < tier.count)?.count ?? trait.tiers[trait.tiers.length - 1].count;
-    const color = setBonusColor(trait.tiers.length, reachedTierIndex);
+    const reachedTierIndex = tiers.reduce((highest, tier, index) => (count >= tier.count ? index : highest), -1);
+    const target = tiers.find((tier) => count < tier.count)?.count ?? tiers[tiers.length - 1].count;
+    const color = setBonusColor(tiers.length, reachedTierIndex);
 
-    return { id: trait.id, name: trait.name, count, target, color, tiers: trait.tiers };
+    return { id: trait.id, name: trait.name, count, target, color, tiers };
   }).filter((progress): progress is TraitProgress => progress !== null);
   const breakdown: BreakdownLine[] = score
     ? [
         { text: `Value: $${score.baseValue}` },
+        score.gildedValueMultiplier > 1 && { text: `Gilded Value: Items ×${score.gildedValueMultiplier.toFixed(1)}`, className: 'item-effect-label' },
         score.hiddenTraitBonus !== 0 && { text: `Finds: ${score.hiddenTraitBonus >= 0 ? '+' : ''}$${score.hiddenTraitBonus}` },
         score.scoreScalingBonus !== 0 && { text: `Item effects: +$${score.scoreScalingBonus}`, className: 'item-effect-label' },
         score.solitaireBonus !== 0 && { text: `Solitaire bonuses: +$${score.solitaireBonus}` },
         score.hoarderBonus !== 0 && { text: `Hoarder bonus: +$${score.hoarderBonus}`, className: 'item-effect-label' },
         ...score.traitBonuses.map((trait) => {
           const definition = getTraitDefinition(trait.traitId);
-          const reachedTierIndex = definition?.tiers.reduce((highest, tier, index) => (trait.count >= tier.count ? index : highest), -1) ?? -1;
+          const tiers = trait.traitId === 'weapon' && player.classId === 'smuggler'
+            ? SMUGGLER_WEAPON_TIERS
+            : definition?.tiers ?? [];
+          const reachedTierIndex = tiers.reduce((highest, tier, index) => (trait.count >= tier.count ? index : highest), -1);
           return {
             text: breakdownTraitText(trait.traitId, trait.count, trait.bonus, trait.multiplier),
-            color: setBonusColor(definition?.tiers.length ?? 1, reachedTierIndex),
+            color: setBonusColor(tiers.length || 1, reachedTierIndex),
           };
         }),
       ].filter((line): line is BreakdownLine => Boolean(line))
@@ -219,6 +256,9 @@ export function Inventory({
           const item = stash[index];
           const template = item ? getTemplate(item.templateId) : undefined;
           const hiddenTrait = item ? getHiddenTrait(item.hiddenTraitId) : undefined;
+          const weaponAbility = template ? weaponAbilityShortName(template) : null;
+          const curioAbility = template ? curioAbilityShortName(template) : null;
+          const attributes = item ? itemAttributes(item) : [];
           const used = item?.usedActiveEffect === true;
           const usable = Boolean(item && onUseItem && !used && isEffectUsableNow(template, roundPhase));
           const slotClasses = ['inventory-slot', usable && 'inventory-slot-usable', used && 'inventory-slot-used'].filter(Boolean).join(' ');
@@ -251,27 +291,33 @@ export function Inventory({
                         </ul>
                       </>
                     )}
-                    <span>Attributes:</span>
-                    <ul className="inventory-detail-list">
-                      {itemAttributes(item).map((attribute) => {
-                        const traitColor = attribute.traitId ? getTraitLabelColor(attribute.traitId) : undefined;
-                        return (
-                          <li key={attribute.label}>
-                            <span
-                              className={!traitColor && attribute.traitId ? 'attribute-set-label' : attribute.effect ? 'item-effect-label' : undefined}
-                              style={traitColor ? { color: traitColor } : undefined}
-                            >
-                              {attribute.label}
-                            </span>
-                          </li>
-                        );
-                      })}
-                    </ul>
+                    {attributes.length > 0 && (
+                      <>
+                        <span>Attributes:</span>
+                        <ul className="inventory-detail-list">
+                          {attributes.map((attribute) => {
+                            const traitColor = attribute.traitId ? getTraitLabelColor(attribute.traitId) : undefined;
+                            return (
+                              <li key={attribute.label}>
+                                <span
+                                  className={!traitColor && attribute.traitId ? 'attribute-set-label' : attribute.effect ? 'item-effect-label' : undefined}
+                                  style={traitColor ? { color: traitColor } : undefined}
+                                >
+                                  {attribute.label}
+                                </span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </>
+                    )}
                     {hiddenTrait && (
                       <span className={`inventory-find ${hiddenTrait.id === 'flawed' ? 'find-flawed' : hiddenTrait.id === 'windfall' ? 'find-windfall' : ''}`}>
                         {hiddenTrait.name} {hiddenTrait.scoreBonus >= 0 ? '+$' : '-$'}{Math.abs(hiddenTrait.scoreBonus)}
                       </span>
                     )}
+                    {weaponAbility && <span className="inventory-weapon-ability">{weaponAbility}</span>}
+                    {curioAbility && <span className="inventory-curio-ability">{curioAbility}</span>}
                   </div>
                 </>
               )}

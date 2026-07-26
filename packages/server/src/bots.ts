@@ -278,6 +278,7 @@ export function scheduleBotWeaponUses(
           item &&
           !item.usedActiveEffect &&
           template?.weapon &&
+          template.effectType !== 'copyItem' &&
           (template.weapon.phase === phase || (phase === 'preBid' && template.weapon.phase === 'anytime'))
         )
       );

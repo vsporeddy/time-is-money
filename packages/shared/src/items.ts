@@ -72,8 +72,9 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   { id: 'sunken-treasure-chest', name: 'Sunken Treasure Chest', flavorText: 'Barnacles and all, it still hasn\u2019t been opened.', baseSpriteId: '270', baseValue: 0, materials: ['Used'], rarities: ['Common'], effectType: 'chest', flatValue: true, traits: [], chest: { keyTemplateId: 'rusty-key', grantsTraitId: 'aquatic', grantsCountRange: [3, 5] } },
   { id: 'rusty-key', name: 'Rusty Key', flavorText: 'It fits something. You just don\u2019t know what yet.', baseSpriteId: '185', baseValue: 1, materials: ['Used'], rarities: ['Common'], effectType: 'key', flatValue: true, traits: [] },
   { id: 'chronomancers-hourglass', name: "Chronomancer's Hourglass", flavorText: 'The sand never seems to run out, no matter how long you watch.', baseSpriteId: '352', baseValue: 0, materials: ['Used'], rarities: ['Common'], effectType: 'refundOnLoss', flatValue: true, traits: [] },
-  { id: 'mirror-of-desire', name: 'Mirror of Desire', flavorText: 'It never shows your own reflection.', baseSpriteId: '177', baseValue: 5, materials: ['Used'], rarities: ['Common'], effectType: 'copyItem', flatValue: true, traits: [] },
+  { id: 'mirror-of-desire', name: 'Mirror of Desire', flavorText: 'It never shows your own reflection.', baseSpriteId: '177', baseValue: 5, materials: MATERIAL_POOL, rarities: RARITY_POOL, effectType: 'copyItem', weapon: { phase: 'anytime', target: 'one' }, traits: ['weapon'] },
   { id: 'contraband-permit', name: 'Contraband Permit', flavorText: 'Official-looking, if you don\u2019t look too closely at the seal.', baseSpriteId: '218', baseValue: 5, materials: ['Used'], rarities: ['Common'], effectType: 'weaponMultiplier', flatValue: true, traits: [] },
+  { id: 'midas-golden-coin', name: "Midas's Coin", flavorText: 'Everything it touches becomes a little more valuable.', baseSpriteId: '199', baseValue: 0, materials: ['Used'], rarities: ['Common'], effectType: 'itemValueMultiplier', flatValue: true, traits: [] },
 ];
 
 // Fisher-Yates — used to pick the game's fixed lot pool and randomize its auction order.

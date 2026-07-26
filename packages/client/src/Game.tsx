@@ -28,6 +28,7 @@ function templateAttributes(template: ItemTemplate | undefined, item?: Pick<Item
   if (template.scoreScaling === 'bargain') attributes.push({ label: 'Bargain' });
   if (item?.fairTrade) attributes.push({ label: 'Fair Trade', effect: true, tooltip: { title: 'FAIR TRADE', text: "Only costs the runner-up's time spent" } });
   if (item?.solitaire) attributes.push({ label: 'Solitaire', effect: true, tooltip: { title: 'If you own only one Solitaire item: +$20', text: '' } });
+  if (template.weapon) return attributes;
   if (template.effectType === 'revealBidding') attributes.push({ label: 'Scouts Bidders', effect: true, tooltip: { title: 'SPYGLASS', text: "Other players' time left and bids are always revealed to you while you own one" } });
   if (template.effectType === 'chest' && template.chest) {
     const traitName = getTraitDefinition(template.chest.grantsTraitId)?.name ?? template.chest.grantsTraitId;
@@ -37,25 +38,6 @@ function templateAttributes(template: ItemTemplate | undefined, item?: Pick<Item
   if (template.effectType === 'key') attributes.push({ label: 'Opens Chests', effect: true, tooltip: { title: 'RUSTY KEY', text: 'Combine with a matching locked chest — both are consumed' } });
   if (template.effectType === 'refundOnLoss') attributes.push({ label: 'Refunds Losses', effect: true, tooltip: { title: "CHRONOMANCER'S HOURGLASS", text: "50% of your time is refunded if you don't win the bid" } });
   if (template.effectType === 'copyItem') attributes.push({ label: 'Copies an Item', effect: true, tooltip: { title: 'MIRROR OF DESIRE', text: 'Click it in your inventory to copy one item from another player. One-time use.' } });
-  if (template.effectType === 'destroyLot') attributes.push({ label: 'Destroys the Lot', effect: true, tooltip: { title: 'FLAIL', text: 'Pre-bid: instantly pass the current lot. One-time use.' } });
-  if (template.effectType === 'forceEnter' && template.weapon) {
-    attributes.push(
-      template.weapon.exclusive
-        ? { label: 'Forces a Duel', effect: true, tooltip: { title: 'DUAL DAGGERS', text: 'Pre-bid: force one chosen player to bid, and lock everyone else out of this lot. One-time use.' } }
-        : { label: 'Forces All to Bid', effect: true, tooltip: { title: template.name.toUpperCase(), text: 'Pre-bid: force every other player to enter this lot. One-time use.' } }
-    );
-  }
-  if (template.effectType === 'forceWithdraw' && template.weapon) {
-    attributes.push(
-      template.weapon.target === 'all'
-        ? { label: 'Clears the Field', effect: true, tooltip: { title: 'SCIMITAR', text: 'During bidding: force every other bidder to withdraw. One-time use.' } }
-        : { label: 'Forces a Withdrawal', effect: true, tooltip: { title: 'WOODEN DAGGER', text: 'During bidding: force one chosen bidder to withdraw. One-time use.' } }
-    );
-  }
-  if (template.effectType === 'destroyItem') attributes.push({ label: 'Destroys an Item', effect: true, tooltip: { title: 'CROSSBOW', text: "Anytime: destroy an item from another player's inventory. One-time use." } });
-  if (template.effectType === 'transformLot') attributes.push({ label: 'Transforms the Lot', effect: true, tooltip: { title: 'ARCANE STAFF', text: 'During bidding: randomly replace the current lot with a new item. One-time use.' } });
-  if (template.effectType === 'stealTime') attributes.push({ label: 'Steals Time', effect: true, tooltip: { title: "BANDIT'S DAGGER", text: "Anytime: steal up to 5 seconds of another player's remaining time. One-time use." } });
-  if (template.effectType === 'weaponMultiplier') attributes.push({ label: 'Weapon Value x2', effect: true, tooltip: { title: 'CONTRABAND PERMIT', text: 'Passive: multiplies the value of every weapon you own by 2x while held.' } });
   return attributes;
 }
 
@@ -72,6 +54,25 @@ function curioEffectCallout(template: ItemTemplate | undefined): string | null {
     case 'refundOnLoss': return 'Emergency Refund: Refunds 50% of time spent on lost bids';
     case 'copyItem': return "Mirror of Desire: Copy an opponent's item once";
     case 'weaponMultiplier': return 'Contraband Permit: All weapons are worth ×2';
+    case 'itemValueMultiplier': return 'Gilded Value: Your items are 20% more valuable';
+    default: return null;
+  }
+}
+
+function weaponEffectCallout(template: ItemTemplate | undefined): string | null {
+  if (!template?.weapon) return null;
+  switch (template.effectType) {
+    case 'destroyLot': return 'Pre-bid: Instantly pass the current lot';
+    case 'forceEnter': return template.weapon?.exclusive
+      ? 'Pre-bid: Force one player to bid and lock everyone else out'
+      : 'Pre-bid: Force every other player to enter this lot';
+    case 'forceWithdraw': return template.weapon?.target === 'all'
+      ? 'During bidding: Force every other bidder to withdraw'
+      : 'During bidding: Force one bidder to withdraw';
+    case 'destroyItem': return 'Anytime: Destroy one opponent item';
+    case 'transformLot': return 'During bidding: Replace the current lot';
+    case 'stealTime': return 'Anytime: Steal up to 5 seconds from another player';
+    case 'copyItem': return 'Anytime: Copy one opponent item';
     default: return null;
   }
 }
@@ -308,6 +309,7 @@ export function Game({
   const currentItemTemplate = currentRound ? getTemplate(currentRound.item.templateId) : undefined;
   const currentItemAttributes = currentRound ? templateAttributes(currentItemTemplate, currentRound.item) : [];
   const currentCurioCallout = curioEffectCallout(currentItemTemplate);
+  const currentWeaponCallout = weaponEffectCallout(currentItemTemplate);
 
   return (
     <>
@@ -457,7 +459,7 @@ export function Game({
                 </ul>
               </div>
             )}
-            {currentItemAttributes.length > 0 && (
+          {currentItemAttributes.length > 0 && (
               <div>
                 <p>Attributes</p>
                 <ul>
@@ -475,6 +477,9 @@ export function Game({
               </div>
             )}
           </div>
+          {currentWeaponCallout && (
+            <div className="item-effect-callout weapon-effect-callout">{currentWeaponCallout}</div>
+          )}
           {currentCurioCallout && (
             <div className="item-effect-callout curio-effect-callout">{currentCurioCallout}</div>
           )}
