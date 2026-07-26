@@ -160,6 +160,19 @@ input[type='text']:focus {
   border-color: var(--gold-bright);
 }
 
+/* Matches the .lobby-code display style so the code reads the same whether
+   you're typing it or looking at it in the lobby. */
+.lobby-code-input {
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.field-hint {
+  margin: 0;
+  font-size: 0.55rem;
+  color: var(--text-dim);
+}
+
 .round-limit-control {
   margin: 0 0 1.25rem;
 }
