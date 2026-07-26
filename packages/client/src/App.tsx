@@ -591,6 +591,8 @@ export default function App() {
         const isMe = p.id === myId;
         // Public "entered this lot" indicator — stays true after a withdrawal.
         const holding = holdingPlayerIds.includes(p.id);
+        // Distinct from `holding` above: only true while actively spending.
+        const isCurrentlyHolding = liveBids[p.id] !== undefined;
         const dropped = (isMe || hasSpyglass) && droppedThisRound[p.id] !== undefined;
         const time = liveTimes[p.id] ?? p.timeRemainingMs;
         const classDef = getClassDefinition(p.classId);
