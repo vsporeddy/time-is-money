@@ -2,6 +2,7 @@ import type { ItemInstance, Player } from 'shared';
 import { getTemplate } from 'shared';
 import { SpriteIcon } from './SpriteIcon';
 import { getGlowFilter, getGlowIntensity, getItemGlowCategory } from './itemVisuals';
+import { usePanelDrag } from './usePanelDrag';
 
 interface ItemTargetPickerProps {
   title: string;
@@ -18,6 +19,7 @@ interface ItemTargetPickerProps {
 // Used both by Mirror of Desire (copy) and Crossbow (destroy) — any effect
 // that targets a specific item somewhere in another player's inventory.
 export function ItemTargetPicker({ title, subtitle, players, myId, items, excludePlayerIds, error, onSelect, onCancel }: ItemTargetPickerProps) {
+  const { panelRef, panelStyle, headingProps } = usePanelDrag<HTMLDivElement>('item-target-picker');
   const excluded = new Set(excludePlayerIds ?? []);
   const groups = players
     .filter((player) => player.id !== myId && !excluded.has(player.id))
@@ -29,8 +31,8 @@ export function ItemTargetPicker({ title, subtitle, players, myId, items, exclud
 
   return (
     <div className="mirror-picker-overlay" role="dialog" aria-label={title}>
-      <div className="panel mirror-picker-panel">
-        <div className="inventory-heading">
+      <div ref={panelRef} style={panelStyle} className="panel mirror-picker-panel">
+        <div {...headingProps}>
           <h2 className="panel-title">{title}</h2>
           <button type="button" className="inventory-close" aria-label="Cancel" onClick={onCancel}>×</button>
         </div>

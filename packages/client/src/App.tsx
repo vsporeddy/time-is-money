@@ -90,7 +90,9 @@ export default function App() {
   const [gameOverPlayers, setGameOverPlayers] = useState<Player[] | null>(null);
   const [scores, setScores] = useState<ScoreBreakdown[] | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [selectedOpponentId, setSelectedOpponentId] = useState<string | null>(null);
+  // Any number of opponent inventories can be open at once; order is open order,
+  // which also drives the cascade offset of their panels.
+  const [openOpponentIds, setOpenOpponentIds] = useState<string[]>([]);
   const [myInventoryOpen, setMyInventoryOpen] = useState(true);
   const [roundLimit, setRoundLimit] = useState(15);
   // Mirror of Desire (copy) and Crossbow (destroy) both target an item in
@@ -148,9 +150,10 @@ export default function App() {
         setActionError(null);
         setLotPoolOpen(false);
       }
-      if (selectedOpponentId && !state.players.some((player) => player.id === selectedOpponentId)) {
-        setSelectedOpponentId(null);
-      }
+      setOpenOpponentIds((open) => {
+        const present = open.filter((id) => state.players.some((player) => player.id === id));
+        return present.length === open.length ? open : present;
+      });
     };
     const onRoundStart = (payload: CurrentRound) => {
       setCurrentRound((current) =>
@@ -484,14 +487,18 @@ export default function App() {
             <button
               type="button"
               className="portrait-button"
-              aria-pressed={isMe ? myInventoryOpen : selectedOpponentId === p.id}
-              aria-label={isMe ? `${myInventoryOpen ? 'Hide' : 'Show'} your inventory` : `Show ${p.name}'s inventory`}
+              aria-pressed={isMe ? myInventoryOpen : openOpponentIds.includes(p.id)}
+              aria-label={
+                isMe
+                  ? `${myInventoryOpen ? 'Hide' : 'Show'} your inventory`
+                  : `${openOpponentIds.includes(p.id) ? 'Hide' : 'Show'} ${p.name}'s inventory`
+              }
               onClick={() => {
                 if (isMe) setMyInventoryOpen((open) => !open);
-                else setSelectedOpponentId((selected) => (selected === p.id ? null : p.id));
+                else setOpenOpponentIds((open) => (open.includes(p.id) ? open.filter((id) => id !== p.id) : [...open, p.id]));
               }}
             >
-              <PortraitIcon index={p.portraitIndex} />
+              <PortraitIcon index={p.portraitIndex} size={64} />
             </button>
             {classDef && (
               <div className="player-class-badge" style={{ color: classDef.color, borderColor: classDef.color }} tabIndex={0}>
@@ -551,7 +558,7 @@ export default function App() {
                 autoCapitalize="characters"
                 autoCorrect="off"
                 spellCheck={false}
-                placeholder="e.g. QT4B"
+                placeholder="TIME"
               />
               <p className="field-hint">Leave blank to start a new lobby.</p>
             </div>
@@ -732,16 +739,24 @@ export default function App() {
       )}
       {actionError && <div className="action-error-banner">{actionError}</div>}
       {joined && lotPoolOpen && room && <LotPool pool={room.lotPool} onClose={() => setLotPoolOpen(false)} />}
-      {joined && selectedOpponentId && room?.players.find((player) => player.id === selectedOpponentId) && (
-        <Inventory
-          player={room.players.find((player) => player.id === selectedOpponentId)!}
-          items={knownItems}
-          score={scoresByPlayer.get(selectedOpponentId)}
-          side="right"
-          showValue={false}
-          onClose={() => setSelectedOpponentId(null)}
-        />
-      )}
+      {joined &&
+        openOpponentIds.map((opponentId, index) => {
+          const opponent = room?.players.find((player) => player.id === opponentId);
+          if (!opponent) return null;
+          return (
+            <Inventory
+              key={opponentId}
+              player={opponent}
+              items={knownItems}
+              score={scoresByPlayer.get(opponentId)}
+              side="right"
+              showValue={false}
+              panelKey={`inventory-opponent-${opponentId}`}
+              cascadeIndex={index}
+              onClose={() => setOpenOpponentIds((open) => open.filter((id) => id !== opponentId))}
+            />
+          );
+        })}
       <BackgroundMusic ducked={currentRound !== null} muffled={!joined || room?.status === 'lobby'} />
       {isHost && (
         <button className="dev-reset-button" onClick={handleResetGame}>
