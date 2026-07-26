@@ -8,11 +8,12 @@
     "packages/client"
   ],
   "scripts": {
-    "dev:server": "npm run dev --workspace=server",
+    "dev:server": "STATS_SIGNING_KEY='YL6Cv6lbejnJoIdsmAYy+kQDzGfC3m+GVKkgKVoTW7U=' npm run dev --workspace=server",
     "dev:client": "npm run dev --workspace=client",
     "build:client": "npm run build --workspace=client",
     "build:pages": "npm run build:pages --workspace=client",
     "build:itch": "npm run build:itch --workspace=client",
-    "typecheck": "tsc --noEmit -p packages/server/tsconfig.json && tsc --noEmit -p packages/client/tsconfig.json"
+    "typecheck": "tsc --noEmit -p packages/server/tsconfig.json && tsc --noEmit -p packages/client/tsconfig.json",
+    "gen:stats-key": "node packages/server/scripts/generate-stats-key.mjs"
   }
 }

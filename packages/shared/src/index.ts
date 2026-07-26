@@ -6,6 +6,8 @@ export * from './scoring.js';
 export * from './portraits.js';
 export * from './classes.js';
 export * from './roomCode.js';
+export * from './playerStats.js';
+import type { PlayerStats } from './playerStats.js';
 
 export interface Player {
   id: string;
@@ -174,7 +176,10 @@ export type JoinFailureReason =
 export interface ClientToServerEvents {
   // Omitting `code` creates a brand-new lobby with this player as its host.
   join_room: (
-    payload: { playerName: string; code?: string | null },
+    // statsToken is the player's signed lifetime-stats blob from a previous
+    // game, if they have one. Never trusted beyond its signature — an invalid
+    // or absent token just means "start a fresh profile", it never blocks joining.
+    payload: { playerName: string; code?: string | null; statsToken?: string },
     ack: (
       res:
         | { ok: true; code: string; playerId: string; state: RoomState }
@@ -238,4 +243,12 @@ export interface ServerToClientEvents {
   lot_transformed: (payload: { roundId: string; item: MaskedRoundItem }) => void;
   // Dual Daggers: bidding on this lot is now locked to the listed player ids.
   bid_restricted: (payload: { roundId: string; allowedPlayerIds: string[] }) => void;
+  // Sent to one socket at game over: their lifetime stats, re-signed with this
+  // game folded in. The client stores it and sends it back on the next join.
+  stats_token: (payload: { token: string }) => void;
+  // Everyone else's lifetime stats, so players can look each other up. Sent as
+  // plain data, not signed tokens: the signature exists to protect the profile
+  // on its trip through the owner's localStorage, and this copy never leaves
+  // the server's own socket. Players without a profile yet are absent.
+  player_stats: (payload: { entries: { playerId: string; stats: PlayerStats }[] }) => void;
 }

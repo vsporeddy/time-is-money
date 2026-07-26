@@ -1,8 +1,10 @@
-import type { ItemInstance, ItemTemplate, Player, ScoreBreakdown } from 'shared';
+import type { ItemInstance, ItemTemplate, Player, PlayerStats, ScoreBreakdown } from 'shared';
 import { getHiddenTrait, getMaterialValueMultiplier, getRarityValueMultiplier, getSpecialModifierValueMultiplier, getTemplate, getTraitDefinition, TRAIT_DEFINITIONS } from 'shared';
+import { useState } from 'react';
 import { SpriteIcon } from './SpriteIcon';
 import { getGlowFilter, getGlowIntensity, getItemGlowCategory, getTraitLabelColor } from './itemVisuals';
 import { usePanelDrag } from './usePanelDrag';
+import { PlayerStatsView } from './PlayerStatsView';
 
 interface InventoryProps {
   player: Player;
@@ -15,7 +17,12 @@ interface InventoryProps {
   roundPhase?: 'preBid' | 'bidding' | null; // gates weapon effects tied to a round phase
   panelKey?: string; // identity for the remembered drag position; defaults to the side
   cascadeIndex?: number; // stagger for panels opened on top of each other
+  // This player's career record, shown on the RECORD tab. Null until they
+  // finish their first game; bots never have one.
+  stats?: PlayerStats | null;
 }
+
+type InventoryTab = 'items' | 'record';
 
 // Each additional panel opens down-and-left of the one before it so a stack of
 // open inventories doesn't hide itself.
@@ -148,7 +155,10 @@ export function Inventory({
   roundPhase = null,
   panelKey,
   cascadeIndex = 0,
+  stats = null,
 }: InventoryProps) {
+  const [tab, setTab] = useState<InventoryTab>('items');
+  const isSelf = side === 'left';
   const { panelRef, panelStyle, headingProps, dragging } = usePanelDrag(panelKey ?? `inventory-${side}`, {
     x: (side === 'right' ? -1 : 1) * cascadeIndex * CASCADE_STEP,
     y: cascadeIndex * CASCADE_STEP,
@@ -198,9 +208,19 @@ export function Inventory({
       aria-label={`${player.name}'s inventory`}
     >
       <div {...headingProps}>
-        <h2>{side === 'left' ? 'YOUR INVENTORY' : `${player.name.toUpperCase()}'S INVENTORY`}</h2>
+        <h2>
+          {tab === 'items'
+            ? isSelf
+              ? 'YOUR INVENTORY'
+              : `${player.name.toUpperCase()}'S INVENTORY`
+            : isSelf
+              ? 'YOUR RECORD'
+              : `${player.name.toUpperCase()}'S RECORD`}
+        </h2>
         <div className="inventory-heading-actions">
-          {showValue && (
+          {/* The running total belongs to the items view; on the record tab it
+              would sit next to unrelated lifetime numbers. */}
+          {showValue && tab === 'items' && (
             <div className="inventory-total" tabIndex={0}>
               <strong>${score?.total ?? 0}</strong>
               <div className="inventory-tooltip inventory-total-tooltip">
@@ -214,6 +234,27 @@ export function Inventory({
           {onClose && <button type="button" className="inventory-close" aria-label="Minimize inventory" onClick={onClose}>×</button>}
         </div>
       </div>
+      {/* Bots never have a signed record, so their panel keeps its single view. */}
+      {!player.isBot && (
+        <div className="inventory-tabs" role="tablist">
+          {(['items', 'record'] as InventoryTab[]).map((id) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              className="inventory-tab"
+              aria-selected={tab === id}
+              onClick={() => setTab(id)}
+            >
+              {id === 'items' ? 'ITEMS' : 'RECORD'}
+            </button>
+          ))}
+        </div>
+      )}
+      {tab === 'record' && !player.isBot ? (
+        <PlayerStatsView stats={stats} isSelf={isSelf} />
+      ) : (
+      <>
       <div className="inventory-grid">
         {Array.from({ length: INVENTORY_SIZE }, (_, index) => {
           const item = stash[index];
@@ -301,6 +342,8 @@ export function Inventory({
             </span>
           ))}
         </div>
+      )}
+      </>
       )}
     </aside>
   );

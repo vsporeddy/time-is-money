@@ -742,6 +742,78 @@ input[type='text']:focus {
   filter: grayscale(1) brightness(0.6);
 }
 
+/* --- Career records: lifetime stats, held by the player, signed by us --- */
+
+/* Tab strip across the top of an inventory panel: ITEMS | RECORD. */
+.inventory-tabs {
+  display: flex;
+  gap: 0.3rem;
+  margin-bottom: 0.6rem;
+}
+
+.inventory-tab {
+  flex: 1;
+  padding: 0.3rem 0.2rem;
+  font-family: var(--font-pixel);
+  font-size: 0.45rem;
+  color: var(--text-dim);
+  background: var(--bg);
+  border: 2px solid var(--border-gold);
+  cursor: pointer;
+}
+
+.inventory-tab:hover {
+  color: var(--gold);
+}
+
+.inventory-tab[aria-selected='true'] {
+  color: var(--bg);
+  background: var(--gold);
+}
+
+.stats-tab {
+  min-height: 12rem;
+}
+
+.stats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stats-list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.5rem;
+  line-height: 1.5;
+}
+
+.stats-label {
+  color: var(--text-dim);
+}
+
+.stats-value {
+  color: var(--gold-bright);
+  text-align: right;
+}
+
+.career-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 2px solid var(--border-gold);
+  font-size: 0.5rem;
+  color: var(--text-dim);
+}
+
 /* --- Lot pool: the whole game's fixed item list, visible up front --- */
 
 .lot-pool-panel {

@@ -3,6 +3,7 @@ import { cloneItemInstance, computeScores, getTemplate, ITEM_TEMPLATES, rollItem
 import { emitRoomState, humanPlayerIds, ownsItemTemplate, playerHasClass } from './rooms.js';
 import type { ActiveRound, IO, Room } from './rooms.js';
 import { scheduleBotEntries, scheduleBotReleases } from './bots.js';
+import { recordGameResults } from './playerStats.js';
 import { addSystemChatMessage } from './chat.js';
 
 const SOLE_BIDDER_PRICE_MS = 5_000;
@@ -554,6 +555,7 @@ function finishGame(room: Room, io: IO) {
   const players = [...room.players.values()].filter((p) => !p.isObserver);
   const scores = computeScores(players, room.wonItems, room.itemPricePaidMs);
   io.to(room.code).emit('game_over', { players, scores });
+  recordGameResults(room, io, players, scores);
 }
 
 // Clears round/round-timers/status back to a fresh lobby. Also promotes any
