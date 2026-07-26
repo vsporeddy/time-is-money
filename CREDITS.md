@@ -3,6 +3,9 @@
 ## Items
 Matt Firth (shikashipx) and [game-icons.net](https://game-icons.net)
 
+## Coins
+TotusLotus [pixel-coins](https://totuslotus.itch.io/pixel-coins)
+
 ## Sound Effects
 Oryx Design Lab
 
