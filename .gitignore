@@ -2,3 +2,6 @@ node_modules/
 dist/
 .env
 *.log
+
+# training artifacts
+packages/server/scripts/ml/.data/
