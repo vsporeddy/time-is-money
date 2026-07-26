@@ -23,7 +23,7 @@ import { Inventory, breakdownTraitText } from './Inventory';
 import { ItemTargetPicker } from './ItemTargetPicker';
 import { PlayerPicker } from './PlayerPicker';
 import { LotPool } from './LotPool';
-import { playChatDing, playClick, playLose, playWeaponUsed, playWin } from './sound';
+import { playChatDing, playClick, playLose, playMirrorUsed, playWeaponUsed, playWin } from './sound';
 import { useViewportTooltips } from './useViewportTooltips';
 import { addTotalEarnings, loadPlayerName, loadTotalEarnings, savePlayerName } from './playerStats';
 
@@ -272,6 +272,7 @@ export default function App() {
       setChatMessages((prev) => [...prev, message].slice(-100));
     };
     const onWeaponUsed = () => playWeaponUsed();
+    const onMirrorUsed = () => playMirrorUsed();
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
@@ -292,6 +293,7 @@ export default function App() {
     socket.on('chat_history', onChatHistory);
     socket.on('chat_message', onChatMessage);
     socket.on('weapon_used', onWeaponUsed);
+    socket.on('mirror_used', onMirrorUsed);
 
     return () => {
       socket.off('connect', onConnect);
@@ -313,6 +315,7 @@ export default function App() {
       socket.off('chat_history', onChatHistory);
       socket.off('chat_message', onChatMessage);
       socket.off('weapon_used', onWeaponUsed);
+      socket.off('mirror_used', onMirrorUsed);
       socket.disconnect();
     };
   }, []);

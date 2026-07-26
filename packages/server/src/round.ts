@@ -673,6 +673,7 @@ export function useMirror(
   player.stash.push(copy.id);
   tryOpenChests(room, player);
   logGameEvent(room, io, `${player.name} has used ${template.name} on ${targetOwner.name}.`);
+  io.to(room.code).emit('mirror_used', { playerId, itemId });
 
   return { ok: true };
 }

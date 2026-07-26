@@ -213,7 +213,7 @@ io.on('connection', (socket: AppSocket) => {
       }
       room = getRoomByCode(normalized);
       if (!room) {
-        ack({ ok: false, reason: 'not_found', error: "That lobby has expired or doesn't exist." });
+        ack({ ok: false, reason: 'not_found', error: "That auction has expired or doesn't exist." });
         return;
       }
     } else {
