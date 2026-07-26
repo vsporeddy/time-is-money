@@ -2,7 +2,7 @@ import type { ItemTemplate, MaskedRoundItem, Player, Round, TimeRefundConfig } f
 import { cloneItemInstance, computeScores, getTemplate, ITEM_TEMPLATES, rollItemInstanceForTemplate, shuffle } from 'shared';
 import { emitRoomState, humanPlayerIds, ownsItemTemplate, playerHasClass } from './rooms.js';
 import type { ActiveRound, IO, Room } from './rooms.js';
-import { scheduleBotEntries, scheduleBotReleases } from './bots.js';
+import { scheduleBotEntries, scheduleBotReleases, scheduleBotWeaponUses } from './bots.js';
 import { addSystemChatMessage } from './chat.js';
 
 const SOLE_BIDDER_PRICE_MS = 5_000;
@@ -238,6 +238,7 @@ function activateRound(room: Room, io: IO) {
   ar.round.bidWindowOpen = true;
   ar.bidWindowOpen = true;
   emitRoundStart(room, io);
+  scheduleBotWeaponUses(room, io, 'preBid', useWeapon);
   scheduleBotEntries(room, io, handleHoldStart);
 
   ar.noBidTimer = setTimeout(() => closeBidWindow(room, io), room.settings.noBidTimeoutMs);
@@ -272,6 +273,7 @@ function closeBidWindow(room: Room, io: IO) {
   for (const [playerId] of activeBidders) {
     ar.holdStartedAt.set(playerId, spendingStartedAt);
   }
+  scheduleBotWeaponUses(room, io, 'bidding', useWeapon);
   scheduleBotReleases(room, io, handleHoldRelease);
 
   // Holding to the buzzer is a mutual failure, not a win for anyone: every
