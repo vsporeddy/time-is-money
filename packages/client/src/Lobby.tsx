@@ -86,6 +86,10 @@ export function Lobby({
         {playerCount} of {maxPlayers} players — waiting for players…
       </p>
 
+      {playerCount < 2 && (
+        <p className="error-text">Not enough players to start the game.</p>
+      )}
+
       {isHost ? (
         <>
           <div className="round-limit-control">
@@ -103,6 +107,7 @@ export function Lobby({
           </div>
           <button
             className="btn btn-block"
+            disabled={playerCount < 2}
             onClick={() => {
               playClick();
               onStartGame();

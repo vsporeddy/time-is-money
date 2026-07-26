@@ -45,11 +45,11 @@ body {
   user-select: none;
 }
 
-/* keep selectable: form fields + chat log so text can be copied */
+/* Keep editable fields selectable while preventing accidental drag-selection
+   across the rest of the game UI. */
 input,
 textarea,
-[contenteditable],
-.chat-messages {
+[contenteditable] {
   -webkit-user-select: text;
   user-select: text;
 }
@@ -125,6 +125,7 @@ input {
 /* --- Panels & cards --- */
 
 .panel {
+  --panel-pad: 1.25rem;
   width: 100%;
   max-width: 640px;
   background: var(--bg-panel);
@@ -132,7 +133,7 @@ input {
   box-shadow:
     inset 0 0 0 2px #1a0f07,
     6px 6px 0 0 var(--shadow);
-  padding: 1.25rem;
+  padding: var(--panel-pad);
 }
 
 .panel-title {
@@ -484,11 +485,12 @@ input[type='text']:focus {
 /* --- Inventories --- */
 
 .inventory-panel {
+  --panel-pad: 0.65rem;
   position: fixed;
   top: 50%;
   z-index: 15;
   width: 19rem;
-  padding: 0.65rem;
+  padding: var(--panel-pad);
   transform: translateY(-50%);
   background: var(--bg-panel);
   border: 3px solid var(--border-gold);
@@ -515,6 +517,47 @@ input[type='text']:focus {
   display: flex;
   align-items: flex-start;
   gap: 0.35rem;
+}
+
+/* Heading doubles as the drag handle: a full-bleed title bar across the panel
+   top. The negative margin cancels the panel's own padding, so every panel that
+   uses it must declare --panel-pad. Sticky keeps the handle reachable in the
+   scrollable picker modals. */
+.inventory-heading-draggable {
+  position: sticky;
+  top: calc(var(--panel-pad, 0.65rem) * -1);
+  z-index: 1;
+  align-items: center;
+  margin: calc(var(--panel-pad, 0.65rem) * -1) calc(var(--panel-pad, 0.65rem) * -1) 0.6rem;
+  padding: 0.4rem 0.5rem;
+  background: var(--bg-panel-alt);
+  border-bottom: 3px solid var(--border-gold);
+  cursor: grab;
+  user-select: none;
+  touch-action: none; /* otherwise a touch drag scrolls the page instead */
+}
+
+.inventory-heading-draggable:active {
+  cursor: grabbing;
+}
+
+/* The modal pickers' heading is a .panel-title sized for a standalone screen. */
+.inventory-heading-draggable .panel-title {
+  margin: 0;
+  font-size: 0.7rem;
+}
+
+.inventory-heading-draggable .inventory-heading-actions {
+  cursor: default;
+}
+
+.inventory-heading-draggable .inventory-total {
+  cursor: help;
+}
+
+/* Lift a panel over the bottom bar (z-index 20) while it is being moved. */
+.inventory-panel-dragging {
+  z-index: 25;
 }
 
 .inventory-panel h2 {

@@ -20,3 +20,19 @@ export function addChatMessage(room: Room, name: string, text: string): ChatMess
 
   return message;
 }
+
+export function addSystemChatMessage(room: Room, text: string): ChatMessage {
+  room.chatCounter += 1;
+  const message: ChatMessage = {
+    id: `chat-${room.chatCounter}`,
+    name: '',
+    text,
+    ts: Date.now(),
+    system: true,
+  };
+
+  room.chat.push(message);
+  if (room.chat.length > MAX_HISTORY) room.chat.shift();
+
+  return message;
+}

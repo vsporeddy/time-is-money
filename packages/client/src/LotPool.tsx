@@ -2,6 +2,7 @@ import type { ItemTemplate, LotPoolItem } from 'shared';
 import { getTemplate, getTraitDefinition } from 'shared';
 import { SpriteIcon } from './SpriteIcon';
 import { getGlowFilter, getItemGlowCategory, getTraitLabelColor } from './itemVisuals';
+import { usePanelDrag } from './usePanelDrag';
 
 interface LotPoolProps {
   pool: LotPoolItem[];
@@ -38,6 +39,8 @@ function itemAttributes(template: ItemTemplate | undefined): DisplayAttribute[] 
 }
 
 export function LotPool({ pool, onClose }: LotPoolProps) {
+  const { panelRef, panelStyle, headingProps, dragging } = usePanelDrag('lot-pool');
+
   // Only a Merchant ever gets saleRound populated — its presence anywhere in
   // the pool means the whole schedule is revealed (mystery items are a
   // separate Spy ability and may still be blurred here).
@@ -48,8 +51,13 @@ export function LotPool({ pool, onClose }: LotPoolProps) {
     : pool;
 
   return (
-    <aside className="inventory-panel inventory-panel-right lot-pool-panel" aria-label="Lot Pool">
-      <div className="inventory-heading">
+    <aside
+      ref={panelRef}
+      style={panelStyle}
+      className={`inventory-panel inventory-panel-right lot-pool-panel${dragging ? ' inventory-panel-dragging' : ''}`}
+      aria-label="Lot Pool"
+    >
+      <div {...headingProps}>
         <h2>LOT POOL</h2>
         <button type="button" className="inventory-close" aria-label="Close" onClick={onClose}>×</button>
       </div>
