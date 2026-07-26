@@ -541,7 +541,7 @@ export default function App() {
                 autoCapitalize="characters"
                 autoCorrect="off"
                 spellCheck={false}
-                placeholder="e.g. QT4B"
+                placeholder="TIME"
               />
               <p className="field-hint">Leave blank to start a new lobby.</p>
             </div>
