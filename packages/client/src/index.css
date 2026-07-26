@@ -467,10 +467,27 @@ input[type='text']:focus {
 }
 
 .portrait-button {
+  position: relative;
   border: 0;
   padding: 0;
   background: transparent;
   cursor: pointer;
+}
+
+/* Zero-size marker the coin burst uses to track the portrait's on-screen
+   position; the canvas itself is fixed so the dock's overflow can't clip
+   the arcs, and sits at negative z so coins emerge from behind the card. */
+.coin-burst-anchor {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.coin-burst-canvas {
+  position: fixed;
+  z-index: -1;
+  pointer-events: none;
+  image-rendering: pixelated;
 }
 
 .portrait-button:focus-visible {

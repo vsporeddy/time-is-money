@@ -18,6 +18,7 @@ import { Logo } from './Logo';
 import { Game } from './Game';
 import { Lobby } from './Lobby';
 import { PortraitIcon } from './PortraitIcon';
+import { CoinBurst } from './CoinBurst';
 import { Chat } from './Chat';
 import { BackgroundMusic } from './BackgroundMusic';
 import { Inventory } from './Inventory';
@@ -499,6 +500,15 @@ export default function App() {
               }}
             >
               <PortraitIcon index={p.portraitIndex} />
+              {isMe && (
+                <CoinBurst
+                  active={
+                    isCurrentlyHolding &&
+                    currentRound?.round.status === 'active' &&
+                    !currentRound.round.bidWindowOpen
+                  }
+                />
+              )}
             </button>
             {classDef && (
               <div className="player-class-badge" style={{ color: classDef.color, borderColor: classDef.color }} tabIndex={0}>
