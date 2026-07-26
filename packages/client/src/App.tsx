@@ -136,6 +136,16 @@ export default function App() {
         setItemPrices({});
         setLastResult(null);
         setCurrentRound(null);
+        setLiveTimes({});
+        setLiveBids({});
+        setHoldingPlayerIds([]);
+        setDroppedThisRound({});
+        setSelectedOpponentId(null);
+        setItemPickerItemId(null);
+        setItemPickerError(null);
+        setPlayerPickerItemId(null);
+        setPlayerPickerError(null);
+        setActionError(null);
         setLotPoolOpen(false);
       }
       if (selectedOpponentId && !state.players.some((player) => player.id === selectedOpponentId)) {

@@ -43,11 +43,11 @@ body {
   user-select: none;
 }
 
-/* keep selectable: form fields + chat log so text can be copied */
+/* Keep editable fields selectable while preventing accidental drag-selection
+   across the rest of the game UI. */
 input,
 textarea,
-[contenteditable],
-.chat-messages {
+[contenteditable] {
   -webkit-user-select: text;
   user-select: text;
 }
