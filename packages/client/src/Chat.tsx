@@ -52,8 +52,9 @@ export function Chat({ messages, onSend }: ChatProps) {
           <div className="chat-messages" ref={listRef}>
             {messages.length === 0 && <p className="chat-empty">It's quiet in here...</p>}
             {messages.map((m) => (
-              <p key={m.id} className="chat-line">
-                <span className="chat-name">{m.name}:</span> <span className="chat-text">{m.text}</span>
+              <p key={m.id} className={`chat-line${m.system ? ' chat-system-line' : ''}`}>
+                {!m.system && <><span className="chat-name">{m.name}:</span>{' '}</>}
+                <span className="chat-text">{m.text}</span>
               </p>
             ))}
           </div>

@@ -8,11 +8,8 @@ const BARGAIN_CAP_SECONDS = 5;
 const BARGAIN_RATE_PER_SEC = 8;
 const CONTRABAND_WEAPON_MULTIPLIER = 2;
 
-// Jeweller/Smuggler: class-gated set bonuses for trait categories that get
-// no bonus otherwise (trinket is explicitly noSetBonus; weapon isn't even a
-// TraitDefinition) — same shape as TraitTier, just applied outside the
-// TRAIT_DEFINITIONS loop since they're conditional on the owner's class.
-const JEWELLER_TRINKET_TIERS: TraitTier[] = [{ count: 2, bonus: 10 }, { count: 4, bonus: 25 }, { count: 6, bonus: 45 }];
+// Smuggler: a class-gated set bonus for weapons, which otherwise have no
+// universal set bonus.
 const SMUGGLER_WEAPON_TIERS: TraitTier[] = [{ count: 2, bonus: 10 }, { count: 4, bonus: 25 }];
 const HOARDER_BONUS_PER_ITEM = 3; // Hoarder: flat bonus per item owned, regardless of value — rewards volume over quality
 
@@ -93,13 +90,8 @@ export function computeScores(
       }
     }
 
-    // Jeweller/Smuggler: same tier-lookup shape as TRAIT_DEFINITIONS above,
-    // but gated to the owner's class instead of being universal.
-    if (player.classId === 'jeweller') {
-      const count = items.filter((i) => getTemplate(i.templateId)?.traits.includes('trinket')).length;
-      const tier = [...JEWELLER_TRINKET_TIERS].reverse().find((t) => count >= t.count);
-      if (tier) traitBonuses.push({ traitId: 'trinket', count, bonus: tier.bonus });
-    }
+    // Smuggler uses the same tier-lookup shape as TRAIT_DEFINITIONS above,
+    // but is gated to the owner's class instead of being universal.
     if (player.classId === 'smuggler') {
       const count = items.filter((i) => getTemplate(i.templateId)?.traits.includes('weapon')).length;
       const tier = [...SMUGGLER_WEAPON_TIERS].reverse().find((t) => count >= t.count);
@@ -135,10 +127,7 @@ export function computeScores(
       const specialSetMultiplier = item.specialModifier
         ? activeTraitTiers.get(item.specialModifier.toLowerCase())?.multiplier
         : undefined;
-      // Fence: ignores the Cursed value penalty specifically — the Cursed set
-      // bonus (from specialSetMultiplier) still applies on top if earned.
-      const fenceIgnoresCursedPenalty = player.classId === 'fence' && item.specialModifier === 'Cursed';
-      const specialMultiplier = specialSetMultiplier ?? (fenceIgnoresCursedPenalty ? 1 : getSpecialModifierValueMultiplier(item.specialModifier));
+      const specialMultiplier = specialSetMultiplier ?? getSpecialModifierValueMultiplier(item.specialModifier);
       const weaponMultiplier = hasContrabandPermit && template?.weapon ? CONTRABAND_WEAPON_MULTIPLIER : 1;
       const aquaticMultiplier = template?.traits.includes('aquatic')
         ? activeTraitTiers.get('aquatic')?.matchingItemMultiplier ?? 1

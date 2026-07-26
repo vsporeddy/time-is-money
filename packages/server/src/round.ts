@@ -4,6 +4,7 @@ import { emitRoomState, humanPlayerIds, ownsItemTemplate, playerHasClass } from 
 import type { ActiveRound, IO, Room } from './rooms.js';
 import { scheduleBotEntries, scheduleBotReleases } from './bots.js';
 import { recordGameResults } from './playerStats.js';
+import { addSystemChatMessage } from './chat.js';
 
 const SOLE_BIDDER_PRICE_MS = 5_000;
 const MODIFIER_REVEAL_INTERVAL_MS = 7_000;
@@ -17,6 +18,16 @@ const TREASURE_CHEST_TEMPLATE_ID = 'treasure-chest';
 const TREASURE_CHEST_KEY_TEMPLATE_ID = 'rusty-key';
 const MAIN_TRAIT_IDS = ['armor', 'trinket', 'text', 'musical', 'aquatic'] as const;
 type MainTraitId = (typeof MAIN_TRAIT_IDS)[number];
+
+function logSystemEvent(room: Room, io: IO, text: string) {
+  const message = addSystemChatMessage(room, text);
+  io.to(room.code).emit('chat_message', message);
+}
+
+function logGameEvent(room: Room, io: IO, text: string) {
+  const lotNumber = Math.max(1, room.currentRoundIndex + 1);
+  logSystemEvent(room, io, `[Lot ${lotNumber}] ${text}`);
+}
 
 function takeRandom<T>(items: T[]): T | undefined {
   if (items.length === 0) return undefined;
@@ -146,8 +157,11 @@ function buildLotPool(room: Room) {
 
 export function startGame(room: Room, io: IO) {
   if (room.status !== 'lobby') return;
+  const eligiblePlayerCount = [...room.players.values()].filter((player) => !player.isObserver).length;
+  if (eligiblePlayerCount < 2) return;
   room.status = 'in_round';
   buildLotPool(room);
+  logSystemEvent(room, io, 'The game has started.');
   startRound(room, io);
 }
 
@@ -511,6 +525,14 @@ function resolveRound(room: Room, io: IO, winnerId: string | null, opts?: { stal
     player.timeRemainingMs += Math.round(player.timeRemainingMs * INVESTOR_INTEREST_RATE);
   }
 
+  const itemName = template?.name ?? ar.item.templateId;
+  const winner = winnerId ? room.players.get(winnerId) : undefined;
+  logGameEvent(
+    room,
+    io,
+    winner ? `${itemName} was won by ${winner.name}.` : `${itemName} was passed.`
+  );
+
   io.to(room.code).emit('round_end', { round: publicRoundResult(ar.round), item: ar.item });
   emitRoomState(room, io);
 
@@ -626,6 +648,7 @@ function tryOpenChests(room: Room, player: Player) {
 // player's chosen item. Usable any time it's owned, not just mid-round.
 export function useMirror(
   room: Room,
+  io: IO,
   playerId: string,
   itemId: string,
   copyItemId: string
@@ -639,16 +662,17 @@ export function useMirror(
   if (!mirrorItem || template?.effectType !== 'copyItem') return { ok: false, error: 'That item has no copy effect.' };
 
   const targetItem = room.wonItems.get(copyItemId);
-  const ownedByOther = targetItem
-    ? [...room.players.values()].some((p) => p.id !== playerId && p.stash.includes(copyItemId))
-    : false;
-  if (!targetItem || !ownedByOther) return { ok: false, error: 'That item is no longer available to copy.' };
+  const targetOwner = targetItem
+    ? [...room.players.values()].find((p) => p.id !== playerId && p.stash.includes(copyItemId))
+    : undefined;
+  if (!targetItem || !targetOwner) return { ok: false, error: 'That item is no longer available to copy.' };
 
   player.stash = player.stash.filter((id) => id !== itemId);
   const copy = cloneItemInstance(targetItem);
   room.wonItems.set(copy.id, copy);
   player.stash.push(copy.id);
   tryOpenChests(room, player);
+  logGameEvent(room, io, `${player.name} has used ${template.name} on ${targetOwner.name}.`);
 
   return { ok: true };
 }
@@ -682,6 +706,8 @@ export function useWeapon(
     return { ok: false, error: 'Can only be used while bidding is underway.' };
   }
 
+  const affectedPlayerNames: string[] = [];
+
   switch (template.effectType) {
     case 'destroyLot': {
       resolveRound(room, io, null);
@@ -696,6 +722,7 @@ export function useWeapon(
           if (!p || p.status !== 'active' || p.timeRemainingMs <= 0) continue;
           bidder.isHolding = true;
           ar!.hasAnyoneHeld = true;
+          affectedPlayerNames.push(p.name);
         }
       } else {
         if (!targetPlayerId || targetPlayerId === playerId) return { ok: false, error: 'Choose another player to target.' };
@@ -706,6 +733,7 @@ export function useWeapon(
 
         bidder.isHolding = true;
         ar!.hasAnyoneHeld = true;
+        affectedPlayerNames.push(targetPlayer.name);
 
         if (exclusive) {
           const allowed = new Set([playerId, targetPlayerId]);
@@ -736,6 +764,10 @@ export function useWeapon(
         if (!bidder || !bidder.isHolding) return { ok: false, error: 'That player is not currently bidding.' };
         targets.push(targetPlayerId);
       }
+      for (const pid of targets) {
+        const targetPlayer = room.players.get(pid);
+        if (targetPlayer) affectedPlayerNames.push(targetPlayer.name);
+      }
       for (const pid of targets) forceWithdraw(room, io, ar!, pid);
       checkResolution(room, io, null);
       break;
@@ -746,6 +778,7 @@ export function useWeapon(
       if (targetPlayerId === playerId) return { ok: false, error: "Choose another player's item." };
       const targetPlayer = room.players.get(targetPlayerId);
       if (!targetPlayer || !targetPlayer.stash.includes(targetItemId)) return { ok: false, error: 'Item not found.' };
+      affectedPlayerNames.push(targetPlayer.name);
       targetPlayer.stash = targetPlayer.stash.filter((id) => id !== targetItemId);
       break;
     }
@@ -755,6 +788,7 @@ export function useWeapon(
       const targetPlayer = room.players.get(targetPlayerId);
       if (!targetPlayer || targetPlayer.isObserver) return { ok: false, error: 'That player cannot be targeted.' };
       if (targetPlayer.timeRemainingMs <= 0) return { ok: false, error: 'That player has no time remaining.' };
+      affectedPlayerNames.push(targetPlayer.name);
       const stolenTimeMs = Math.min(5_000, targetPlayer.timeRemainingMs);
       targetPlayer.timeRemainingMs -= stolenTimeMs;
       actor.timeRemainingMs += stolenTimeMs;
@@ -786,6 +820,11 @@ export function useWeapon(
   }
 
   item.usedActiveEffect = true;
+  logGameEvent(
+    room,
+    io,
+    `${actor.name} has used ${template.name}${affectedPlayerNames.length > 0 ? ` on ${affectedPlayerNames.join(', ')}` : ''}.`
+  );
   emitRoomState(room, io);
   return { ok: true };
 }

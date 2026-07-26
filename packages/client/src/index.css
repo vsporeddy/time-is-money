@@ -22,7 +22,9 @@
   --red-bright: #c94f4f;
   --shadow: rgba(0, 0, 0, 0.65);
   --font-pixel: 'Press Start 2P', 'Courier New', monospace;
-  --dock-height: 14.5rem;
+  /* Sized so a full player card (120px portrait + badges + name + two time
+     lines) fits without clipping. */
+  --dock-height: 18rem;
   --chat-height: 16rem;
 }
 
@@ -43,11 +45,11 @@ body {
   user-select: none;
 }
 
-/* keep selectable: form fields + chat log so text can be copied */
+/* Keep editable fields selectable while preventing accidental drag-selection
+   across the rest of the game UI. */
 input,
 textarea,
-[contenteditable],
-.chat-messages {
+[contenteditable] {
   -webkit-user-select: text;
   user-select: text;
 }
@@ -1929,6 +1931,10 @@ input[type='text']:focus {
        tall, so this tier is the common desktop case, not the exception. --- */
 
 @media (min-width: 561px) and (max-height: 900px) {
+  :root {
+    --dock-height: 17.5rem;
+  }
+
   .app-shell {
     gap: 0.75rem;
     padding-top: 0.5rem;
@@ -1971,15 +1977,14 @@ input[type='text']:focus {
   }
 }
 
-/* Shorter still: shrink the player dock too. */
+/* Shorter still: tighten the dock's card chrome (the portraits stay
+   full-size — they're the point of the dock). */
 @media (min-width: 561px) and (max-height: 780px) {
   :root {
-    --dock-height: 12.5rem;
+    --dock-height: 16.5rem;
   }
 
   .player-row .portrait-icon {
-    width: 3rem !important;
-    height: 3rem !important;
     margin-bottom: 0.25rem;
   }
 
@@ -2028,6 +2033,18 @@ input[type='text']:focus {
   /* Out from under the docked logo. */
   .dev-reset-button {
     top: 4.75rem;
+  }
+
+  /* The full-size dock leaves no room for the timer below the item card on
+     shorter screens — float it in the empty right rail instead, below the
+     sound controls, where it's always visible without scrolling. Kept under
+     the inventory overlays (z-index 15) so an opened panel wins. */
+  .initial-bid-timer {
+    position: fixed;
+    top: 4.5rem;
+    right: 1.25rem;
+    z-index: 10;
+    width: 20rem;
   }
 }
 

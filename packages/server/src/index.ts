@@ -193,7 +193,7 @@ io.on('connection', (socket: AppSocket) => {
       ack({ ok: false, error: 'Not in a lobby.' });
       return;
     }
-    const result = useMirror(room, socket.id, itemId, copyItemId);
+    const result = useMirror(room, io, socket.id, itemId, copyItemId);
     ack(result);
     if (result.ok) emitRoomState(room, io);
   });

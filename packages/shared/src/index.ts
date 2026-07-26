@@ -158,6 +158,7 @@ export interface ChatMessage {
   name: string;
   text: string;
   ts: number;
+  system?: boolean;
 }
 
 // --- Socket event contract ---

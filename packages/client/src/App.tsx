@@ -143,6 +143,16 @@ export default function App() {
         setItemPrices({});
         setLastResult(null);
         setCurrentRound(null);
+        setLiveTimes({});
+        setLiveBids({});
+        setHoldingPlayerIds([]);
+        setDroppedThisRound({});
+        setSelectedOpponentId(null);
+        setItemPickerItemId(null);
+        setItemPickerError(null);
+        setPlayerPickerItemId(null);
+        setPlayerPickerError(null);
+        setActionError(null);
         setLotPoolOpen(false);
       }
       setOpenOpponentIds((open) => {
@@ -515,7 +525,7 @@ export default function App() {
                 else setOpenOpponentIds((open) => (open.includes(p.id) ? open.filter((id) => id !== p.id) : [...open, p.id]));
               }}
             >
-              <PortraitIcon index={p.portraitIndex} size={64} />
+              <PortraitIcon index={p.portraitIndex} />
             </button>
             {classDef && (
               <div className="player-class-badge" style={{ color: classDef.color, borderColor: classDef.color }} tabIndex={0}>
