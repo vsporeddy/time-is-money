@@ -341,6 +341,7 @@ input[type='text']:focus {
   font-family: var(--font-pixel);
   font-size: 0.75rem;
   letter-spacing: 0.04em;
+  text-align: center;
   color: var(--bg);
   background: var(--gold);
   border: 3px solid var(--border-gold);
@@ -369,6 +370,13 @@ input[type='text']:focus {
 
 .btn-block {
   width: 100%;
+}
+
+.btn-hint {
+  display: block;
+  font-size: 0.7em;
+  opacity: 0.75;
+  margin-top: 0.35em;
 }
 
 .error-text {
@@ -455,6 +463,17 @@ input[type='text']:focus {
   color: var(--bg);
 }
 
+.player-time-left {
+  font-size: 1rem;
+  color: var(--gold-bright);
+  text-shadow: 1px 1px 0 var(--shadow);
+  margin-top: 0.15rem;
+}
+
+.player-card.holding .player-time-left {
+  color: var(--bg);
+}
+
 /* --- Item / auction card --- */
 
 .round-progress {
@@ -501,10 +520,27 @@ input[type='text']:focus {
 }
 
 .portrait-button {
+  position: relative;
   border: 0;
   padding: 0;
   background: transparent;
   cursor: pointer;
+}
+
+/* Zero-size marker the coin burst uses to track the portrait's on-screen
+   position; the canvas itself is fixed so the dock's overflow can't clip
+   the arcs, and sits at negative z so coins emerge from behind the card. */
+.coin-burst-anchor {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.coin-burst-canvas {
+  position: fixed;
+  z-index: -1;
+  pointer-events: none;
+  image-rendering: pixelated;
 }
 
 .portrait-button:focus-visible {
@@ -1595,15 +1631,19 @@ input[type='text']:focus {
   position: fixed;
   top: 1rem;
   right: 1rem;
+  left: 1rem;
   z-index: 40;
   display: flex;
   align-items: flex-start;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 0.45rem;
 }
 
 .music-toggle,
 .sfx-toggle,
 .credits-toggle,
+.main-menu-toggle,
 .how-to-play-trigger {
   font-family: var(--font-pixel);
   font-size: 0.55rem;
@@ -1623,6 +1663,7 @@ input[type='text']:focus {
 .music-toggle:active,
 .sfx-toggle:active,
 .credits-toggle:active,
+.main-menu-toggle:active,
 .how-to-play-trigger:active {
   transform: translate(1px, 1px);
 }

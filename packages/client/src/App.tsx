@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import type { ChatMessage, ItemInstance, JoinFailureReason, MaskedRoundItem, Player, Round, RoomState, ScoreBreakdown } from 'shared';
 import {
+  MAX_BOTS,
   MAX_PLAYERS_PER_ROOM,
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
@@ -17,6 +18,7 @@ import { Logo } from './Logo';
 import { Game } from './Game';
 import { Lobby } from './Lobby';
 import { PortraitIcon } from './PortraitIcon';
+import { CoinBurst } from './CoinBurst';
 import { Chat } from './Chat';
 import { BackgroundMusic } from './BackgroundMusic';
 import { Inventory, breakdownTraitText } from './Inventory';
@@ -349,6 +351,29 @@ export default function App() {
     });
   };
 
+  const handleQuickAuction = () => {
+    playClick();
+    setError(null);
+    setJoinErrorReason(null);
+    setJoining(true);
+    socket.emit('join_room', { playerName: name, code: null }, (res) => {
+      if (res.ok) {
+        setMyId(res.playerId);
+        setRoom(res.state);
+        setLobbyCode(res.code);
+        writeLobbyCodeToUrl(res.code);
+        setJoined(true);
+        for (let i = 0; i < MAX_BOTS; i++) socket.emit('add_bot');
+        socket.emit('start_game');
+        return;
+      }
+
+      setJoining(false);
+      setJoinErrorReason(res.reason);
+      setError(res.error);
+    });
+  };
+
   const handleMatchmake = () => {
     playClick();
     setError(null);
@@ -374,6 +399,7 @@ export default function App() {
     playClick();
     socket.emit('leave_room', () => {
       setJoined(false);
+      setJoining(false);
       setMyId(null);
       setRoom(null);
       setLobbyCode(null);
@@ -565,8 +591,7 @@ export default function App() {
         const isMe = p.id === myId;
         // Public "entered this lot" indicator — stays true after a withdrawal.
         const holding = holdingPlayerIds.includes(p.id);
-        // Distinct from `holding` above: only true while actively spending, so
-        // the live amount swaps for the final spend line the instant you withdraw.
+        // Distinct from `holding` above: only true while actively spending.
         const isCurrentlyHolding = liveBids[p.id] !== undefined;
         const dropped = (isMe || hasSpyglass) && droppedThisRound[p.id] !== undefined;
         const time = liveTimes[p.id] ?? p.timeRemainingMs;
@@ -591,6 +616,15 @@ export default function App() {
               }}
             >
               <PortraitIcon index={p.portraitIndex} size={96} />
+              {isMe && (
+                <CoinBurst
+                  active={
+                    isCurrentlyHolding &&
+                    currentRound?.round.status === 'active' &&
+                    !currentRound.round.bidWindowOpen
+                  }
+                />
+              )}
             </button>
             {classDef && (
               <div className="player-class-badge" style={{ color: classDef.color, borderColor: classDef.color }} tabIndex={0}>
@@ -611,8 +645,7 @@ export default function App() {
               <div>Observing</div>
             ) : isMe || hasSpyglass ? (
               <>
-                <div>{fmt(time)} left</div>
-                {isCurrentlyHolding && <div>bidding {fmt(liveBids[p.id])}</div>}
+                <div className="player-time-left">{fmt(time)} left</div>
                 {dropped && <div>withdrew! Spent {fmt(droppedThisRound[p.id])}</div>}
               </>
             ) : holding ? (
@@ -646,7 +679,7 @@ export default function App() {
         <Logo scale={5} />
         <div className="panel">
           <p className="status-line">{connected ? 'Connected to server' : 'Connecting…'}</p>
-          <p className="status-line">Net worth: ${totalEarnings}</p>
+          {/* <p className="status-line">Net worth: ${totalEarnings}</p> */}
           <form onSubmit={handleJoin}>
             <div className="field">
               <label htmlFor="name">Your name</label>
@@ -661,7 +694,7 @@ export default function App() {
               />
             </div>
             <div className="field">
-              <label htmlFor="lobby-code">Auction code (optional)</label>
+              <label htmlFor="lobby-code">Room code (optional)</label>
               <input
                 id="lobby-code"
                 type="text"
@@ -692,7 +725,16 @@ export default function App() {
             disabled={!connected || joining || !name.trim()}
             onClick={handleMatchmake}
           >
-            PUBLIC AUCTION
+            PUBLIC AUCTION<span className="btn-hint">(matchmaking)</span>
+          </button>
+          <button
+            type="button"
+            className="btn btn-block"
+            style={{ marginTop: '0.75rem' }}
+            disabled={!connected || joining || !name.trim()}
+            onClick={handleQuickAuction}
+          >
+            QUICK AUCTION<span className="btn-hint">(singleplayer)</span>
           </button>
           {codeLooksWrong && (
             <p className="error-text">Auction codes are {ROOM_CODE_LENGTH} characters, letters and numbers.</p>
@@ -899,6 +941,7 @@ export default function App() {
         ducked={currentRound !== null}
         muffled={!joined || room?.status === 'lobby'}
         onOpenCredits={() => setCreditsOpen(true)}
+        onMainMenu={joined ? handleLeaveLobby : undefined}
       />
       {creditsOpen && <Credits onClose={() => setCreditsOpen(false)} />}
       {isHost && (
