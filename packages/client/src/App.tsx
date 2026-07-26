@@ -65,7 +65,9 @@ export default function App() {
   const [scores, setScores] = useState<ScoreBreakdown[] | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [selectedOpponentId, setSelectedOpponentId] = useState<string | null>(null);
-  const [myInventoryOpen, setMyInventoryOpen] = useState(true);
+  // Like the chat, the inventory overlay eats too much of a phone screen (it
+  // covers the auction card) — start closed there, open by default on desktop.
+  const [myInventoryOpen, setMyInventoryOpen] = useState(() => !window.matchMedia('(max-width: 560px)').matches);
   const [roundLimit, setRoundLimit] = useState(15);
   // Mirror of Desire (copy) and Crossbow (destroy) both target an item in
   // someone else's inventory — one picker overlay serves both.
@@ -449,7 +451,7 @@ export default function App() {
                 else setSelectedOpponentId((selected) => (selected === p.id ? null : p.id));
               }}
             >
-              <PortraitIcon index={p.portraitIndex} />
+              <PortraitIcon index={p.portraitIndex} size={64} />
             </button>
             {classDef && (
               <div className="player-class-badge" style={{ color: classDef.color, borderColor: classDef.color }} tabIndex={0}>
