@@ -18,3 +18,6 @@ The client points at the server via `packages/client/.env` (`VITE_SERVER_URL`).
 - **Client** ships to two static hosts, both talking to the same Fly server over `wss://`:
   - **itch.io** — `npm run build:client` (root-relative paths); zip `packages/client/dist` and upload it directly.
   - **GitHub Pages** — auto-deployed by `.github/workflows/deploy-pages.yml` on every push to `main` (uses `npm run build:pages`, which builds with base path `/time-is-money/` via `packages/client/.env.pages`). Requires repo Settings → Pages → Source = "GitHub Actions" (one-time toggle).
+
+## Itch.io link
+https://itch.io/jam/gmtk-jam-2026/rate/4823434
