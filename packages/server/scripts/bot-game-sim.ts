@@ -5,6 +5,7 @@
 //
 //   npx tsx scripts/bot-game-sim.ts [games]
 //
+import { computeScores } from 'shared';
 import { addBot } from '../src/bots.js';
 import { createRoomObject } from '../src/rooms.js';
 import type { IO, Room } from '../src/rooms.js';
@@ -61,12 +62,25 @@ function playGame(gameIndex: number): Promise<RoundRecord[]> {
             `  ${record.roundId.padEnd(9)} ${record.stalemate ? 'STALEMATE' : (record.winner ?? 'passed').padEnd(12)}  ${holds}`
           );
         }
-        for (const player of room.players.values()) {
+        const seats = [...room.players.values()];
+        const scores = computeScores(seats, room.wonItems, room.itemPricePaidMs);
+        for (const [index, player] of seats.entries()) {
           console.log(
             `  = ${player.name.padEnd(12)} ${String(player.timeRemainingMs).padStart(6)}ms left` +
-            `  ${player.stash.length} items  ${player.status}`
+            `  ${player.stash.length} items  score ${String(scores[index].total).padStart(4)}  ${player.status}`
           );
         }
+        // Machine-readable line for the abstract simulator's calibration check.
+        console.log(`CALIBRATION ${JSON.stringify({
+          rounds: records.length,
+          contested: records.filter((r) => r.holds.length > 1).length,
+          passed: records.filter((r) => r.winner === null && !r.stalemate).length,
+          stalemates: records.filter((r) => r.stalemate).length,
+          holds: records.flatMap((r) => r.holds.map((h) => h.ms)),
+          scores: scores.map((s) => s.total),
+          items: seats.map((p) => p.stash.length),
+          timeLeft: seats.map((p) => p.timeRemainingMs),
+        })}`);
         resolve(records);
       }
     }, 100);
