@@ -13,11 +13,6 @@
     "build:client": "npm run build --workspace=client",
     "build:pages": "npm run build:pages --workspace=client",
     "build:itch": "npm run build:itch --workspace=client",
-    "typecheck": "tsc --noEmit -p packages/server/tsconfig.json && tsc --noEmit -p packages/client/tsconfig.json",
-    "ml:gate": "npm run ml:gate --workspace=server",
-    "ml:test": "npm run ml:test --workspace=server",
-    "ml:train:cem": "npm run ml:train:cem --workspace=server",
-    "ml:train:nn": "npm run ml:train:nn --workspace=server",
-    "ml:ablation": "npm run ml:ablation --workspace=server"
+    "typecheck": "tsc --noEmit -p packages/server/tsconfig.json && tsc --noEmit -p packages/client/tsconfig.json"
   }
 }

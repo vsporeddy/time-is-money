@@ -21,16 +21,20 @@ function buildRoom(): Room {
   const room = createRoomObject('SIM');
   room.roundsToPlay = ROUNDS_TO_PLAY;
   room.selectedMainTraits = ['armor', 'trinket', 'text'];
-  // addBot is lobby-gated and capped at MAX_BOTS = 3. Personalities are drawn
-  // without replacement per room, so seating five bots covers all five exactly
-  // once — a real game only ever sees three, but the sim wants full coverage.
+  // addBot is lobby-gated and capped at MAX_BOTS, so seat the real three first
+  // and then clone them under ids that hash to the two personalities a
+  // three-bot lobby can never produce. A real game only ever sees three at
+  // once; the sim wants all five covered.
   for (let i = 0; i < 3; i += 1) addBot(room);
   const seated = [...room.players.values()];
-  for (let n = 4; n <= 5; n += 1) {
+  const covered = new Set(seated.map((bot) => personalityFor(bot).name));
+  for (let n = 4; n < 60 && covered.size < 5; n += 1) {
     const id = `bot-${n}`;
-    room.players.set(id, { ...seated[0], id, name: `sim-${n}`, stash: [] });
+    const name = personalityFor({ ...seated[0], id } as Player).name;
+    if (covered.has(name)) continue;
+    covered.add(name);
+    room.players.set(id, { ...seated[0], id, name: `sim-${name}`, stash: [] });
   }
-  for (const bot of room.players.values()) personalityFor(room, bot);
   room.status = 'in_round';
   return room;
 }
@@ -111,7 +115,7 @@ function reservationSweep(holdingCount: number, timeRemainingMs: number, roundIn
       const firstPass = reservationMs(room, bot, neutral);
       const noised = reservationMs(room, bot, firstPass, sampleNerveMultiplier());
 
-      const name = personalityFor(room, bot).name;
+      const name = personalityFor(bot).name;
       if (!byPersonality.has(name)) byPersonality.set(name, []);
       byPersonality.get(name)!.push(noised);
 

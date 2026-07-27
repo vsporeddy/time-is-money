@@ -5,25 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "start": "tsx src/index.ts",
-    "sim:bots": "tsx scripts/bot-game-sim.ts",
-    "sim:reserve": "tsx scripts/bot-sim.ts",
-    "ml:gate": "tsx scripts/ml/eval.ts",
-    "ml:test": "tsx scripts/ml/test-masking.ts",
-    "ml:calibrate": "tsx scripts/ml/calibrate.ts",
-    "ml:train:cem": "tsx scripts/ml/train-cem.ts",
-    "ml:train:nn": "tsx scripts/ml/train-reinforce.ts",
-    "ml:ablation": "tsx scripts/ml/ablation.ts"
+    "start": "tsx src/index.ts"
   },
   "dependencies": {
     "express": "^4.19.2",
-    "shared": "*",
-    "socket.io": "^4.7.5"
+    "socket.io": "^4.7.5",
+    "shared": "*"
   },
   "devDependencies": {
-    "@tensorflow/tfjs-backend-cpu": "^4.22.0",
-    "@tensorflow/tfjs-core": "^4.22.0",
-    "@tensorflow/tfjs-layers": "^4.22.0",
     "@types/express": "^4.17.21",
     "@types/node": "^20.14.2",
     "tsx": "^4.15.7",
