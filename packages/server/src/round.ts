@@ -626,7 +626,7 @@ function emitBidderDropped(room: Room, io: IO, payload: { roundId: string; playe
 // Combining a chest with its matching key consumes both and grants a handful
 // of random items from the chest's reward trait. Checked right after a win
 // changes the winner's stash, since that's the only way stash contents change.
-export function tryOpenChests(room: Room, player: Player) {
+function tryOpenChests(room: Room, player: Player) {
   for (const chestTemplate of ITEM_TEMPLATES) {
     if (!chestTemplate.chest) continue;
 
@@ -924,7 +924,7 @@ function publicRoundResult(round: Round): Round {
   return { ...round, bidders };
 }
 
-export function computeTimeRefund(config: TimeRefundConfig, currentTimeRemainingMs: number, startingTimeMs: number): number {
+function computeTimeRefund(config: TimeRefundConfig, currentTimeRemainingMs: number, startingTimeMs: number): number {
   if (config.mode === 'flat') return config.amountMs;
   // catchup: full amount at ~0 remaining time, scaling down to 0 once back at/above starting time
   const ratio = Math.max(0, 1 - currentTimeRemainingMs / startingTimeMs);

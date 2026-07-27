@@ -1,9 +1,6 @@
 import type { ItemInstance, Player } from 'shared';
 import { computeScores, getClassDefinition, getTemplate, MAX_BOTS, pickAvailableClassId } from 'shared';
 import type { ActiveRound, IO, Room } from './rooms.js';
-import { buildObservation, OBS_DIM } from './botPolicy/features.js';
-import { getPolicy } from './botPolicy/index.js';
-import { residualMultiplier } from './botPolicy/policy.js';
 
 type HoldFn = (room: Room, playerId: string, io: IO) => void;
 type WeaponFn = (
@@ -100,7 +97,6 @@ interface BotRoundNerve {
 interface BotMemory {
   lotScores: Map<string, { sum: number; count: number }>; // botId -> running marginal-score stats
   nerve: Map<string, BotRoundNerve>; // botId -> current-round nerve state
-  personalities: Map<string, BotPersonality>; // botId -> the personality drawn for this room
 }
 
 const BOT_MEMORY = new WeakMap<Room, BotMemory>();
@@ -108,7 +104,7 @@ const BOT_MEMORY = new WeakMap<Room, BotMemory>();
 function memoryFor(room: Room): BotMemory {
   let memory = BOT_MEMORY.get(room);
   if (!memory) {
-    memory = { lotScores: new Map(), nerve: new Map(), personalities: new Map() };
+    memory = { lotScores: new Map(), nerve: new Map() };
     BOT_MEMORY.set(room, memory);
   }
   return memory;
@@ -144,23 +140,10 @@ function gaussian(): number {
 
 const MAIN_TRAIT_IDS = new Set(['armor', 'trinket', 'text', 'musical', 'aquatic']);
 
-// Drawn without replacement per room, so a three-bot lobby always fields three
-// distinct personalities. This used to hash player.id — but bot ids are always
-// bot-1..bot-3 (MAX_BOTS), and those three ids hash to opportunist, aggressive
-// and collector every single game. Conservative and disruptor never shipped.
-// Assignment is lazy rather than done in addBot so offline harnesses that seat
-// players into room.players directly get one too.
-function personalityFor(room: Room, player: Player): BotPersonality {
-  const assigned = memoryFor(room).personalities;
-  const existing = assigned.get(player.id);
-  if (existing) return existing;
-
-  const taken = new Set([...assigned.values()].map((personality) => personality.name));
-  const unused = BOT_PERSONALITIES.filter((personality) => !taken.has(personality.name));
-  const pool = unused.length > 0 ? unused : BOT_PERSONALITIES;
-  const choice = pool[Math.floor(Math.random() * pool.length)];
-  assigned.set(player.id, choice);
-  return choice;
+function personalityFor(player: Player): BotPersonality {
+  let hash = 0;
+  for (const char of player.id) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return BOT_PERSONALITIES[hash % BOT_PERSONALITIES.length];
 }
 
 function focusTraitForBot(room: Room, bot: Player): string | undefined {
@@ -228,7 +211,7 @@ function marginalItemScore(room: Room, player: Player, assumedPriceMs = 0): numb
   let marginal =
     scoreForPlayer(room, player, candidate, assumedPriceMs) - scoreForPlayer(room, player);
   const template = getTemplate(candidate.templateId);
-  const personality = personalityFor(room, player);
+  const personality = personalityFor(player);
   const existingTemplates = player.stash
     .map((itemId) => room.wonItems.get(itemId))
     .map((item) => item ? getTemplate(item.templateId) : undefined)
@@ -273,7 +256,7 @@ function competitionFactor(room: Room, player: Player): number {
     ? Object.values(room.activeRound.round.bidders).filter((bidder) => bidder.isHolding).length
     : 1;
   const rivals = Math.max(0, activeCompetitors - 1);
-  return Math.min(1.25, Math.max(0.6, 1 + personalityFor(room, player).competitionBias * rivals));
+  return Math.min(1.25, Math.max(0.6, 1 + personalityFor(player).competitionBias * rivals));
 }
 
 // How long this bot is willing to hold, derived rather than tuned: the budget
@@ -286,26 +269,13 @@ function competitionFactor(room: Room, player: Player): number {
 // applied inside this function rather than to its result so the safety caps
 // stay inviolable — an emboldened bot may overrun its soft per-lot budget, but
 // never the absolute cap and never its own clock.
-interface HeuristicWilling {
-  willing: number; // pre-cap hold time this bot wants, in ms
-  marginal: number; // marginalItemScore at assumedPriceMs
-  expected: number; // expectedLotValue
-  perLot: number; // sustainablePerLot
-}
-
-function heuristicWillingMs(
-  room: Room,
-  player: Player,
-  assumedPriceMs = 0,
-  nerveMultiplier = 1
-): HeuristicWilling {
-  const personality = personalityFor(room, player);
+function reservationMs(room: Room, player: Player, assumedPriceMs = 0, nerveMultiplier = 1): number {
+  const personality = personalityFor(player);
   const value = marginalItemScore(room, player, assumedPriceMs);
-  const perLot = sustainablePerLot(room, player);
-  const expected = expectedLotValue(room, player);
-  if (value <= 0) return { willing: 0, marginal: value, expected, perLot };
+  if (value <= 0) return 0;
 
-  const msPerPoint = perLot / Math.max(1, expected);
+  const perLot = sustainablePerLot(room, player);
+  const msPerPoint = perLot / Math.max(1, expectedLotValue(room, player));
 
   const remainingLots = Math.max(1, room.roundsToPlay - room.currentRoundIndex);
   const progress = 1 - remainingLots / Math.max(1, room.roundsToPlay);
@@ -316,65 +286,17 @@ function heuristicWillingMs(
 
   // Soft ceiling so a single whale lot can't eat a whole clock. Nerve is
   // allowed to push past it — that's the whole point of a bot that gets
-  // carried away — but not past the two hard caps in applyReserveCaps.
+  // carried away — but not past the two hard caps below.
   const budgetCap = Math.max(1_000, perLot * personality.reserveFactor * lateGameFactor);
+  const willing = Math.min(desired, budgetCap) * nerveMultiplier;
 
-  return {
-    willing: Math.min(desired, budgetCap) * nerveMultiplier,
-    marginal: value,
-    expected,
-    perLot,
-  };
-}
-
-// The two inviolable caps: the absolute ceiling, and enough left on the clock
-// that a bot can never bid itself out of the game. timeRemainingMs isn't
-// debited until release, so it's directly comparable to the elapsed hold this
-// bounds. Every path that produces a reservation ends here — a learned policy
-// multiplies the pre-cap figure, and this still clamps the result.
-function applyReserveCaps(player: Player, willing: number): number {
+  // Hard: the absolute cap, and enough left on the clock that a bot can never
+  // bid itself out of the game. timeRemainingMs isn't debited until release,
+  // so it's directly comparable to the elapsed hold this bounds.
   return Math.max(
     0,
     Math.min(willing, ABSOLUTE_RESERVE_CAP_MS, player.timeRemainingMs - SELF_ELIMINATION_GUARD_MS)
   );
-}
-
-// Scratch buffer for the learned policy's observation. reservationMs runs a
-// couple of times at entry and then every 250-500ms per holding bot, so the hot
-// path must not allocate.
-const OBS_SCRATCH = new Float32Array(OBS_DIM);
-
-function reservationMs(room: Room, player: Player, assumedPriceMs = 0, nerveMultiplier = 1): number {
-  const heuristic = heuristicWillingMs(room, player, assumedPriceMs, nerveMultiplier);
-  if (heuristic.willing <= 0) return 0;
-
-  // The learned policy is a bounded residual on the figure above, never a
-  // replacement for it: exp(tanh(x)) is confined to [0.368, 2.718], and
-  // applyReserveCaps still clamps whatever comes out. Nerve, flinch and second
-  // winds are untouched — they live in scheduleBotReleases and act on the
-  // result, so the human-feeling jitter around the target survives intact.
-  const policy = getPolicy();
-  const visibleItem = policy ? botVisibleItem(room, player) : undefined;
-  if (!policy || !visibleItem) return applyReserveCaps(player, heuristic.willing);
-
-  const observation = buildObservation(
-    {
-      room,
-      player,
-      visibleItem,
-      revealed: new Set(room.activeRound?.round.revealedFields ?? []),
-      assumedPriceMs,
-      heuristicWillingMs: heuristic.willing,
-      marginalScore: heuristic.marginal,
-      expectedLot: heuristic.expected,
-      perLotMs: heuristic.perLot,
-      lotObservationCount: room.currentRoundIndex + 1,
-    },
-    OBS_SCRATCH
-  );
-
-  const { logMult } = policy.forward(observation);
-  return applyReserveCaps(player, heuristic.willing * residualMultiplier(logMult));
 }
 
 const MIN_ENTRY_DELAY_MS = 200;
@@ -398,14 +320,10 @@ const POLL_PRECISION_MS = 300; // switch from polling to an exact wake inside th
 // offline. Nothing in the running server reads it.
 export const __botInternals = {
   reservationMs,
-  heuristicWillingMs,
-  applyReserveCaps,
   marginalItemScore,
   expectedLotValue,
   recordLotObservation,
   personalityFor,
-  botVisibleItem,
-  focusTraitForBot,
   sustainablePerLot,
   sampleNerveMultiplier: () => Math.exp(gaussian() * NERVE_SIGMA),
   constants: {
@@ -426,7 +344,7 @@ export function scheduleBotEntries(room: Room, io: IO, handleHoldStart: HoldFn) 
 
   for (const player of room.players.values()) {
     if (!player.isBot || !ar.round.bidders[player.id]) continue;
-    const personality = personalityFor(room, player);
+    const personality = personalityFor(player);
 
     // Price and reservation depend on each other for Investment and Bargain
     // lots, so settle it in two passes: a neutral guess of one lot's fair
@@ -563,7 +481,7 @@ export function scheduleBotWeaponUses(
 
   for (const bot of room.players.values()) {
     if (!bot.isBot || bot.status !== 'active') continue;
-    const personality = personalityFor(room, bot);
+    const personality = personalityFor(bot);
     if (Math.random() > personality.weaponChance) continue;
 
     const weapons = bot.stash
